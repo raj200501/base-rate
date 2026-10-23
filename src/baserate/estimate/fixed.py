@@ -37,6 +37,7 @@ from baserate.estimate.bootstrap import (
     cluster_index,
     cluster_weights,
     percentile_interval,
+    tail_draw,
 )
 
 FIXED_METHODS: tuple[str, ...] = ("cp", "wilson", "jeffreys", "cluster_cp", "cluster_bootstrap")
@@ -100,11 +101,17 @@ def rate_interval(
         lo, hi = float(lo_a), float(hi_a)
     else:
         gen = rng if rng is not None else np.random.default_rng(0)
-        samples: list[NDArray[np.float64]] = []
-        for size in chunks(reps, f.size):
-            w = cluster_weights(idx, size, gen, "multinomial")
-            samples.append((w @ f.astype(np.float64)) / w.sum(axis=1))
-        lo, hi = percentile_interval(np.concatenate(samples), alpha)
+        # only flagged traces need individual weights (exact; see tail_draw)
+        drawn = tail_draw(idx, np.ones(f.size), f, reps, gen, "multinomial")
+        if drawn is not None:
+            values = drawn[0].sum(axis=1) / drawn[1]
+        else:  # unequal cluster sizes: draw full weights
+            samples: list[NDArray[np.float64]] = []
+            for size in chunks(reps, f.size):
+                w = cluster_weights(idx, size, gen, "multinomial")
+                samples.append((w @ f.astype(np.float64)) / w.sum(axis=1))
+            values = np.concatenate(samples)
+        lo, hi = percentile_interval(values, alpha)
     return Interval(rate, min(lo, rate), max(hi, rate), method, alpha)
 
 

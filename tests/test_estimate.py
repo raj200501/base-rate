@@ -459,3 +459,10 @@ def test_tail_cutoff_none_when_mass_covers_everything() -> None:
     neg, pos = np.array([0.1, 0.2]), np.array([0.3])
     assert atbudget._tail_cutoff(neg, pos, np.ones(2), np.ones(1), 0.1, 1.0) is None
     assert atbudget._tail_cutoff(neg, pos, np.ones(2), np.ones(1), 0.1, 0.99) is None
+
+
+def test_cluster_bootstrap_rate_with_unequal_clusters() -> None:
+    flags = np.array([True, False, False, True, False, False, False])
+    clusters = ["a", "a", "b", "c", "c", "c", "d"]
+    iv = rate_interval(flags, clusters, method="cluster_bootstrap", reps=300)
+    assert iv.lower <= iv.estimate <= iv.upper

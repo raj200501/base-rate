@@ -46,6 +46,7 @@ def check(
     n_pos: int,
     clustered: bool,
     emit: bool = True,
+    metric: str = "budget_recall",
 ) -> tuple[str, ...]:
     """Return (and by default warn about) unsupported E0 cells matching a call.
 
@@ -57,11 +58,17 @@ def check(
         n_pos: Violation sample size.
         clustered: Whether traces share source runs.
         emit: Emit :class:`UnsupportedCellWarning` for each match.
+        metric: E0 metric family of the call (``budget_recall`` for
+            :func:`baserate.estimate.recall_at_budget`).
 
     Returns:
         Ids of the matching unsupported cells.
     """
-    cells = [c for c in _cells() if c.get("estimator") == method]
+    cells = [
+        c
+        for c in _cells()
+        if c.get("estimator") == method and c.get("metric", "budget_recall") == metric
+    ]
     if not cells:
         return ()
 

@@ -16,7 +16,7 @@ for :func:`baserate.estimate.operating.budget_recall_batch`.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -25,7 +25,7 @@ Kind = Literal["multinomial", "bayesian"]
 FloatArray = NDArray[np.float64]
 
 
-def cluster_index(clusters: Sequence[str] | NDArray[np.str_] | None, n: int) -> NDArray[np.intp]:
+def cluster_index(clusters: Sequence[str] | NDArray[Any] | None, n: int) -> NDArray[np.intp]:
     """Map cluster labels to 0..k-1; ``None`` makes every trace its own cluster.
 
     Args:

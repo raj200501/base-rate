@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -64,7 +65,7 @@ RESAMPLING_METHODS: frozenset[str] = frozenset(
     {"cluster_bootstrap", "bayesian_bootstrap", "composite"}
 )
 
-Labels = Sequence[str] | NDArray[np.str_] | None
+Labels = Sequence[str] | NDArray[Any] | None
 
 
 @dataclass(frozen=True)
