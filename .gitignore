@@ -34,3 +34,6 @@ models/
 
 # OS noise
 .DS_Store
+
+# Subagent worktrees
+.claude/worktrees/
