@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use base-rate, please cite it as below."
+title: "base-rate: prevalence-aware evaluation of AI agent monitors"
+type: software
+authors:
+  - alias: raj200501
+repository-code: "https://github.com/raj200501/base-rate"
+license: MIT
+version: 0.0.1
+keywords:
+  - AI safety
+  - agent monitoring
+  - rare-event estimation
+  - evaluation methodology

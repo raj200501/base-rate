@@ -1,0 +1,36 @@
+# Private material and run scratch space (never tracked)
+private/
+runs/
+
+# Secrets and local environment
+.env
+.env*
+*.pem
+*.key
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Model weights and large downloads
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.onnx
+models/
+.cache/
+
+# OS noise
+.DS_Store
