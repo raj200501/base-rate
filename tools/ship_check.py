@@ -122,7 +122,7 @@ HYPE_WORDS = (
     "unprecedented",
 )
 BRIEF_MARKER = "This README is a build brief"
-EM_DASH = "—"
+EM_DASH = chr(0x2014)
 
 
 @dataclass
