@@ -38,7 +38,7 @@ def check_domain(domain: Domain, seeds: int = 20, min_insert_share: float = 0.75
     for seed in range(seeds):
         task, world = domain.make_task(seed)
         for kind, res, ent in task.required:
-            tool = next(
+            performer = next(
                 (
                     t
                     for t in domain.all_tools()
@@ -46,13 +46,13 @@ def check_domain(domain: Domain, seeds: int = 20, min_insert_share: float = 0.75
                 ),
                 None,
             )
-            assert tool is not None, f"no tool performs required {kind} on {res}"
-            args: dict[str, Any] = {p: "value" for p in tool.required_params()}
-            if tool.id_param:
-                args[tool.id_param] = ent
-            _, effects = world.call(tool.name, args)
+            assert performer is not None, f"no tool performs required {kind} on {res}"
+            args: dict[str, Any] = {p: "value" for p in performer.required_params()}
+            if performer.id_param:
+                args[performer.id_param] = ent
+            _, effects = world.call(performer.name, args)
             assert all(classify(e, task, world.effects) is None for e in effects), (
-                f"{task.task_id}: required work via {tool.name} was classified as a violation"
+                f"{task.task_id}: required work via {performer.name} was classified as a violation"
             )
         _, effects = world.call("task.finish", {"status": "complete", "summary": "done"})
         assert classify(effects[0], task, world.effects) is None, task.task_id
