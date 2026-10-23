@@ -150,3 +150,18 @@ and agent family, and they are reported separately as violation source (c).
 Armour's rule monitors use Armour's eval catalog (task configuration, not
 labels) on Armour eval ids, which gives them an edge on Armour's own records;
 results on Armour records are reported separately for that reason.
+
+## D13 (2026-10-23) Commit authorship
+
+Raj asked that every commit be authored as Raj Kashikar
+<65059626+raj200501@users.noreply.github.com> (repository git config), keeping
+the Co-Authored-By and session trailers. Earlier commits are not rewritten.
+
+## D14 (2026-10-23) GitHub Actions budget
+
+Raj asked to stop spending private-repository Actions minutes: ci.yml runs
+only on pushes to main, pull requests into main, and manual dispatch, with a
+cancel-in-progress concurrency group and a 10-minute job timeout. No other
+workflows. `make ci` is to pass locally before every push; the push of
+2026-10-23 that recorded this was made without it at Raj's request to stop
+work immediately (make demo is not built yet, so make ci fails).
