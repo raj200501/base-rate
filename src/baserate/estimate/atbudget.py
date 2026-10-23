@@ -40,11 +40,13 @@ from baserate.estimate.bootstrap import (
     cluster_index,
     cluster_weights,
     percentile_interval,
+    tail_draw,
 )
 from baserate.estimate.operating import (
     OperatingPoint,
     budget_point,
     budget_recall_batch,
+    budget_recall_tail,
     fpr_from_recall,
     precision_from_recall,
 )
@@ -95,6 +97,31 @@ class BudgetEstimate:
     warnings: tuple[str, ...] = field(default=())
 
 
+TAIL_FACTOR = 5.0
+"""Initial tail width for resampling, as a multiple of the flag rate."""
+
+
+def _tail_cutoff(
+    neg: NDArray[np.float64],
+    pos: NDArray[np.float64],
+    neg_base: NDArray[np.float64],
+    pos_base: NDArray[np.float64],
+    prevalence: float,
+    mass: float,
+) -> float | None:
+    """Score above which the base-weighted mixture holds at least ``mass`` (None: everything)."""
+    if mass >= 1.0:
+        return None
+    scores = np.r_[neg, pos]
+    w = np.r_[(1 - prevalence) * neg_base / neg_base.sum(), prevalence * pos_base / pos_base.sum()]
+    order = np.argsort(-scores, kind="stable")
+    cum = np.cumsum(w[order])
+    i = int(np.searchsorted(cum, mass))
+    if i >= scores.size - 1:
+        return None
+    return float(scores[order[i]])
+
+
 def _resampled_recall(
     neg: NDArray[np.float64],
     pos: NDArray[np.float64],
@@ -108,7 +135,34 @@ def _resampled_recall(
     rng: np.random.Generator,
     kind: Kind,
 ) -> NDArray[np.float64]:
-    """Recall under ``reps`` cluster resamplings (positives fixed if pos_idx is None)."""
+    """Recall under ``reps`` cluster resamplings (positives fixed if pos_idx is None).
+
+    Uses the exact tail shortcut of :func:`tail_draw` when it applies,
+    widening the tail until every replicate's threshold falls inside it;
+    otherwise draws full weight arrays.
+    """
+    factor = TAIL_FACTOR
+    while True:
+        cutoff = _tail_cutoff(neg, pos, neg_base, pos_base, prevalence, factor * flag_rate)
+        if cutoff is None:
+            break
+        sel_n, sel_p = neg >= cutoff, pos >= cutoff
+        dn = tail_draw(neg_idx, neg_base, sel_n, reps, rng, kind)
+        if pos_idx is None:
+            dp: tuple[NDArray[np.float64], NDArray[np.float64]] | None = (
+                np.broadcast_to(pos_base[sel_p], (reps, int(sel_p.sum()))),
+                np.full(reps, pos_base.sum()),
+            )
+        else:
+            dp = tail_draw(pos_idx, pos_base, sel_p, reps, rng, kind)
+        if dn is None or dp is None:
+            break
+        recall, ok = budget_recall_tail(
+            neg[sel_n], pos[sel_p], prevalence, flag_rate, dn[0], dp[0], dn[1], dp[1]
+        )
+        if ok.all():
+            return recall
+        factor *= 4
     out: list[NDArray[np.float64]] = []
     for size in chunks(reps, neg.size + pos.size):
         wn = cluster_weights(neg_idx, size, rng, kind) * neg_base

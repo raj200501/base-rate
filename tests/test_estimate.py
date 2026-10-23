@@ -365,3 +365,97 @@ def test_fixed_threshold_metrics() -> None:
 def test_precision_is_zero_when_nothing_flagged() -> None:
     est = fixed_threshold(np.zeros(10), np.zeros(5), 0.5, prevalence=0.1, method="cp")
     assert est.precision.estimate == 0.0
+
+
+# ------------------------------------------------------------- tail shortcut
+
+
+def test_tail_computation_matches_full_weights() -> None:
+    rng = np.random.default_rng(11)
+    neg, pos = rng.normal(size=3000), rng.normal(2, 1, size=200)
+    wn = rng.poisson(1.0, size=(20, neg.size)).astype(float) + 0.01
+    wp = rng.poisson(1.0, size=(20, pos.size)).astype(float) + 0.01
+    full, _, _ = operating.budget_recall_batch(neg, pos, 1e-3, 2e-3, wn, wp)
+    cutoff = np.quantile(np.r_[neg, pos], 0.9)
+    sn, sp = neg >= cutoff, pos >= cutoff
+    tail, ok = operating.budget_recall_tail(
+        neg[sn], pos[sp], 1e-3, 2e-3, wn[:, sn], wp[:, sp], wn.sum(axis=1), wp.sum(axis=1)
+    )
+    assert ok.all()
+    assert np.allclose(tail, full)
+
+
+def test_tail_reports_rows_where_threshold_is_below_cutoff() -> None:
+    neg, pos = np.linspace(0, 1, 100), np.array([0.5])
+    _, ok = operating.budget_recall_tail(
+        neg[-2:], np.array([]), 0.01, 0.5, np.ones((1, 2)), np.ones((1, 0)), [100.0], [1.0]
+    )
+    assert not ok.any()
+    assert pos.size == 1
+
+
+def test_tail_draw_aggregates_exactly() -> None:
+    idx = np.repeat(np.arange(50), 4).astype(np.intp)
+    base = np.ones(idx.size)
+    sel = np.zeros(idx.size, dtype=bool)
+    sel[:8] = True  # clusters 0 and 1
+    rng = np.random.default_rng(12)
+    for kind in ("multinomial", "bayesian"):
+        out = bootstrap.tail_draw(idx, base, sel, 4000, rng, kind)  # type: ignore[arg-type]  # literal from loop
+        assert out is not None
+        w, totals = out
+        assert w.shape == (4000, 8)
+        assert np.all(w[:, 0] == w[:, 3])
+        if kind == "multinomial":
+            assert np.allclose(totals, 200.0)
+        else:
+            assert np.allclose(totals, 200.0)
+        assert w[:, 0].mean() == pytest.approx(1.0, abs=0.06)
+    uneven = np.r_[np.ones(4), np.ones(4) * 2, np.ones(192)]
+    assert (
+        bootstrap.tail_draw(idx, uneven, np.r_[np.ones(4, bool), np.zeros(196, bool)], 3, rng)
+        is None
+    )
+    with pytest.raises(ValueError):
+        bootstrap.tail_draw(idx, base, sel, 2, rng, "x")  # type: ignore[arg-type]  # invalid kind on purpose
+
+
+def test_shortcut_and_full_bootstrap_agree_in_distribution(monkeypatch: pytest.MonkeyPatch) -> None:
+    from baserate.estimate import atbudget
+
+    rng = np.random.default_rng(13)
+    neg, pos = rng.normal(size=4000), rng.normal(2, 1, size=150)
+    cl = np.repeat(np.arange(400), 10).astype(str)
+    fast = recall_at_budget(
+        neg,
+        pos,
+        1e-3,
+        5e-3,
+        "cluster_bootstrap",
+        neg_clusters=cl,
+        reps=2000,
+        rng=np.random.default_rng(1),
+        warn=False,
+    )
+    monkeypatch.setattr(atbudget, "tail_draw", lambda *a, **k: None)
+    slow = recall_at_budget(
+        neg,
+        pos,
+        1e-3,
+        5e-3,
+        "cluster_bootstrap",
+        neg_clusters=cl,
+        reps=2000,
+        rng=np.random.default_rng(2),
+        warn=False,
+    )
+    assert fast.recall.lower == pytest.approx(slow.recall.lower, abs=0.02)
+    assert fast.recall.upper == pytest.approx(slow.recall.upper, abs=0.02)
+
+
+def test_tail_cutoff_none_when_mass_covers_everything() -> None:
+    from baserate.estimate import atbudget
+
+    neg, pos = np.array([0.1, 0.2]), np.array([0.3])
+    assert atbudget._tail_cutoff(neg, pos, np.ones(2), np.ones(1), 0.1, 1.0) is None
+    assert atbudget._tail_cutoff(neg, pos, np.ones(2), np.ones(1), 0.1, 0.99) is None

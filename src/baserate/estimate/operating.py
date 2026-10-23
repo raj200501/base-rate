@@ -98,15 +98,79 @@ def _level_mass(
     present: NDArray[np.intp],
     n_levels: int,
     total: float,
+    sums: FloatArray | None = None,
 ) -> FloatArray:
-    """Per-level class mass for each row of ``weights`` (rows sum to ``total``)."""
-    sums = weights.sum(axis=1, keepdims=True)
-    if np.any(sums <= 0):
+    """Per-level class mass for each row of ``weights``.
+
+    Each row is scaled so that its class weight ``sums`` (default: the row
+    sum) maps to the class mass ``total``. Passing larger ``sums`` than the
+    row sums means some class weight lies outside the given scores.
+    """
+    row = weights.sum(axis=1) if sums is None else np.asarray(sums, dtype=np.float64)
+    if np.any(row <= 0):
         raise ValueError("each weight row needs positive total weight")
-    reduced = np.add.reduceat(weights[:, order], starts, axis=1)
     out = np.zeros((weights.shape[0], n_levels))
-    out[:, present] = reduced
-    return np.asarray(out * (total / sums), dtype=np.float64)
+    if order.size:
+        out[:, present] = np.add.reduceat(weights[:, order], starts, axis=1)
+    return np.asarray(out * (total / row[:, None]), dtype=np.float64)
+
+
+def _weights(weights: ArrayLike | None, scores: FloatArray) -> FloatArray:
+    """Weights as a 2-D float array; unit weights when None."""
+    if weights is None:
+        return np.atleast_2d(np.ones_like(scores))
+    return np.atleast_2d(np.asarray(weights, dtype=np.float64))
+
+
+def _batch(
+    neg_a: FloatArray,
+    pos_a: FloatArray,
+    prevalence: float,
+    flag_rate: float,
+    wn: FloatArray,
+    wp: FloatArray,
+    neg_totals: FloatArray | None,
+    pos_totals: FloatArray | None,
+) -> tuple[FloatArray, FloatArray, FloatArray, NDArray[np.bool_]]:
+    """Shared core: (recall, threshold, tie fraction, budget reached within the scores)."""
+    _validate(prevalence, flag_rate)
+    if wn.shape[1] != neg_a.size or wp.shape[1] != pos_a.size:
+        raise ValueError("weight columns must match the number of scores")
+    if np.any(wn < 0) or np.any(wp < 0):
+        raise ValueError("weights must be non-negative")
+    lv = _levels(neg_a, pos_a)
+    b = max(wn.shape[0], wp.shape[0])
+    wn = np.broadcast_to(wn, (b, neg_a.size))
+    wp = np.broadcast_to(wp, (b, pos_a.size))
+    n_levels = lv.levels.size
+    mass_n = _level_mass(
+        wn, lv.neg_order, lv.neg_starts, lv.neg_present, n_levels, 1 - prevalence, neg_totals
+    )
+    mass_p = _level_mass(
+        wp, lv.pos_order, lv.pos_starts, lv.pos_present, n_levels, prevalence, pos_totals
+    )
+    mix = mass_n + mass_p
+    cum = np.cumsum(mix, axis=1)
+    eps = 1e-12
+    # first level at which the cumulative flagged mass reaches the budget
+    hit = cum >= flag_rate - eps
+    reached = np.asarray(hit.any(axis=1), dtype=np.bool_)
+    level = np.where(reached, hit.argmax(axis=1), n_levels - 1)
+    rows = np.arange(b)
+    at_mix = mix[rows, level]
+    above = cum[rows, level] - at_mix
+    with np.errstate(divide="ignore", invalid="ignore"):
+        tie = np.where(at_mix > 0, (flag_rate - above) / at_mix, 1.0)
+    tie = np.clip(tie, 0.0, 1.0)
+    cum_p = np.cumsum(mass_p, axis=1)
+    at_p = mass_p[rows, level]
+    recall = (cum_p[rows, level] - at_p + tie * at_p) / prevalence
+    return (
+        np.clip(recall, 0.0, 1.0).astype(np.float64),
+        lv.levels[level].astype(np.float64),
+        tie.astype(np.float64),
+        reached,
+    )
 
 
 def budget_recall_batch(
@@ -130,46 +194,73 @@ def budget_recall_batch(
     Returns:
         (recall, threshold, tie_fraction), each of shape (B,).
     """
-    _validate(prevalence, flag_rate)
     neg_a = np.asarray(neg, dtype=np.float64).ravel()
     pos_a = np.asarray(pos, dtype=np.float64).ravel()
-    lv = _levels(neg_a, pos_a)
-    wn = np.atleast_2d(
-        np.ones_like(neg_a) if neg_weights is None else np.asarray(neg_weights, float)
+    recall, threshold, tie, _ = _batch(
+        neg_a,
+        pos_a,
+        prevalence,
+        flag_rate,
+        _weights(neg_weights, neg_a),
+        _weights(pos_weights, pos_a),
+        None,
+        None,
     )
-    wp = np.atleast_2d(
-        np.ones_like(pos_a) if pos_weights is None else np.asarray(pos_weights, float)
+    return recall, threshold, tie
+
+
+def budget_recall_tail(
+    neg_top: ArrayLike,
+    pos_top: ArrayLike,
+    prevalence: float,
+    flag_rate: float,
+    neg_weights: ArrayLike,
+    pos_weights: ArrayLike,
+    neg_totals: ArrayLike,
+    pos_totals: ArrayLike,
+) -> tuple[FloatArray, NDArray[np.bool_]]:
+    """Recall at a budget when only the top-scoring traces are given.
+
+    The given scores must be every trace scoring at or above some cutoff; the
+    rest of each class's weight enters only through ``*_totals``. Where the
+    budget is not reached within the given scores the threshold lies below
+    the cutoff, so the result for that row is invalid and ``ok`` is False.
+
+    Args:
+        neg_top: Benign scores at or above the cutoff, shape (k0,).
+        pos_top: Violation scores at or above the cutoff, shape (k1,).
+        prevalence: Deployment prevalence.
+        flag_rate: Fraction of traffic reviewed.
+        neg_weights: Weights of ``neg_top``, shape (B, k0).
+        pos_weights: Weights of ``pos_top``, shape (B, k1).
+        neg_totals: Total benign weight per row (including below the cutoff).
+        pos_totals: Total violation weight per row.
+
+    Returns:
+        (recall, ok), each of shape (B,).
+    """
+    neg_a = np.asarray(neg_top, dtype=np.float64).ravel()
+    pos_a = np.asarray(pos_top, dtype=np.float64).ravel()
+    if neg_a.size == 0 or pos_a.size == 0:
+        # pad with a zero-weight score far below the cutoff so levels exist
+        floor = float(np.min(np.r_[neg_a, pos_a])) - 1.0
+        if neg_a.size == 0:
+            neg_a = np.array([floor])
+            neg_weights = np.zeros((np.atleast_2d(np.asarray(pos_weights)).shape[0], 1))
+        if pos_a.size == 0:
+            pos_a = np.array([floor])
+            pos_weights = np.zeros((np.atleast_2d(np.asarray(neg_weights)).shape[0], 1))
+    recall, _, _, reached = _batch(
+        neg_a,
+        pos_a,
+        prevalence,
+        flag_rate,
+        _weights(neg_weights, neg_a),
+        _weights(pos_weights, pos_a),
+        np.asarray(neg_totals, float),
+        np.asarray(pos_totals, float),
     )
-    if wn.shape[1] != neg_a.size or wp.shape[1] != pos_a.size:
-        raise ValueError("weight columns must match the number of scores")
-    if np.any(wn < 0) or np.any(wp < 0):
-        raise ValueError("weights must be non-negative")
-    b = max(wn.shape[0], wp.shape[0])
-    wn = np.broadcast_to(wn, (b, neg_a.size))
-    wp = np.broadcast_to(wp, (b, pos_a.size))
-    n_levels = lv.levels.size
-    mass_n = _level_mass(wn, lv.neg_order, lv.neg_starts, lv.neg_present, n_levels, 1 - prevalence)
-    mass_p = _level_mass(wp, lv.pos_order, lv.pos_starts, lv.pos_present, n_levels, prevalence)
-    mix = mass_n + mass_p
-    cum = np.cumsum(mix, axis=1)
-    eps = 1e-12
-    # first level at which the cumulative flagged mass reaches the budget
-    hit = cum >= flag_rate - eps
-    level = np.where(hit.any(axis=1), hit.argmax(axis=1), n_levels - 1)
-    rows = np.arange(b)
-    at_mix = mix[rows, level]
-    above = cum[rows, level] - at_mix
-    with np.errstate(divide="ignore", invalid="ignore"):
-        tie = np.where(at_mix > 0, (flag_rate - above) / at_mix, 1.0)
-    tie = np.clip(tie, 0.0, 1.0)
-    cum_p = np.cumsum(mass_p, axis=1)
-    at_p = mass_p[rows, level]
-    recall = (cum_p[rows, level] - at_p + tie * at_p) / prevalence
-    return (
-        np.clip(recall, 0.0, 1.0).astype(np.float64),
-        lv.levels[level].astype(np.float64),
-        tie.astype(np.float64),
-    )
+    return recall, reached
 
 
 def budget_point(

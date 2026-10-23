@@ -86,3 +86,61 @@ def percentile_interval(samples: NDArray[np.float64], alpha: float = 0.05) -> tu
         raise ValueError("no samples")
     lo, hi = np.quantile(samples, [alpha / 2, 1 - alpha / 2])
     return float(lo), float(hi)
+
+
+def tail_draw(
+    index: NDArray[np.intp],
+    base: FloatArray,
+    selected: NDArray[np.bool_],
+    reps: int,
+    rng: np.random.Generator,
+    kind: Kind = "multinomial",
+) -> tuple[FloatArray, FloatArray] | None:
+    """Resampling weights for selected traces plus each replicate's total class weight.
+
+    Only clusters that contain a selected trace are drawn individually; all
+    other clusters are drawn as one aggregate (multinomial and Dirichlet are
+    closed under merging categories). This is exact, not an approximation,
+    when every unselected cluster has the same total base weight, which holds
+    for equal cluster sizes and unit weights. Otherwise it returns None and
+    the caller uses full weights.
+
+    Args:
+        index: Cluster index per trace.
+        base: Base (sampling) weight per trace.
+        selected: Mask of traces whose individual weights are needed.
+        reps: Number of replicates.
+        rng: Random generator.
+        kind: ``multinomial`` or ``bayesian``.
+
+    Returns:
+        (weights of selected traces, shape (reps, n_selected); total class
+        weight, shape (reps,)), or None when the shortcut is not exact.
+    """
+    k = int(index.max()) + 1
+    sums = np.bincount(index, weights=base, minlength=k)
+    top = np.unique(index[selected])
+    is_top = np.zeros(k, dtype=bool)
+    is_top[top] = True
+    rest = sums[~is_top]
+    if rest.size and not np.allclose(rest, rest[0], rtol=1e-12, atol=0.0):
+        return None
+    n_top, n_rest = top.size, k - top.size
+    slot = np.full(k, -1, dtype=np.intp)
+    slot[top] = np.arange(n_top)
+    chosen = np.flatnonzero(selected)
+    if kind == "multinomial":
+        probs = np.r_[np.full(n_top, 1.0 / k), [n_rest / k]]
+        draws = rng.multinomial(k, probs, size=reps).astype(np.float64)
+    elif kind == "bayesian":
+        alphas = np.r_[np.ones(n_top), [float(n_rest)]] if n_rest else np.ones(n_top)
+        draws = rng.dirichlet(alphas, size=reps) * k
+        if not n_rest:
+            draws = np.c_[draws, np.zeros(reps)]
+    else:
+        raise ValueError(f"unknown kind {kind!r}")
+    top_counts, rest_count = draws[:, :n_top], draws[:, n_top]
+    weights = top_counts[:, slot[index[chosen]]] * base[chosen]
+    rest_sum = float(rest[0]) if rest.size else 0.0
+    totals = top_counts @ sums[top] + rest_count * rest_sum
+    return np.asarray(weights, dtype=np.float64), np.asarray(totals, dtype=np.float64)
