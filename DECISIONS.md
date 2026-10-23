@@ -94,3 +94,27 @@ children ever run, `claude_agent_max_turns` is enforced by counting turns in
 the stream-json output and stopping the child at the cap (section 8). The
 headless path of `tools/review.py` is untested here because the guard blocks
 it.
+
+## D9 (2026-10-23) Raj's launch settings for this session
+
+Raj's `/goal` message sets, for this Claude Code on the web session,
+`ALLOW_PUSH=1` and `CAP_SHARE=0.2` (five projects share one Max plan). They
+are treated as set: every command in this session runs with both exported,
+and the usage wrapper reads `CAP_SHARE` from the environment. D1 is
+superseded: pushing is now explicitly allowed, still only to this session's
+working branch, never force, never tags, never repository settings. With
+`CAP_SHARE=0.2` the effective Claude caps are 6 agent runs a day, 8 turns a
+run, 60 single calls a day, and 1 review run a day. Reviewer-subagent runs
+are logged to the usage ledger as `claude_review_run` entries so that cap
+binds them too.
+
+## D10 (2026-10-23) Parallel subagents (ultracode)
+
+Independent work goes to parallel subagents, with one owner per gate or file
+set and no two agents editing the same file. The main session owns the shared
+files (pyproject.toml, uv.lock, Makefile, STATUS.md, DECISIONS.md, CLAUDE.md,
+tools/ship_check.py, docs/PLAN.md) and integrates subagent work; subagents
+report the dependency or Makefile changes they need instead of making them,
+and never commit. Given `CAP_SHARE=0.2`, subagents are used where they save
+real time (porting, literature verification, adapters, reviews), not for
+routine edits.

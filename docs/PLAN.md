@@ -96,8 +96,8 @@ All paths are repository-relative. JSON is UTF-8. Hashes are SHA-256 hex.
 - **Corpus** `artifacts/corpus/manifest.json`: `shards` list (`path`, `sha256`, `records`),
   each a gzip JSONL file under 50 MB. Each trace has `trace_id`, `source_run_id`,
   `source` (`real_agent`, `procedural`, `inserted`, `dataset`), `synthetic`, `domain`,
-  `label` (`benign` or `violation`), `steps`, and for violations `violation_type`,
-  `violation_source`, and `first_violating_step`.
+  `label` (`benign` or `violation`), `actions` (Armour `AgentAction` records), and for violations `violation_type`,
+  `violation_source`, and `first_violating_step` (0-based index into `actions`).
 - **Label audit** `artifacts/corpus/label_audit.json`: `auditor`, `items` (each with
   `trace_id`, `original_label`, `audit_label`, `original_step`, `audit_step`), `agreement`.
 - **E2** `artifacts/e2/results.json`: `confirmatory`, `estimates` (each with `family`,

@@ -672,7 +672,7 @@ def g6(ctx: Ctx) -> str:
             elif t["label"] == "violation":
                 step = t.get("first_violating_step")
                 need(
-                    isinstance(step, int) and 0 <= step < len(t.get("steps", [])),
+                    isinstance(step, int) and 0 <= step < len(t.get("actions", [])),
                     f"violation {t.get('trace_id')} lacks a valid first_violating_step",
                 )
                 counts["violations"] += 1
