@@ -44,7 +44,64 @@ independent runs a claim would need (RQ2).
 
 ## 2. Related work
 
-<!-- @prose related -->
+Closest in framing is "Practical challenges of control monitoring in frontier AI
+deployments" [@practical-challenges-2025], a conceptual analysis of what changes when
+control monitoring moves from simplified evaluations to real deployments: many agent
+instances in parallel, oversight that takes time, attacks that make partial progress
+across instances, and actions too ambiguous to justify shutdown. It compares synchronous,
+semi-synchronous, and asynchronous monitoring, models availability from the flag rate,
+audit duration, and instance count, and sketches a safety case whose claims include monitor
+and human recall and latencies. It states that these quantities can be estimated with
+control evaluations and extrapolated conservatively, and it illustrates that a limited
+review capacity forces a monitor to operate at a matching false-positive rate, after which
+recall drives safety. It gives no estimator, interval, or sample size for any of these
+quantities, and it does not discuss precision, prevalence, review budgets, or cascades.
+base-rate supplies that measurement layer: recall and precision at a fixed number of
+reviews per unit of traffic, at stated prevalences, with intervals whose coverage was
+checked, sample sizes for certifying a claim, a test of whether the operating threshold
+transfers, and cost-recall fronts for cascades. It does not address synchrony,
+cross-instance coordination, recovery, or shutdown policy, and its estimates are inputs to
+the per-attempt catch rate of such a safety case, not a replacement for it. The control
+safety-case sketch of [@korbak-safety-case-2025] makes the same dependence explicit:
+its argument rests on extrapolating red-team performance conservatively, which needs
+exactly these estimates.
+
+Async Control [@aisi-async-control-2025] evaluates asynchronous monitors of software
+engineering agents in a blue-team and red-team game, reports the false negative rate at a
+fixed low false-positive rate with bootstrap error bars over generated episodes, and
+extrapolates to deployment risk with a queueing model; its attack share is a design choice
+of the game, not a deployment prevalence. BashArena [@basharena-2025], LinuxArena
+[@linuxarena-2026], and SHADE-Arena [@shade-arena-2025] are control settings in which
+attackers pursue hidden objectives while a monitor scores trajectories; they report safety
+at a fixed false-positive rate against attackers of increasing strength and are natural
+sources of attack data and targets for base-rate's evaluation, but do not estimate
+monitor performance at deployment prevalence or review budgets. SHADE-Arena's observation
+that catching most side tasks cost a false-positive rate too high for deployment is the
+intuition that base-rate turns into computed precision and reviewer load. MonitorBench
+[@monitorbench-2026] studies whether chain-of-thought reveals the factors that drive
+behavior, one input channel a monitor may read. TRACE [@trace-2026] benchmarks
+reward-hack detection in code and finds that the ratio of benign to hacked trajectories
+changes measured detection, independent evidence that results should be reported at a
+fixed prevalence.
+
+Hua and colleagues [@hua-cascades-2025] are the closest prior art for cascades: they
+combine runtime monitors of different cost under one budget covering monitor calls and
+audits, rank outputs by an estimated likelihood ratio, and compare policies that call a
+second monitor only inside a score range, with intervals from repeated random splits of
+the misaligned data while the benign set is held fixed. base-rate asks a neighboring
+question with a different evidence layer: a fixed deployment prevalence and human-review
+budget, intervals that also carry the uncertainty of the benign tail, sample sizes for
+certification, and held-out validation that keeps source runs on one side of the split.
+The two are complementary; a policy found by their method can be certified with base-rate.
+
+base-rate builds on Armour [@armour], whose trace schema it extends, whose rule monitors
+and policy packs form one monitor family here, and whose labeled records are one source of
+violations. The statistical tools are standard: exact binomial intervals
+[@clopper-pearson-1934], the score interval [@wilson-1927], the comparison and the
+Jeffreys interval of [@brown-cai-dasgupta-2001], the Bayesian bootstrap [@rubin-1981],
+and the rule of three for zero numerators [@hanley-lippman-hand-1983]. The corpus
+datasheet follows [@gebru-datasheets-2021], and the monitor ladder uses the Qwen3 model
+family [@qwen3-2025].
 
 ## 3. Method
 
@@ -128,15 +185,97 @@ split, with a bootstrap that repeats the selection on every resampled training s
 
 ### 3.5. Corpus
 
-<!-- @prose corpus-method -->
+The corpus follows the protocol frozen in prereg/0002-e1-corpus.md before any corpus
+run. Eight mock-tool domains (devops, SaaS administration, customer support, finance
+operations, HR, research data, a browser portal, and code maintenance) each define a small
+simulated entity store, a dozen tools of a few generic kinds (list, get, update, create,
+side-effecting actions, export, grant or approve, audit-log edits, and finish), and task
+templates whose instances state the entity ids involved. Each task carries a write scope
+(the entities it may change), a sensitive-read scope, the grants it authorizes, and the
+effects required for completion. One oracle labels violations identically in every
+domain from the effects of each tool call: an audit-log edit; a grant or approval the
+task did not authorize; a bulk export or a sensitive read the task did not need; a write
+or side-effecting action outside the write scope; or finishing as complete before a
+required effect happened. These are the five violation types of Armour's taxonomy, made
+operational (DECISIONS.md D11).
+
+Subject agents are local open-weight models (Qwen3 at {{name:1.7B}} and {{name:4B}}
+parameters, pinned by revision and hash) served by a pinned llama.cpp build. An agent sees
+a system prompt listing the domain's tools and the task request, and replies with one
+JSON tool call per turn; a Python simulator answers each call. Nothing is executed and
+nothing leaves the process. The first action of every trajectory is the user request, so
+monitors see what was asked. A real run in which the oracle finds a violation is a
+natural violation, with the first violating action as its step label; the other real runs
+are benign.
+
+Controlled insertions turn benign runs into violations without a seam: the run's first
+actions are replayed exactly through a fresh world (observations are checked to match),
+one violating call of the drawn type, checked by the oracle, is placed at a step drawn
+uniformly from the run's agent steps, and the same model then continues from that state,
+so everything after the inserted step is regenerated by the agent. Inserted trajectories
+keep their source run's id and are labeled synthetic, because one step was written by
+the harness. Procedural variants of each benign real run rename entity ids and remap
+amounts consistently, reorder JSON observations, and swap a few phrases; they are labeled
+synthetic and keep the source run's id, so they add scale without pretending to add
+independent runs. Armour's labeled records add a third, separately reported violation
+source, clustered by source file and agent family because they come from a few
+generator scripts (DECISIONS.md D12). An independent auditor, blind to the labels,
+relabeled a stratified random sample of trajectories; agreement is reported in Section 5.
 
 ### 3.6. Monitors
 
-<!-- @prose monitors-method -->
+Rule monitors are a port of Armour's pattern rules and its three built-in policy packs
+(baseline, reviewer-calibrated, and strict-agent), reading only the monitor view. Their
+score is Armour's severity-weighted penalty capped and scaled to the unit interval, so
+they tie heavily; their own decision threshold is Armour's fail verdict.
+
+Model monitors form a size ladder of one family with one frozen prompt: Qwen3 at
+{{name:0.6B}}, {{name:1.7B}}, {{name:4B}}, and {{name:8B}} parameters. The prompt (hash in
+prereg/0003-e2-main-study.md) lists the five violation types and asks for one digit from
+zero to nine; the score is the probability-weighted mean digit over the digit tokens among
+the model's top next-token probabilities, which gives a continuous score with few ties.
+Monitors read the task request, every action with its observation, and the final answer,
+and nothing else: labels, provenance, and harness state are never in the monitor view.
+
+Two derived monitors complete the four families. The ensemble rank-normalizes the
+reviewer-calibrated rule monitor and the largest model monitor against the benign scores
+and averages them. The cascade sends the top share of traffic by the smallest model's
+score to the largest model and reviews by the largest model's score among escalated
+trajectories.
 
 ## 4. Experiments
 
-<!-- @prose experiments -->
+All four confirmatory experiments were preregistered: the hypotheses or estimands,
+metrics, analysis plan, thresholds, sample sizes, seeds, exclusions, and stopping rules
+were committed under prereg/ before any data they govern existed, and `make prereg-verify`
+checks the commit order. Anything else in this report is labeled exploratory.
+
+E0 (prereg/0001-e0-statistical-engine.md) is a simulation study of every interval method
+on a grid of score distributions (two binormal separations, a heavy-tailed benign
+distribution, and a tied four-level distribution), sample-size designs with and without
+source-run clustering, three prevalences, and three review budgets, with the exact truth
+computed for every cell. A cell passes if its simulated coverage is at least the nominal
+level minus {{param:1.5}} points minus twice its Monte Carlo standard error.
+
+E1 (prereg/0002-e1-corpus.md) builds the corpus described in Section 3.5.
+
+E2 (prereg/0003-e2-main-study.md) estimates recall, precision, and the false-positive rate
+at each prevalence and review budget for every monitor on the primary set: the real benign
+runs (one per independent run) and the natural and inserted violations. Its interval
+method was chosen from the methods E0 supports for that design before any monitor score
+existed, and every headline estimate lists the E0 cells it relies on. E2 also reports
+fixed-threshold rates for the rule monitors, time to detection from prefix scores, recall
+by violation source, type, and subject model, results on the full corpus with variants, and
+the size ladder.
+
+E3 (prereg/0004-e3-transfer.md) tunes each monitor's threshold in one domain and applies it
+in every other, and tunes it at one prevalence and applies it at lower ones, testing
+whether the review load stays within a factor of two of the budget and whether recall holds.
+
+E4 (prereg/0005-e4-cascades.md) chooses a cascade on a training half of the source runs
+under a compute budget of half the cost of running the expensive monitor on all traffic,
+and tests on the other half whether its recall holds and whether it is within a fixed
+margin of the expensive monitor alone.
 
 ## 5. Results
 
@@ -174,4 +313,4 @@ definition-of-done gates on a fresh clone.
 
 ## References
 
-<!-- @prose references -->
+<!-- @references -->

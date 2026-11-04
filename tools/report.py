@@ -430,8 +430,39 @@ def write_table(name: str, rendered: str) -> str:
 # ---------------------------------------------------------------- documents
 
 
+CITE_RE = re.compile(r"\[@([A-Za-z0-9][\w\-]*)\]")
+
+
+def references(keys: Sequence[str]) -> str:
+    """Reference list (template syntax) for cited keys, from artifacts/citecheck.json."""
+    data = load("artifacts/citecheck.json")
+    entries = {r["key"]: r for r in data["references"]}
+    lines = []
+    for key in keys:
+        ref = entries.get(key)
+        if ref is None or not ref.get("verified"):
+            raise SystemExit(f"cited reference {key} is missing or unverified in citecheck.json")
+        claimed = ref.get("claimed", {})
+        title = ref.get("page_title") or claimed.get("title") or key
+        year = claimed.get("year")
+        when = f" {{{{date:{year}}}}}." if year else ""
+        title_t = _tag_digits(str(title))
+        lines.append(f"- [@{key}] {title_t}.{when} <{ref['final_url']}>")
+    return "\n".join(lines)
+
+
+def _tag_digits(text: str) -> str:
+    """Wrap digit-bearing words of a title in label allowances."""
+    return " ".join(f"{{{{label:{w}}}}}" if re.search(r"\d", w) else w for w in text.split())
+
+
 def build_templates(fragments: dict[str, str]) -> list[str]:
-    """Expand ``<!-- @table NAME -->`` markers in the prose sources into templates."""
+    """Expand ``<!-- @table NAME -->`` markers in the prose sources into templates.
+
+    Citations ``[@key]`` are wrapped in name allowances (keys carry years), and a
+    ``<!-- @references -->`` marker becomes the reference list of every key the
+    document cites.
+    """
     docs = []
     for doc, prose, tmpl in (
         ("README.md", "README.prose.md", "README.md.tmpl"),
@@ -448,7 +479,11 @@ def build_templates(fragments: dict[str, str]) -> list[str]:
                 raise SystemExit(f"{prose}: unknown table {name}")
             return fragments[name]
 
-        (TEMPLATES / tmpl).write_text(re.sub(r"<!-- @table ([\w\-]+) -->", sub, text))
+        text = re.sub(r"<!-- @table ([\w\-]+) -->", sub, text)
+        cited = list(dict.fromkeys(CITE_RE.findall(text)))
+        text = text.replace("<!-- @references -->", references(cited) if cited else "")
+        text = CITE_RE.sub(lambda m: f"{{{{name:[@{m.group(1)}]}}}}", text)
+        (TEMPLATES / tmpl).write_text(text)
         docs.append(doc)
     return docs
 
