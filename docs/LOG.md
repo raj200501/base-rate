@@ -32,3 +32,9 @@ Iteration history moved out of STATUS.md. Newest last.
 - The VM was reclaimed at about 04:17 UTC and rebooted at 07:10; the pipeline was
   restarted at 07:12 and is kept alive by a two-hour waiter (D20).
 - Adversarial review workflow over the session's integrity-critical changes started.
+- Second and third adversarial review rounds (insertion code, G11 edge cases, analysis,
+  report, documents, then the code the pipeline runs next): every upheld finding fixed
+  with a test; insertion amended before it ran (prereg/0007; readings in D23); the 4B
+  model server was killed for memory once and every server now caps its prompt cache
+  (D24); the data artifacts now cite their preregistrations so prereg-verify orders them.
+
