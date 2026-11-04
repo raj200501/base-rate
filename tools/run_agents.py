@@ -54,6 +54,12 @@ def model_spec(key: str, port: int) -> tuple[ModelSpec, dict[str, Any]]:
     ), entry
 
 
+SERVER_CACHE_RAM_MIB = 1024
+"""Cap on llama-server's in-memory prompt cache. Its default (8 GiB) plus the weights and
+the KV cache exceeded the VM's memory and the kernel killed the server (DECISIONS.md D24);
+the cap affects speed only."""
+
+
 def start_server(
     entry: dict[str, Any], port: int, slots: int, threads: int, log: Path
 ) -> subprocess.Popen[bytes]:
@@ -73,6 +79,8 @@ def start_server(
         str(slots),
         "-c",
         str(slots * 6144),
+        "--cache-ram",
+        str(SERVER_CACHE_RAM_MIB),
         "--jinja",
     ]
     try:

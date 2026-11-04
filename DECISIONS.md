@@ -317,3 +317,18 @@ the E3 table states the set exactly.
    whose status is "complete" in any letter case (the simulated world itself
    compares the status case-insensitively). The first such call's summary is
    used unchanged; the recorded call keeps the harness's own status.
+
+## D24 (2026-11-04) Model server memory cap, and a waiter that saw itself
+
+At 11:44 UTC the kernel's memory-cgroup limit killed the Qwen3-4B llama-server
+(resident memory 13.9 GB): its default in-memory prompt cache (8 GiB) came on top
+of the weights and the KV cache. The 4B batch stopped at 365 of 800 runs with
+every finished run banked. From the restart on, every model server (agents and
+monitors, tools/run_agents.py start_server) caps that cache at 1 GiB
+(`--cache-ram 1024`). The cache only stores prompt states for reuse, so the cap
+changes speed, not outputs; prereg/0002 already lets server threads and slots
+change between batches for the same reason, and each run records its server
+command. The keep-alive waiter also matched its own command line with
+`pgrep -f`, so it reported the pipeline as running for about 80 minutes after
+it had stopped; waiters now match the pipeline's exact command line
+(`pgrep -fx`).
