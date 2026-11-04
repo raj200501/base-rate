@@ -38,7 +38,10 @@ typecheck: ## mypy --strict on the package
 ci: lint typecheck test demo secrets-scan ## What CI runs: lint, typecheck, test, offline demo
 
 demo: ## Offline demo on recorded fixtures; output must match demo/golden_output.txt
-	@echo "NOT IMPLEMENTED: make demo (milestone M1, docs/PLAN.md)"; exit 1
+	@mkdir -p $(dir $(DEMO_OUT))
+	BASERATE_NO_MODEL_CALLS=1 $(RUN) --offline python -m baserate.demo --out $(DEMO_OUT) > /dev/null
+	diff -u demo/golden_output.txt $(DEMO_OUT)
+	@echo "demo: output matches demo/golden_output.txt"
 
 prereg-verify: ## Verify the preregistration chain
 	python3 tools/prereg.py verify
