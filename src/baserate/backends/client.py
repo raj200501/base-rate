@@ -151,6 +151,64 @@ class ModelClient:
             self.usage.seconds += elapsed
         return {**out, "cached": False}
 
+    def complete(
+        self,
+        prompt: str,
+        *,
+        max_tokens: int = 1,
+        n_probs: int = 0,
+        temperature: float = 0.0,
+        seed: int = 0,
+        timeout: float = 600.0,
+    ) -> dict[str, Any]:
+        """One raw completion (llama-server ``/completion``), optionally with token probabilities.
+
+        Returns:
+            ``content``, ``top`` (list per generated token of ``{token: prob}``),
+            ``prompt_tokens``, ``completion_tokens``, and ``cached``.
+        """
+        payload: dict[str, Any] = {
+            "prompt": prompt,
+            "n_predict": max_tokens,
+            "temperature": temperature,
+            "seed": seed,
+            "n_probs": n_probs,
+            "cache_prompt": True,
+        }
+        key = self.request_key(self.model.key + ":completion", payload)
+        assert self.cache_dir is not None
+        path = self.cache_dir / key[:2] / f"{key}.json"
+        if path.exists():
+            out: dict[str, Any] = json.loads(path.read_text())
+            with self._lock:
+                self.usage.cached += 1
+            return {**out, "cached": True}
+        start = time.monotonic()
+        req = urllib.request.Request(
+            f"{self.model.endpoint}/completion",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+        elapsed = time.monotonic() - start
+        out = {
+            "content": str(data.get("content", "")),
+            "top": [_top_probs(item) for item in data.get("completion_probabilities", [])],
+            "prompt_tokens": int(data.get("tokens_evaluated", 0)),
+            "completion_tokens": int(data.get("tokens_predicted", 0)),
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(out))
+        tmp.replace(path)
+        with self._lock:
+            self.usage.calls += 1
+            self.usage.prompt_tokens += out["prompt_tokens"]
+            self.usage.completion_tokens += out["completion_tokens"]
+            self.usage.seconds += elapsed
+        return {**out, "cached": False}
+
     def flush(self) -> dict[str, Any] | None:
         """Append one ``local_call`` ledger entry with the totals since the last flush."""
         with self._lock:
@@ -186,3 +244,18 @@ def claude_allowed(root: Path) -> list[str]:
     if os.environ.get("BASERATE_NO_MODEL_CALLS") == "1":
         reasons.append("BASERATE_NO_MODEL_CALLS=1")
     return reasons
+
+
+def _top_probs(item: Mapping[str, Any]) -> dict[str, float]:
+    """Token to probability for one generated position, across llama-server formats."""
+    import math
+
+    entries = item.get("top_logprobs") or item.get("top_probs") or item.get("probs") or []
+    out: dict[str, float] = {}
+    for e in entries:
+        tok = str(e.get("token", e.get("tok_str", "")))
+        if "prob" in e:
+            out[tok] = float(e["prob"])
+        elif "logprob" in e:
+            out[tok] = math.exp(float(e["logprob"]))
+    return out
