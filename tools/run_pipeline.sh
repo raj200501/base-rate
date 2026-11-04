@@ -71,7 +71,7 @@ if [ "${n4}" -gt 0 ]; then
 fi
 
 step "build the corpus"
-$RUN tools/build_corpus.py --runs runs/agents/corpus-*/traces.jsonl runs/agents/insert-*/traces.jsonl \
+$RUN tools/build_corpus.py --keep-current --runs runs/agents/corpus-*/traces.jsonl runs/agents/insert-*/traces.jsonl \
   --variants 9
 step "audit sample"
 $RUN tools/label_audit.py sample

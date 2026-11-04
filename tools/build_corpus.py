@@ -293,6 +293,37 @@ def composition(traces: list[Trace]) -> dict[str, Any]:
     }
 
 
+def input_records(runs: list[Path]) -> list[dict[str, Any]]:
+    """Path and SHA-256 of every input: the run files, then their insertion skip logs."""
+    records = [{"path": str(p), "sha256": sha256_bytes(p.read_bytes())} for p in runs]
+    for path in runs:
+        skip = path.parent / "skipped.jsonl"
+        if skip.exists():
+            records.append({"path": str(skip), "sha256": sha256_bytes(skip.read_bytes())})
+    return records
+
+
+def is_current(out: Path, inputs: list[dict[str, Any]], variants: int) -> bool:
+    """Whether ``out`` holds a build of exactly these inputs and options with intact shards."""
+    try:
+        manifest = json.loads((out / "manifest.json").read_text())
+    except (OSError, ValueError):
+        return False
+    if (
+        manifest.get("inputs") != inputs
+        or manifest.get("variants_per_real_benign_run") != variants
+        or (manifest.get("armour") or {}).get("commit") != ARMOUR_COMMIT
+    ):
+        return False
+    shards = manifest.get("shards") or []
+    for shard in shards:
+        path = Path(shard["path"])
+        path = path if path.is_absolute() else ROOT / path
+        if not path.is_file() or sha256_bytes(path.read_bytes()) != shard["sha256"]:
+            return False
+    return bool(shards) and len(list((out / "shards").glob("*.jsonl.gz"))) == len(shards)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command-line entry point."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -306,13 +337,19 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="expected attempts over all insertion runs (default: prereg/0002); for tests",
     )
+    ap.add_argument(
+        "--keep-current",
+        action="store_true",
+        help="leave the output as is if it already holds a build of exactly these inputs and "
+        "options with intact shards (a resumed pipeline; score files cite the manifest hash)",
+    )
     args = ap.parse_args(argv)
-    loaded, inputs = load_runs(sorted(args.runs))
+    inputs = input_records(sorted(args.runs))
+    if args.keep_current and is_current(args.out, inputs, args.variants):
+        print(f"corpus is current ({args.out / 'manifest.json'}): same inputs, not rebuilt")
+        return 0
+    loaded, _ = load_runs(sorted(args.runs))
     insertion = insertion_log(sorted(args.runs), loaded, args.planned_insertions)
-    for path in sorted(args.runs):
-        skip_path = path.parent / "skipped.jsonl"
-        if skip_path.exists():
-            inputs.append({"path": str(skip_path), "sha256": sha256_bytes(skip_path.read_bytes())})
     runs, relabel_log = relabel_all(loaded)
     real_benign = [t for t in runs if t.source == "real_agent" and t.label == "benign"]
     procedural = [v for t in real_benign for v in variants(t, args.variants)]

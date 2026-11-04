@@ -126,6 +126,35 @@ def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
     assert sum(m1["armour"]["label_sources"].values()) == comp["by_source"]["dataset"]
 
 
+def test_keep_current_leaves_an_up_to_date_build_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resumed pipeline must not rewrite a banked corpus that score files cite by hash."""
+    runs = _run_file(tmp_path, range(3))
+    out = tmp_path / "c"
+    args = ["--runs", str(runs), "--variants", "1", "--out", str(out), "--planned-insertions", "0"]
+    assert bc.main(args) == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    builds: list[int] = []
+    real = bc.write_shards
+    monkeypatch.setattr(bc, "write_shards", lambda *a, **k: builds.append(1) or real(*a, **k))
+    assert bc.main([*args, "--keep-current"]) == 0
+    assert builds == []  # the same inputs and intact shards: left as is
+    assert bc.main([*args, "--keep-current", "--variants", "2"]) == 0
+    assert builds == [1]  # different options: rebuilt
+    assert bc.main([*args, "--keep-current"]) == 0
+    assert builds == [1, 1]  # back to the first options: rebuilt again, then current
+    assert bc.main([*args, "--keep-current"]) == 0
+    assert builds == [1, 1]
+    Path(manifest["shards"][0]["path"]).write_bytes(b"damaged")
+    assert bc.main([*args, "--keep-current"]) == 0
+    assert builds == [1, 1, 1]  # a damaged shard: rebuilt
+    _run_file(tmp_path, range(4))  # the run file changes
+    assert bc.main([*args, "--keep-current"]) == 0
+    assert builds == [1, 1, 1, 1]
+    assert json.loads((out / "manifest.json").read_text())["composition"]["benign_real_agent"] == 4
+
+
 def test_seed_ranges_render_gaps_and_singletons() -> None:
     assert bc.seed_ranges([3, 0, 1, 2, 350, 351, 9]) == "0 to 3, 9, 350 to 351"
     assert bc.seed_ranges([]) == ""
