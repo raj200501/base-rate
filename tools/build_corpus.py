@@ -42,6 +42,9 @@ from baserate.traces.runner import NO_USABLE_SUMMARY, NO_VALID_CALL, relabel
 from baserate.traces.schema import Trace, independent_runs, synthetic_share
 from baserate.traces.variants import variants
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from chainlib import sha256_obj
+
 ROOT = Path(__file__).resolve().parents[1]
 PILOT_SEED_FLOOR = 900_000
 SHARD_RECORDS = 4000
@@ -82,6 +85,13 @@ def load_runs(paths: list[Path]) -> tuple[list[Trace], list[dict[str, Any]]]:
 
 SKIP_REASONS = (NO_VALID_CALL, NO_USABLE_SUMMARY)
 """The two skip reasons of prereg/0007."""
+
+
+def prereg_link(path: str) -> dict[str, str]:
+    """A citation of a preregistration: its path and its config's canonical SHA-256."""
+    text = (ROOT / path).read_text(encoding="utf-8")
+    config = json.loads(re.findall(r"```json prereg-config\n(.*?)```", text, re.S)[0])
+    return {"prereg": path, "prereg_config_sha256": sha256_obj(config)}
 
 
 def planned_insertions() -> int:
@@ -316,6 +326,12 @@ def main(argv: list[str] | None = None) -> int:
     manifest = {
         "schema": "baserate-corpus/1",
         "experiment": "E1",
+        "confirmatory": True,
+        **prereg_link("prereg/0002-e1-corpus.md"),
+        "prereg_amendments": [
+            prereg_link("prereg/0006-e1-amendment-oracle.md"),
+            prereg_link("prereg/0007-e1-amendment-insertion.md"),
+        ],
         "canary": CANARY,
         "shards": entries,
         "composition": composition(traces),

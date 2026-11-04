@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -104,6 +105,21 @@ def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
     assert {t.source_run_id for t in traces if t.source == "procedural"} <= real_runs
     assert all(t.source_run_id.startswith("armour:") for t in traces if t.source == "dataset")
     assert comp["independent_source_runs"] < comp["traces"]
+    # the corpus cites its protocol and both amendments, with their config hashes
+    assert m1["confirmatory"] is True and m1["prereg"] == "prereg/0002-e1-corpus.md"
+    assert [a["prereg"] for a in m1["prereg_amendments"]] == [
+        "prereg/0006-e1-amendment-oracle.md",
+        "prereg/0007-e1-amendment-insertion.md",
+    ]
+    for citation in [m1, *m1["prereg_amendments"]]:
+        expected = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "prereg.py"), "hash", citation["prereg"]],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert citation["prereg_config_sha256"] == expected
     # the stopping rule's outcome: realized seeds per subject model
     assert m1["task_seeds"] == [{"agent": "m", "runs": 5, "distinct_seeds": 5, "ranges": "0 to 4"}]
     assert sum(m1["armour"]["label_sources"].values()) == comp["by_source"]["dataset"]

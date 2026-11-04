@@ -544,7 +544,41 @@ def s_non_ascii_rename(r: Any) -> None:
     r.commit("rename after the freeze")
 
 
+def s_artifact_before_a_cited_amendment(r: Any) -> None:
+    plan(r, CONFIG)
+    r.commit("freeze")
+    amendment = {"change": "relabel"}
+    art = {
+        **confirmatory(CONFIG),
+        "prereg_amendments": [
+            {"prereg": P2, "prereg_config_sha256": chainlib.sha256_obj(amendment)}
+        ],
+    }
+    r.write_json(ART, art)
+    r.commit("bank, citing an amendment that does not exist yet")
+    plan(r, amendment, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("amend afterwards")
+
+
+def s_artifact_after_a_cited_amendment(r: Any) -> None:
+    plan(r, CONFIG)
+    r.commit("freeze")
+    amendment = {"change": "relabel"}
+    plan(r, amendment, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("amend")
+    art = {
+        **confirmatory(CONFIG),
+        "prereg_amendments": [
+            {"prereg": P2, "prereg_config_sha256": chainlib.sha256_obj(amendment)}
+        ],
+    }
+    r.write_json(ART, art)
+    r.commit("bank under the amended plan")
+
+
 G11_HISTORY_CASES: list[tuple[str, Callable[[Any], None], str | None]] = [
+    ("artifact-before-a-cited-amendment", s_artifact_before_a_cited_amendment, "was not committed"),
+    ("artifact-after-a-cited-amendment", s_artifact_after_a_cited_amendment, None),
     ("amendment-versions-in-either-order", s_amendment_versions_unordered, "0002"),
     ("prereg-added-and-removed-only-in-merges", s_prereg_only_in_merges, "deleted"),
     ("non-ascii-artifact-name", s_non_ascii_artifact, None),

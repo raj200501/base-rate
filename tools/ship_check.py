@@ -553,15 +553,6 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
     included, must strictly descend from the commit that froze the
     preregistration (not from a draft of it).
     """
-    prereg_path = str(artifact.get("prereg", ""))
-    _, config = prereg_config(ctx, prereg_path)
-    need(
-        artifact.get("prereg_config_sha256") == canonical_sha256(config),
-        f"{artifact_rel}: prereg_config_sha256 does not match {prereg_path}",
-    )
-    frozen = freeze_of(ctx.clone, prereg_path).commit
-    need(frozen is not None, f"{prereg_path} is not frozen, so {artifact_rel} cannot cite it")
-    assert frozen is not None
     present = {
         c
         for name in renamed_from(ctx.clone, artifact_rel)
@@ -569,11 +560,26 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
         if state is not None
     }
     need(bool(present), f"{artifact_rel} is not committed")
-    need(
-        present <= descendant_set(ctx.clone, frozen),
-        f"{prereg_path} was not committed before {artifact_rel}",
-    )
-    return config
+    amendments = artifact.get("prereg_amendments", [])
+    need(isinstance(amendments, list), f"{artifact_rel}: prereg_amendments is not a list")
+    configs = []
+    for citation in [artifact, *amendments]:
+        need(isinstance(citation, dict), f"{artifact_rel}: a prereg citation is not an object")
+        prereg_path = str(citation.get("prereg", ""))
+        _, config = prereg_config(ctx, prereg_path)
+        need(
+            citation.get("prereg_config_sha256") == canonical_sha256(config),
+            f"{artifact_rel}: prereg_config_sha256 does not match {prereg_path}",
+        )
+        frozen = freeze_of(ctx.clone, prereg_path).commit
+        need(frozen is not None, f"{prereg_path} is not frozen, so {artifact_rel} cannot cite it")
+        assert frozen is not None
+        need(
+            present <= descendant_set(ctx.clone, frozen),
+            f"{prereg_path} was not committed before {artifact_rel}",
+        )
+        configs.append(config)
+    return configs[0]
 
 
 def junit_cases(path: Path) -> list[tuple[str, str]]:

@@ -27,6 +27,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -46,9 +47,19 @@ from baserate.backends.client import ModelClient  # noqa: E402
 from baserate.monitors import model as model_mon  # noqa: E402
 from baserate.monitors.rules import builtin_rule_monitors  # noqa: E402
 from baserate.traces.schema import Trace  # noqa: E402
-from run_agents import model_spec, start_server  # noqa: E402
+from chainlib import sha256_obj  # noqa: E402
+from run_agents import model_spec, repair_jsonl, start_server  # noqa: E402
+
+E2_PREREG = "prereg/0003-e2-main-study.md"
 
 SETS = ("primary", "full", "dataset")
+
+
+def prereg_link(path: str) -> dict[str, str]:
+    """A citation of a preregistration: its path and its config's canonical SHA-256."""
+    text = (ROOT / path).read_text(encoding="utf-8")
+    config = json.loads(re.findall(r"```json prereg-config\n(.*?)```", text, re.S)[0])
+    return {"prereg": path, "prereg_config_sha256": sha256_obj(config)}
 
 
 def in_set(trace: Trace, name: str) -> bool:
@@ -87,6 +98,29 @@ def prefix_start(trace: Trace) -> int | None:
     return max(int(trace.first_violating_step), 1)
 
 
+def model_record(mon: Any, trace: Trace, start: int | None) -> dict[str, Any]:
+    """One model monitor's score record for a trace.
+
+    ``seconds`` times the full-trace call alone, as for rule monitors, because
+    the E4 cost (prereg/0005) is its median; prefix calls are timed apart in
+    ``prefix_seconds``.
+    """
+    t0 = time.monotonic()
+    s = mon.score(trace)
+    rec: dict[str, Any] = {
+        "trace_id": trace.trace_id,
+        "score": s.score,
+        "digit_mass": s.details.get("digit_mass"),
+        "seconds": round(time.monotonic() - t0, 3),
+    }
+    if start is not None:
+        t1 = time.monotonic()
+        rec["prefix_start"] = start
+        rec["prefix_scores"] = mon.score_prefixes(trace, start)
+        rec["prefix_seconds"] = round(time.monotonic() - t1, 3)
+    return rec
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command-line entry point."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -110,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
     work.mkdir(parents=True, exist_ok=True)
     partial = work / f"{safe}{'.limit' if args.limit else ''}.partial.jsonl"
     done: dict[str, dict[str, Any]] = {}
+    if repair_jsonl(partial):
+        print(f"cut a partial last record from {partial}", flush=True)
     if partial.exists():
         for line in partial.read_text().splitlines():
             if line.strip():
@@ -117,7 +153,12 @@ def main(argv: list[str] | None = None) -> int:
                 done[rec["trace_id"]] = rec
     lock = threading.Lock()
     server = None
-    meta: dict[str, Any] = {"monitor": args.monitor, "set": args.set_name}
+    meta: dict[str, Any] = {
+        "monitor": args.monitor,
+        "set": args.set_name,
+        "confirmatory": True,
+        **prereg_link(E2_PREREG),
+    }
     started = time.monotonic()
 
     if args.monitor.startswith("rule:"):
@@ -170,19 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         def score(trace: Trace) -> dict[str, Any]:
-            t0 = time.monotonic()
-            s = mon.score(trace)
-            rec = {
-                "trace_id": trace.trace_id,
-                "score": s.score,
-                "digit_mass": s.details.get("digit_mass"),
-            }
-            start = prefix_start(trace) if args.prefixes else None
-            if start is not None:
-                rec["prefix_start"] = start
-                rec["prefix_scores"] = mon.score_prefixes(trace, start)
-            rec["seconds"] = round(time.monotonic() - t0, 3)
-            return rec
+            return model_record(mon, trace, prefix_start(trace) if args.prefixes else None)
 
         concurrency = args.concurrency
     else:

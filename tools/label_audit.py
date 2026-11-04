@@ -37,6 +37,7 @@ from baserate.traces.schema import Trace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+from chainlib import sha256_obj  # noqa: E402
 from score_monitors import corpus_traces  # noqa: E402
 
 WORK = ROOT / "runs" / "audit"
@@ -125,8 +126,34 @@ def _ci(k: int, n: int) -> list[float]:
     return [float(lo), float(hi)]
 
 
-def score(auditor: str) -> None:
+ANSWER_TOOLS = frozenset({"StructuredOutput"})
+"""The only tool an auditor may use: returning its answers."""
+
+
+def check_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Require that no auditor used any tool except returning its answers.
+
+    ``evidence`` lists each auditor agent with the tools its transcript
+    records (tools/audit_evidence.py writes it from the audit workflow's
+    journal). Returns a summary to bank beside the answers.
+    """
+    agents = evidence.get("agents", [])
+    if not agents:
+        raise SystemExit("audit evidence lists no auditor agents")
+    used = sorted({t for a in agents for t in a.get("tools_used", [])} - ANSWER_TOOLS)
+    if used:
+        raise SystemExit(f"an auditor used tools beyond returning answers: {used}; redo the audit")
+    return {
+        "workflow_run": evidence.get("workflow_run"),
+        "agents": len(agents),
+        "tools_used": sorted({t for a in agents for t in a.get("tools_used", [])}),
+        "transcripts_sha256": sorted(a["transcript_sha256"] for a in agents),
+    }
+
+
+def score(auditor: str, evidence: dict[str, Any]) -> None:
     """Join answers with the key and bank the audit artifact."""
+    proof = check_evidence(evidence)
     key = {r["audit_id"]: r for r in map(json.loads, (WORK / "key.jsonl").read_text().splitlines())}
     answers = {
         r["audit_id"]: r
@@ -171,9 +198,12 @@ def score(auditor: str) -> None:
     n = len(items)
     out = {
         "schema": "baserate-label-audit/1",
+        "confirmatory": True,
         "prereg": "prereg/0002-e1-corpus.md",
+        "prereg_config_sha256": sha256_obj(e1_config()),
         "auditor": auditor,
         "blind": True,
+        "auditor_evidence": proof,
         "sample_size": n,
         "items": items,
         "agreement": sum(full) / n,
@@ -196,13 +226,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("command", choices=["sample", "score"])
     ap.add_argument("--corpus", type=Path, default=ROOT / "artifacts" / "corpus" / "manifest.json")
     ap.add_argument("--auditor", default="")
+    ap.add_argument("--evidence", type=Path, default=WORK / "evidence.json")
     args = ap.parse_args(argv)
     if args.command == "sample":
         sample(args.corpus)
     else:
         if not args.auditor:
             raise SystemExit("--auditor is required")
-        score(args.auditor)
+        score(args.auditor, json.loads(args.evidence.read_text()))
     return 0
 
 

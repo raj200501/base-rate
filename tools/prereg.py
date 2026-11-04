@@ -33,7 +33,9 @@ The contract (docs/PLAN.md "Artifact contracts", prereg/README.md):
   every commit that touched the artifact comes strictly after the commit that
   froze the preregistration (not merely after a draft of it). An artifact
   with ``"confirmatory": true`` must cite one. Exploratory artifacts omit the
-  ``prereg`` field.
+  ``prereg`` field. An optional ``prereg_amendments`` list of further
+  citations (each with ``prereg`` and ``prereg_config_sha256``) is checked the
+  same way, so data that an amendment governs must follow it too.
 
 Commands:
   verify [--root DIR]       check all of the above using DIR's git history
@@ -483,27 +485,38 @@ def _check_artifacts(
                 problems.append(f"{art}: confirmatory but cites no preregistration ('prereg')")
             continue
         linked += 1
-        cited = data["prereg"]
-        prereg = preregs.get(cited) if isinstance(cited, str) else None
-        if prereg is None:
-            problems.append(f"{art}: cites {cited!r}, which is not a tracked prereg/NNNN-*.md")
-            continue
-        if prereg.config_sha256 is None:
-            problems.append(f"{art}: cites {cited}, whose prereg-config block is invalid")
-        elif data.get("prereg_config_sha256") != prereg.config_sha256:
-            problems.append(
-                f"{art}: prereg_config_sha256 {data.get('prereg_config_sha256')!r} does not "
-                f"match {cited} ({prereg.config_sha256})"
-            )
-        present: set[str] = set()
-        for name in rename_sources(root, art):
-            states = path_states(root, name, hist.order, hist.parents)
-            present |= {c for c, state in states.items() if state is not None}
-        if not present:
-            problems.append(f"{art}: not committed")
-        elif prereg.freeze_commit is None:
-            problems.append(f"{art}: cannot order it against {cited}: commit unknown")
-        else:
+        listed = data.get("prereg_amendments", [])
+        citations = [data, *(listed if isinstance(listed, list) else [])]
+        if "prereg_amendments" in data and not isinstance(data["prereg_amendments"], list):
+            problems.append(f"{art}: prereg_amendments must be a list of citations")
+        present: set[str] | None = None
+        for citation in citations:
+            if not isinstance(citation, dict):
+                problems.append(f"{art}: a prereg_amendments entry is not an object")
+                continue
+            cited = citation.get("prereg")
+            prereg = preregs.get(cited) if isinstance(cited, str) else None
+            if prereg is None:
+                problems.append(f"{art}: cites {cited!r}, which is not a tracked prereg/NNNN-*.md")
+                continue
+            if prereg.config_sha256 is None:
+                problems.append(f"{art}: cites {cited}, whose prereg-config block is invalid")
+            elif citation.get("prereg_config_sha256") != prereg.config_sha256:
+                problems.append(
+                    f"{art}: prereg_config_sha256 {citation.get('prereg_config_sha256')!r} does "
+                    f"not match {cited} ({prereg.config_sha256})"
+                )
+            if present is None:
+                present = set()
+                for name in rename_sources(root, art):
+                    states = path_states(root, name, hist.order, hist.parents)
+                    present |= {c for c, state in states.items() if state is not None}
+            if not present:
+                problems.append(f"{art}: not committed")
+                break
+            if prereg.freeze_commit is None:
+                problems.append(f"{art}: cannot order it against {cited}: commit unknown")
+                continue
             frozen = prereg.freeze_commit
             after = hist.descendants(root, frozen)
             pos = {c: i for i, c in enumerate(hist.order)}

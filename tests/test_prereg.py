@@ -865,3 +865,50 @@ def test_symlinked_preregistration_fails(tmp_path: Path) -> None:
     (repo.path / P1).symlink_to("../docs/plan.md")
     repo.commit("plan behind a symlink")
     assert_fails(repo, "not a regular file")
+
+
+# ------------------------------------------- amendment citations on artifacts
+
+
+AMEND_CONFIG: dict[str, Any] = {"change": "relabel by replay"}
+
+
+def _amended(tmp_path: Path, amendment_first: bool) -> Any:
+    repo = h.Repo.init(tmp_path / "amended")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze the plan")
+    amendment = h.prereg_text(AMEND_CONFIG, pid="0002", extra=f"amends: {P1}\n")
+    art = {
+        **linked(),
+        "prereg_amendments": [
+            {"prereg": P2, "prereg_config_sha256": chainlib.sha256_obj(AMEND_CONFIG)}
+        ],
+    }
+    if amendment_first:
+        repo.write(P2, amendment)
+        repo.commit("freeze the amendment")
+        repo.write_json(ART, art)
+        repo.commit("bank under the amended plan")
+    else:
+        repo.write_json(ART, art)
+        repo.commit("bank before the amendment")
+        repo.write(P2, amendment)
+        repo.commit("amend afterwards")
+    return repo
+
+
+def test_artifact_citing_an_earlier_amendment_passes(tmp_path: Path) -> None:
+    assert problems(_amended(tmp_path, amendment_first=True)) == ""
+
+
+def test_artifact_banked_before_an_amendment_it_cites_fails(tmp_path: Path) -> None:
+    assert_fails(_amended(tmp_path, amendment_first=False), f"not strictly after {P2} was frozen")
+
+
+def test_amendment_citation_with_a_wrong_hash_fails(tmp_path: Path) -> None:
+    repo = _amended(tmp_path, amendment_first=True)
+    data = repo.read_json(ART)
+    data["prereg_amendments"][0]["prereg_config_sha256"] = "0" * 64
+    repo.write_json(ART, data)
+    repo.commit("wrong hash")
+    assert_fails(repo, f"does not match {P2}")
