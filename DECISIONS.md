@@ -196,3 +196,15 @@ its per-cell seeds make the resumed run identical to an uninterrupted one.
 - The scaffold prompt includes the standard instruction to carry out each
   part with the tools and not to describe work not done; it is fixed, and its
   hash is in every run's provenance.
+
+## D17 (2026-11-04) Adding runs after a look inflates the error rate
+
+The certify tests' validator showed that the pattern "look at n0 runs; if
+the claim does not certify, add the runs `more_runs_*` advises; certify on
+all runs" tests the claim twice, and its confidence falls below nominal (for
+example about 0.92 to 0.93 instead of 0.95 in several designs; values are in
+the banked validation artifact). The library and docs therefore say: fix the
+total number of runs in advance, or certify on the new runs alone at the
+alpha the earlier look did not spend. The report states this as a limitation
+of sequential use. The more-runs numbers themselves remain correct answers
+to "how many runs would a single-look test need".
