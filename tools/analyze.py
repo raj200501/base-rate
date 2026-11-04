@@ -21,6 +21,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -50,8 +51,10 @@ from baserate.estimate import (
 from baserate.estimate.bootstrap import cluster_index, cluster_weights, percentile_interval
 from baserate.traces.schema import Trace
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
+REPO = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("BASERATE_ROOT", REPO))
+"""Data root; tests point it at a temporary tree."""
+sys.path.insert(0, str(REPO / "tools"))
 
 from score_monitors import corpus_traces, in_set  # noqa: E402
 

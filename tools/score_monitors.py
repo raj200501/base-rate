@@ -37,8 +37,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
+REPO = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("BASERATE_ROOT", REPO))
+"""Data root; tests point it at a temporary tree."""
+sys.path.insert(0, str(REPO / "tools"))
 
 from baserate.backends.client import ModelClient  # noqa: E402
 from baserate.monitors import model as model_mon  # noqa: E402
