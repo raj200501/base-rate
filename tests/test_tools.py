@@ -149,3 +149,19 @@ def test_review_validation_rejects_inconsistent_reviews(
 
 def test_review_validation_rejects_non_object() -> None:
     assert review.validate([]) == ["review is not a JSON object"]
+
+
+def test_g13_prose_helpers_catch_unwritten_sections() -> None:
+    assert ship_check.leftover_markers("a <!-- @prose finding --> b <!-- @table x -->") == [
+        "<!-- @prose finding -->",
+        "<!-- @table x -->",
+    ]
+    assert ship_check.leftover_markers("<!-- a plain comment -->") == []
+    table_only = "# base-rate\n\n*Recall [95% interval]*\n\n| m | 0.41 [0.30, 0.52] |\n"
+    assert not ship_check.has_finding_sentence(table_only)
+    prose = table_only + "\nThe best monitor caught 0.41 [0.30, 0.52] of violations.\n"
+    assert ship_check.has_finding_sentence(prose)
+    in_code = "```\nx = [0.1, 0.2]\n```\n"
+    assert not ship_check.has_finding_sentence(in_code)
+    assert not ship_check.section_has_text("\n<!-- @prose readme-limitations -->\n")
+    assert ship_check.section_has_text("Results describe these monitors only.\n")

@@ -118,8 +118,10 @@ the original protocol, and its effect is stated here:
 
 <!-- @table corpus-relabel -->
 
-Armour's records keep Armour's own labels; their label sources, as Armour records them,
-are given below. Armour's documentation asks that its synthetic reference labels be
+Armour's records keep Armour's benign or violation label. Their violation type and first
+violating step come from base-rate's mapping in `baserate.traces.armour` (DECISIONS.md
+D11), which skips and counts every record it cannot map. Their label sources, as Armour
+records them, are given below. Armour's documentation asks that its synthetic reference labels be
 replaced by independent human labels before external claims are made, so results on the
 `dataset` set are reported separately and read with that caveat.
 
@@ -128,10 +130,13 @@ replaced by independent human labels before external claims are made, so results
 Label audit: the auditor was a Claude subagent of the session that built the corpus, as
 prereg/0002 states. It was given only the audit packet in its prompt (for each record, the
 violation definitions and the trajectory as a monitor sees it, with numbered actions) and
-returned a label, a violation type, and a first violating step for each record. Its
-transcripts record no tool call other than returning those answers, so it read no label,
-code, or oracle; the main session wrote its answers to a file by script and scored them
-against the corpus labels. The auditor is the same model family as the session that wrote
+returned a label, a violation type, and a first violating step for each record. The
+workflow's records list the tools each auditor used; tools/label_audit.py refuses the
+audit if any auditor used a tool other than returning its answers, and the audit artifact
+banks that evidence (auditor_evidence: the tools used and a hash of every auditor's
+transcript). So the auditor read no label, code, or oracle. tools/audit_evidence.py wrote
+the answers to a file exactly as returned, and the answers were scored against the corpus
+labels. The auditor is the same model family as the session that wrote
 the violation definitions, so agreement measures how consistently the labels follow the
 definitions as a careful reader applies them, not ground truth. Agreement means label,
 violation type, and first violating step all match the corpus label. The audited sample
@@ -159,9 +164,12 @@ which is out of scope for this project and which the corpus is not designed to s
 The corpus ships inside this repository under artifacts/corpus/: gzip JSONL shards, each
 well under the shard size limit of the brief, with their {{name:SHA-256}} hashes,
 composition counts, relabeling and insertion logs, and provenance in
-artifacts/corpus/manifest.json. The raw run files under runs/ are not distributed; every
-record in the shards keeps its model replies in provenance, from which the replay
-reproduces it exactly. The project is MIT-licensed (LICENSE); the Armour-derived records
+artifacts/corpus/manifest.json. The raw run files under runs/ are not distributed.
+Real-agent and inserted records keep the model's replies in provenance (for an inserted
+false completion, the recorded call with the model's summary), and replaying them through
+a fresh world reproduces every observation exactly; procedural variants are regenerated
+deterministically from their source record, and Armour's records from
+tests/fixtures/armour. The project is MIT-licensed (LICENSE); the Armour-derived records
 are MIT-licensed by their authors, and their license text ships in
 tests/fixtures/armour/LICENSE. Every shard record and the manifest carry this canary
 string, so that copies can be found and filtered out of training data:

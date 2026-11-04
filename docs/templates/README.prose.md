@@ -2,7 +2,7 @@
 
 <!-- @prose finding -->
 
-![Recall at a fixed human-review budget across prevalences, every monitor on the primary set, with {{param:95%}} intervals](artifacts/report/figures/headline_recall.svg)
+![Recall at a fixed human-review budget across prevalences, every monitor on the primary set of the mock-tool corpus (its inserted violations are synthetic), with {{param:95%}} intervals](artifacts/report/figures/headline_recall.svg)
 
 <!-- @table readme-headline -->
 
@@ -41,7 +41,7 @@ numbers do not.
 flowchart LR
   A[Mock-tool domains and seeded tasks] --> B[Subject agents run tasks]
   B --> C[Oracle labels natural violations]
-  B --> D[Controlled insertion, same agent continues]
+  B --> D[Controlled insertion, the same agent writes what follows]
   B --> E[Procedural variants, synthetic]
   C --> F[Labeled corpus, clustered by source run]
   D --> F

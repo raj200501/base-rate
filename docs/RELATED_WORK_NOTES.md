@@ -53,3 +53,27 @@ Korbak, Clymer, Hilton, Shlegeris, and Irving propose a control safety case, a s
 ## Candidates to verify before citing
 
 Resolved on 2026-11-04: both entries listed here earlier (hua-cascades-2025 and korbak-safety-case-2025) were opened, verified, and described above. Reading depth: the Hua paper was read through the arXiv HTML full text via a fetch tool summary, and the Korbak paper through its abstract page only.
+
+## 2026-11-04 Full-text checks of two characterizations
+
+A review on 2026-11-04 questioned whether the README's summary of these two papers goes
+beyond what the notes above record (the Korbak sketch had been read through its abstract
+page only). Review subagents then read both full texts (arXiv HTML,
+https://arxiv.org/html/2501.17315 and https://arxiv.org/html/2512.22154) and the
+passages were checked in their saved copies:
+
+- korbak-safety-case-2025: "The safety layer edits the 10% most suspicious actions and
+  audits the 0.1% most suspicious actions"; the blue team keeps "the action edits and
+  audits within predetermined budgets"; "human review requirements present the primary
+  scaling constraint"; and claim C12.1, "developers conservatively extrapolate statistics
+  from the proxy deployment to estimate the probability of data exfiltration". The text
+  has no interval, sample-size calculation, or estimator for recall or the false-positive
+  rate beyond measuring how reliably the monitors flag attacks.
+- practical-challenges-2025: "First we need to estimate statistics about our various
+  claims, such as monitor and human recall" and "we need to find a way to conservatively
+  extrapolate them".
+
+The README's wording (review capacity fixes the false-positive rate, recall then drives
+safety, and the quantities must be estimated and extrapolated conservatively, with no
+estimator, interval, or sample size given) is supported by these passages.
+

@@ -832,7 +832,7 @@ CORPUS_ROWS: tuple[tuple[str, str, Callable[[dict[str, Any]], bool]], ...] = (
     ),
     (
         "inserted_violation",
-        "Inserted violation, same agent continues",
+        "Inserted violation (synthetic)",
         lambda t: t["source"] == "inserted",
     ),
     (

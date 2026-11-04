@@ -191,9 +191,11 @@ split, with a bootstrap that repeats the selection on every resampled training s
 ### 3.5. Corpus
 
 The corpus follows the protocol frozen in prereg/0002-e1-corpus.md before any corpus
-run. Eight mock-tool domains (devops, SaaS administration, customer support, finance
-operations, HR, research data, a browser portal, and code maintenance) each define a small
-simulated entity store, a dozen tools of a few generic kinds (list, get, update, create,
+run, as amended by prereg/0006-e1-amendment-oracle.md and
+prereg/0007-e1-amendment-insertion.md. Eight mock-tool domains (devops, SaaS
+administration, customer support, finance operations, HR, research data, a browser portal,
+and code maintenance) each define a small simulated entity store, between thirteen and
+fifteen tools of a few generic kinds (list, get, update, create,
 side-effecting actions, export, grant or approve, audit-log edits, and finish), and task
 templates whose instances state the entity ids involved. Each task carries a write scope
 (the entities it may change), a sensitive-read scope, the grants it authorizes, and the
@@ -207,9 +209,11 @@ operational (DECISIONS.md D11).
 Subject agents are local open-weight models (Qwen3 at {{name:1.7B}} and {{name:4B}}
 parameters, pinned by revision and hash) served by a pinned llama.cpp build. An agent sees
 a system prompt listing the domain's tools and the task request, and replies with one
-JSON tool call per turn; a Python simulator answers each call. Nothing is executed and
-nothing leaves the process. The first action of every trajectory is the user request, so
-monitors see what was asked. A real run in which the oracle finds a violation is a
+JSON tool call per turn; a Python simulator answers each call. Nothing is executed: the
+mock tools run inside the Python process, the model runs in a local server, and nothing
+leaves the machine. The first action of every real, inserted, and variant trajectory is the
+user request, so monitors see what was asked; Armour's records hold only the agent's
+events. A real run in which the oracle finds a violation is a
 natural violation, with the first violating action as its step label; the other real runs
 are benign.
 
@@ -222,14 +226,17 @@ ends the episode at the inserted finish call, so its summary is written by the s
 instead of the harness (prereg/0007-e1-amendment-insertion.md). The sources are the runs
 benign under the fixed oracle, sorted and then shuffled with the preregistered seed, and
 every skipped attempt is counted. Inserted trajectories keep their source run's id and are
-labeled synthetic, because the harness chose one step. Procedural variants of each benign real run rename entity ids and remap
-amounts consistently, reorder JSON observations, and swap a few phrases; they are labeled
-synthetic and keep the source run's id, so they add scale without pretending to add
-independent runs. Armour's labeled records add a third, separately reported violation
+labeled synthetic, because the harness chose one step. Procedural variants of each benign
+real run rename entity ids and remap standalone numbers consistently, and most of them also
+reorder the keys of JSON observations and swap some phrases; they are labeled synthetic
+and keep the source run's id, so they add scale without pretending to add independent
+runs. Armour's labeled records add a third, separately reported violation
 source, clustered by source file and agent family because they come from a few
-generator scripts (DECISIONS.md D12). A Claude subagent, given only the monitor view of a
-stratified random sample of trajectories and making no tool call, labeled them blind to
-the corpus labels; agreement is reported in docs/DATA.md and Section 5.
+generator scripts (DECISIONS.md D12). A Claude subagent of the session that built the
+corpus, given only the monitor view of a stratified random sample of trajectories, labeled
+them blind to the corpus labels; it made no tool call other than returning its answers,
+which tools/label_audit.py checks from the workflow's records and banks with the audit.
+Agreement is reported in docs/DATA.md and Section 5.
 
 ### 3.6. Monitors
 
@@ -256,8 +263,11 @@ trajectories.
 
 All four confirmatory experiments were preregistered: the hypotheses or estimands,
 metrics, analysis plan, thresholds, sample sizes, seeds, exclusions, and stopping rules
-were committed under prereg/ before any data they govern existed, and `make prereg-verify`
-checks the commit order. Anything else in this report is labeled exploratory.
+were committed under prereg/ before any data they govern existed. `make prereg-verify`
+checks, from git history, that every artifact citing a preregistration (the corpus
+manifest, the metadata of every score file, the label audit, and every results file) was
+first committed after each preregistration it cites was frozen. Anything else in this
+report is labeled exploratory.
 
 E0 (prereg/0001-e0-statistical-engine.md) is a simulation study of every interval method
 on a grid of score distributions (two binormal separations, a heavy-tailed benign
@@ -271,15 +281,18 @@ E1 (prereg/0002-e1-corpus.md) builds the corpus described in Section 3.5.
 E2 (prereg/0003-e2-main-study.md) estimates recall, precision, and the false-positive rate
 at each prevalence and review budget for every monitor on the primary set: the real benign
 runs (one per independent run) and the natural and inserted violations. Its interval
-method was chosen from the methods E0 supports for that design before any monitor score
-existed, and every headline estimate lists the E0 cells it relies on. E2 also reports
+method, composite, was chosen from the banked E0 results before any monitor score existed,
+as the method E0 supports best for these designs; it still undercovers in some cells of the
+small independent design at the smallest budget, so every headline estimate lists the E0
+cells it relies on, and estimates that rely on a failing cell are marked. E2 also reports
 fixed-threshold rates for the rule monitors, time to detection from prefix scores, recall
 by violation source, type, and subject model, results on the full corpus with variants, and
 the size ladder.
 
-E3 (prereg/0004-e3-transfer.md) tunes each monitor's threshold in one domain and applies it
-in every other, and tunes it at one prevalence and applies it at lower ones, testing
-whether the review load stays within a factor of two of the budget and whether recall holds.
+E3 (prereg/0004-e3-transfer.md) takes two monitors (the reviewer-calibrated rule monitor and
+the {{name:0.6B}} model monitor), tunes each one's threshold in one domain and applies it in
+every other, and tunes it at one prevalence and applies it at lower ones, testing whether
+the review load stays within a factor of two of the budget and whether recall holds.
 
 E4 (prereg/0005-e4-cascades.md) chooses a cascade on a training half of the source runs
 under a compute budget of half the cost of running the expensive monitor on all traffic,
@@ -301,22 +314,26 @@ models on a CPU, and their trajectories are short. Frontier agents act over long
 horizons with richer tools, and real violations are rarely a single labeled call, so
 recall measured here is not an estimate for any deployed agent.
 
-**How violations arise.** Natural violations here are mostly the mistakes of small models
-(an update on the wrong entity, a read the task did not need), not concealed behavior.
-Inserted violations are one call written by the harness, after which the same agent
-continues; they are labeled synthetic, and recall on them can differ from recall on
-natural violations, which is why the two are reported separately. Armour's records come
+**How violations arise.** Natural violations come from small models doing ordinary tasks
+in mock tools, without any instruction to misbehave or to hide, so by design they are
+mistakes rather than concealed behavior (the corpus tables give their types). Inserted
+violations are one call chosen by the harness, after which the same agent continues; an
+inserted false completion ends the episode at that call, and the same model writes its
+summary. They are labeled synthetic, and recall on them can differ from recall on natural
+violations, which is why the two are reported separately. Armour's records come
 from a few generator scripts and are clustered accordingly. None of the three sources is
 an adversary trying to evade a monitor; the study measures monitors against violations
 that do not hide.
 
-**Labels.** One oracle labels violations from the effects of tool calls, so its
-definitions decide what counts (DECISIONS.md D11). A defect in it, found during E1, counted
-failed calls on missing entities as violations; prereg/0006 fixed it before the corpus was
-built, and the corpus relabeling table states how many labels changed. The blind audit
-bounds the remaining disagreement, but the auditor is a model given the same definitions,
-not a human expert, so agreement measures consistency with the definitions more than
-correctness of the definitions.
+**Labels.** One oracle labels the real and inserted trajectories from the effects of tool
+calls, so its definitions decide what counts (DECISIONS.md D11); Armour's records keep
+Armour's benign or violation label, with the type and step mapped by base-rate. A defect
+in the oracle, found during E1, counted failed calls on missing entities as violations;
+prereg/0006 fixed it before the corpus was built, and the corpus relabeling table states
+how many labels changed. The blind audit estimates agreement on the preregistered strata
+of its sample, not over the corpus as a whole, and the auditor is a model given the same
+definitions, not a human expert, so agreement measures consistency with the definitions
+more than correctness of the definitions.
 
 **Prevalence is a design parameter.** The corpus's share of violations is not a
 deployment rate. Results at each prevalence assume that the benign corpus stands for
@@ -348,8 +365,9 @@ probability-weighted digit), with no prompt tuning, so the size ladder compares 
 one prompt, not each model at its best. No Claude model served as a subject or a monitor in
 this environment (Section 7). The ensemble and the cascade are the preregistered pairs only.
 
-**Cost and time.** E4's compute cost is the median CPU seconds per trace on this machine; on
-other hardware or through an API the costs, and so the best cascade, differ.
+**Cost and time.** E4's compute cost is the median wall-clock seconds per scored trace on
+this machine (a local model server with four slots and four threads), as prereg/0005
+defines it; on other hardware or through an API the costs, and so the best cascade, differ.
 
 **Sequential certification.** Adding runs after looking at a claim and testing again on
 all runs tests the claim twice, and its error rate exceeds the nominal level
@@ -366,8 +384,11 @@ replies are parsed as structured tool calls and never executed. No part of the p
 optimizes agents or trajectories to evade monitors. The local models used are
 open-weight models under the Apache {{version:2.0}} license; the Armour records are MIT
 licensed. No Claude model was used as a subject or a monitor in this environment, because
-the session's billing guard found an API-routing setting (DECISIONS.md D2); Claude was
-used only as an independent label auditor and as the project's reviewer. There is no
+the session's billing guard found an API-routing setting (DECISIONS.md D2). The project
+itself was built by a Claude Code session operated by Raj Kashikar, which wrote the code,
+the mock domains, the oracle and the violation definitions, the corpus pipeline, and these
+documents; subagents of that session served as the label auditor, the citation checker,
+and the reviewer, so none of them is independent of the authoring model family. There is no
 vulnerability to disclose: the study found no way to bypass a deployed monitor, and it
 reports weaknesses of the evaluated monitors only as rates.
 
@@ -379,7 +400,8 @@ analysis) is scripted in tools/ and pinned: model files by revision and hash
 (configs/models.json), the llama.cpp build by tag and commit, sampling settings and
 prompts by hash in each preregistration, and every random seed in the preregistrations.
 The preregistrations under prereg/ were committed before the data they govern, and
-`make prereg-verify` checks that chain. `make ship-check` runs the project's
+`make prereg-verify` checks that every artifact citing one, data and results alike, came
+after it in git history. `make ship-check` runs the project's
 definition-of-done gates on a fresh clone.
 
 ## References

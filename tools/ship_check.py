@@ -1303,6 +1303,35 @@ def g12(ctx: Ctx) -> str:
     return f"REVIEW: SHIP for {reviewed[:12]}; {n_logged} non-blocking logged"
 
 
+MARKER_RE = re.compile(r"<!--\s*@(?:prose|table|references)\b[^>]*-->")
+INTERVAL_RE = re.compile(r"\[\s*-?\d[\d.,]*\s*,\s*-?\d")
+
+
+def leftover_markers(text: str) -> list[str]:
+    """Template markers left in a rendered document (unwritten prose or tables)."""
+    return MARKER_RE.findall(text)
+
+
+def has_finding_sentence(first_screen: str) -> bool:
+    """Whether a prose line (not a table, caption, image, heading, or code) holds an interval."""
+    in_code = False
+    for line in first_screen.splitlines():
+        if line.startswith("```"):
+            in_code = not in_code
+            continue
+        text = line.strip()
+        if in_code or not text or text[0] in "|*!#<":
+            continue
+        if INTERVAL_RE.search(text):
+            return True
+    return False
+
+
+def section_has_text(body: str) -> bool:
+    """Whether a section holds anything besides HTML comments and whitespace."""
+    return bool(re.sub(r"<!--.*?-->", "", body, flags=re.S).strip())
+
+
 def g13(ctx: Ctx) -> str:
     """Documentation: README per section 11, REPORT complete, citations verified."""
     readme = rel(ctx, "README.md").read_text(encoding="utf-8")
@@ -1322,9 +1351,12 @@ def g13(ctx: Ctx) -> str:
         re.match(r"#\s+base-rate\b", readme.lstrip()) is not None,
         "README must open with # base-rate",
     )
+    for name, text in (("README.md", readme), ("docs/REPORT.md", report)):
+        left = leftover_markers(text)
+        need(not left, f"{name} still holds template markers: {', '.join(left[:3])}")
     need(
-        re.search(r"\b(CI|interval)\b|\[\s*-?\d", first_screen) is not None,
-        "first screen lacks a finding with its interval",
+        has_finding_sentence(first_screen),
+        "first screen lacks a one-sentence finding with its interval",
     )
     svgs = re.findall(r"!\[[^\]]*\]\(([^)]+\.svg)\)", first_screen)
     need(bool(svgs), "first screen lacks the headline SVG figure")
@@ -1348,6 +1380,8 @@ def g13(ctx: Ctx) -> str:
         need(idx is not None, f"README lacks section: {label} (or out of order)")
         assert idx is not None
         pos = idx
+    limits = next(b for h, b in sections if "limitation" in h.lower())
+    need(section_has_text(limits), "README limitations section has no text")
     results_body = next(b for h, b in sections if "key results" in h.lower())
     bullets = [ln for ln in results_body.splitlines() if re.match(r"\s*[-*]\s", ln)]
     need(bool(bullets), "key results section has no result bullets")
