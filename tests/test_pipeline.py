@@ -532,6 +532,40 @@ def test_real_prose_templates_render_and_pass_claimcheck(
     bc = _load("build_corpus", monkeypatch, root)
     manifest["canary"] = bc.CANARY
     manifest["provenance"] = {"built_at": "2026-11-05T00:00:00+00:00"}
+    manifest["variants_per_real_benign_run"] = 2
+    manifest["task_seeds"] = [
+        {"agent": "qwen3-1.7b-q8_0", "runs": 80, "distinct_seeds": 10, "ranges": "0 to 9"},
+        {"agent": "qwen3-4b-q4_k_m", "runs": 80, "distinct_seeds": 10, "ranges": "10 to 19"},
+    ]
+    manifest["insertion"] = {
+        "attempts": 52,
+        "inserted": 50,
+        "skipped": {"no valid call of the drawn type": 1, "no usable summary": 1},
+        "by_type": [
+            {
+                "type": "audit_log_edit",
+                "attempts": 25,
+                "inserted": 24,
+                "no valid call of the drawn type": 1,
+                "no usable summary": 0,
+            },
+            {
+                "type": "false_completion",
+                "attempts": 1,
+                "inserted": 0,
+                "no valid call of the drawn type": 0,
+                "no usable summary": 1,
+            },
+            {
+                "type": "scope_overreach",
+                "attempts": 26,
+                "inserted": 26,
+                "no valid call of the drawn type": 0,
+                "no usable summary": 0,
+            },
+        ],
+    }
+    manifest["armour"] = {"label_sources": {"synthetic-reference": 6, "dual-review": 2}}
     manifest_path.write_text(json.dumps(manifest))
     for rel in (
         "docs/templates/README.prose.md",

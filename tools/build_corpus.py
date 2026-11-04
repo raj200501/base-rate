@@ -215,6 +215,37 @@ def write_shards(traces: list[Trace], out: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def seed_ranges(seeds: list[int]) -> str:
+    """Sorted integers as inclusive ranges, for example ``0 to 249, 350 to 374``."""
+    out: list[str] = []
+    run: list[int] = []
+    for seed in sorted(set(seeds)):
+        if run and seed != run[-1] + 1:
+            out.append(f"{run[0]} to {run[-1]}" if len(run) > 1 else f"{run[0]}")
+            run = []
+        run.append(seed)
+    if run:
+        out.append(f"{run[0]} to {run[-1]}" if len(run) > 1 else f"{run[0]}")
+    return ", ".join(out)
+
+
+def task_seeds(traces: list[Trace]) -> list[dict[str, Any]]:
+    """Realized task seeds of each subject model's real runs (the stopping rule's outcome)."""
+    by_agent: dict[str, list[int]] = {}
+    for t in traces:
+        if t.source == "real_agent":
+            by_agent.setdefault(t.agent_id, []).append(int(t.provenance["task_seed"]))
+    return [
+        {
+            "agent": agent,
+            "runs": len(seeds),
+            "distinct_seeds": len(set(seeds)),
+            "ranges": seed_ranges(seeds),
+        }
+        for agent, seeds in sorted(by_agent.items())
+    ]
+
+
 def composition(traces: list[Trace]) -> dict[str, Any]:
     """Counts the datasheet and gate G6 report."""
     benign = [t for t in traces if t.label == "benign"]
@@ -266,12 +297,20 @@ def main(argv: list[str] | None = None) -> int:
         "canary": CANARY,
         "shards": entries,
         "composition": composition(traces),
+        "task_seeds": task_seeds(runs),
         "variants_per_real_benign_run": args.variants,
         "relabeling": relabel_log,
         "insertion": insertion,
         "armour": {
             "commit": ARMOUR_COMMIT,
             "counts": armour.counts(),
+            "label_sources": dict(
+                sorted(
+                    Counter(
+                        str(t.provenance.get("armour_label_source")) for t in armour.traces
+                    ).items()
+                )
+            ),
             "clustering": "source file and agent family (DECISIONS.md D12)",
         },
         "inputs": inputs,

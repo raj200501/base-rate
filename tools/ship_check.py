@@ -21,6 +21,7 @@ Stdlib only, so it runs before ``make setup``.
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import gzip
 import hashlib
@@ -917,6 +918,27 @@ def iter_shard(path: Path) -> Iterable[dict[str, Any]]:
                 yield json.loads(line)
 
 
+CANARY_GUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b")
+
+
+def corpus_canary(ctx: Ctx) -> str:
+    """The CANARY constant of tools/build_corpus.py in the clone; it must hold a GUID."""
+    path = rel(ctx, "tools/build_corpus.py")
+    need(path.is_file(), "tools/build_corpus.py missing")
+    source = path.read_text(encoding="utf-8")
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "CANARY" for t in node.targets
+        ):
+            value = ast.literal_eval(node.value)
+            need(
+                isinstance(value, str) and CANARY_GUID.search(value) is not None,
+                "CANARY in tools/build_corpus.py holds no version-4 GUID",
+            )
+            return str(value)
+    raise GateError("tools/build_corpus.py defines no CANARY")
+
+
 def g6(ctx: Ctx) -> str:
     """Corpus: E1 targets, label audit, datasheet, tables state synthetic share."""
     manifest = load_json(rel(ctx, "artifacts/corpus/manifest.json"))
@@ -927,9 +949,9 @@ def g6(ctx: Ctx) -> str:
     shards = manifest.get("shards", [])
     need(bool(shards), "manifest lists no shards")
     canary = manifest.get("canary")
+    need(isinstance(canary, str) and bool(canary), "manifest has no canary string (brief rule 9)")
     need(
-        isinstance(canary, str) and "canary" in canary.lower(),
-        "manifest has no canary string (brief rule 9)",
+        canary == corpus_canary(ctx), "manifest canary differs from CANARY in tools/build_corpus.py"
     )
     paths = [str(s["path"]) for s in shards]
     need(len(paths) == len(set(paths)), "manifest lists a shard more than once")
@@ -982,7 +1004,8 @@ def g6(ctx: Ctx) -> str:
     )
     data_md = rel(ctx, "docs/DATA.md")
     need(data_md.is_file(), "docs/DATA.md missing")
-    need(canary in data_md.read_text(encoding="utf-8"), "docs/DATA.md does not state the canary")
+    visible = re.sub(r"<!--.*?-->", "", data_md.read_text(encoding="utf-8"), flags=re.S)
+    need(canary in visible, "docs/DATA.md does not state the canary")
     dtext = data_md.read_text(encoding="utf-8").lower()
     gaps = [s for s in DATASHEET_SECTIONS if s not in dtext]
     need(not gaps, f"datasheet lacks: {', '.join(gaps)}")

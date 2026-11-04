@@ -940,6 +940,27 @@ def corpus_numbers(manifest: dict[str, Any], audit: dict[str, Any] | None) -> di
             "changes": changes,
         },
     }
+    out["seeds"] = list(manifest.get("task_seeds", []))
+    insertion = manifest.get("insertion")
+    if insertion:
+        out["insertion"] = {
+            "attempts": insertion["attempts"],
+            "inserted": insertion["inserted"],
+            "skipped": sum(insertion["skipped"].values()),
+            "by_type": [
+                {
+                    "type": r["type"],
+                    "attempts": r["attempts"],
+                    "inserted": r["inserted"],
+                    "no_valid_call": r.get("no valid call of the drawn type", 0),
+                    "no_usable_summary": r.get("no usable summary", 0),
+                }
+                for r in insertion["by_type"]
+            ],
+        }
+    sources = manifest.get("armour", {}).get("label_sources", {})
+    out["armour_label_sources"] = [{"source": k, "records": v} for k, v in sorted(sources.items())]
+    out["armour"] = stats([t for t in traces if t["source"] == "dataset"])
     if audit is not None:
         by_id = {t["trace_id"]: t for t in traces}
         missing = sorted(i["trace_id"] for i in audit["items"] if i["trace_id"] not in by_id)
@@ -1051,6 +1072,60 @@ def table_relabel(reg: Registry, nums: dict[str, Any]) -> str:
     return framed(title, cap, md_table(["Generation label", "Label after replay", "Traces"], rows))
 
 
+def table_insertion(reg: Registry, nums: dict[str, Any]) -> str:
+    """Controlled insertion: attempts, inserted traces, and skips by type (prereg/0007)."""
+    rows = []
+    for r in nums["corpus"]["insertion"]["by_type"]:
+        base = f"corpus.insertion.by_type[type={r['type']}]"
+        cells = [name(r["type"])]
+        for col in ("attempts", "inserted", "no_valid_call", "no_usable_summary"):
+            cells.append(
+                reg.tag(f"corpus.ins.{r['type']}.{col}", NUMBERS, f"{base}.{col}", "{:,d}")
+            )
+        rows.append(cells)
+    rows.append(
+        [
+            "All",
+            reg.tag("corpus.ins.attempts", NUMBERS, "corpus.insertion.attempts", "{:,d}"),
+            reg.tag("corpus.ins.inserted", NUMBERS, "corpus.insertion.inserted", "{:,d}"),
+            "",
+            "",
+        ]
+    )
+    cap = caption(
+        "real agent runs and inserted violations",
+        set_tags(reg, NUMBERS, "corpus.real_and_inserted"),
+    )
+    header = [
+        "Violation type",
+        "Attempts",
+        "Inserted",
+        "Skipped: no valid call",
+        "Skipped: no usable summary",
+    ]
+    return framed("Controlled insertion attempts (prereg/0007)", cap, md_table(header, rows))
+
+
+def table_armour_labels(reg: Registry, nums: dict[str, Any]) -> str:
+    """Where Armour's labels come from, as Armour records them."""
+    rows = [
+        [
+            name(r["source"]),
+            reg.tag(
+                cid_part(f"corpus.armour.{r['source']}"),
+                NUMBERS,
+                f"corpus.armour_label_sources[source={r['source']}].records",
+                "{:,d}",
+            ),
+        ]
+        for r in nums["corpus"]["armour_label_sources"]
+    ]
+    cap = caption("Armour dataset records", set_tags(reg, NUMBERS, "corpus.armour"))
+    return framed(
+        "Label sources of Armour's records", cap, md_table(["Label source", "Records"], rows)
+    )
+
+
 def table_audit(reg: Registry, audit: dict[str, Any]) -> str:
     """Blind label audit agreement by stratum."""
     src = "artifacts/corpus/label_audit.json"
@@ -1105,7 +1180,12 @@ CITE_RE = re.compile(r"\[@([A-Za-z0-9][\w\-]*)\]")
 
 
 def references(keys: Sequence[str]) -> str:
-    """Reference list (template syntax) for cited keys, from artifacts/citecheck.json."""
+    """Reference list (template syntax) for cited keys, from artifacts/citecheck.json.
+
+    Each entry shows the authors, title, and year that the citation check
+    confirmed, and the DOI, arXiv, or publisher link it names (not the API
+    address the check may have read).
+    """
     data = load("artifacts/citecheck.json")
     entries = {r["key"]: r for r in data["references"]}
     lines = []
@@ -1114,11 +1194,13 @@ def references(keys: Sequence[str]) -> str:
         if ref is None or not ref.get("verified"):
             raise SystemExit(f"cited reference {key} is missing or unverified in citecheck.json")
         claimed = ref.get("claimed", {})
-        title = ref.get("page_title") or claimed.get("title") or key
+        title = claimed.get("title") or ref.get("page_title") or key
+        authors = claimed.get("authors")
         year = claimed.get("year")
+        url = claimed.get("url") or ref["final_url"]
+        who = f"{_tag_digits(str(authors).rstrip('.'))}. " if authors else ""
         when = f" {{{{date:{year}}}}}." if year else ""
-        title_t = _tag_digits(str(title))
-        lines.append(f"- [@{key}] {title_t}.{when} <{ref['final_url']}>")
+        lines.append(f"- [@{key}] {who}{_tag_digits(str(title))}.{when} <{url}>")
     return "\n".join(lines)
 
 
@@ -1216,6 +1298,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         fragments["corpus-types"] = table_types(reg, numbers)
         fragments["corpus-agents"] = table_agents(reg, numbers)
         fragments["corpus-relabel"] = table_relabel(reg, numbers)
+        if "insertion" in numbers["corpus"]:
+            fragments["corpus-insertion"] = table_insertion(reg, numbers)
+        if numbers["corpus"]["armour_label_sources"]:
+            fragments["corpus-armour-labels"] = table_armour_labels(reg, numbers)
         if audit is not None:
             fragments["audit"] = table_audit(reg, audit)
     if has(E2_SRC):

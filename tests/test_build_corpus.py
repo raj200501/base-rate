@@ -104,6 +104,14 @@ def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
     assert {t.source_run_id for t in traces if t.source == "procedural"} <= real_runs
     assert all(t.source_run_id.startswith("armour:") for t in traces if t.source == "dataset")
     assert comp["independent_source_runs"] < comp["traces"]
+    # the stopping rule's outcome: realized seeds per subject model
+    assert m1["task_seeds"] == [{"agent": "m", "runs": 5, "distinct_seeds": 5, "ranges": "0 to 4"}]
+    assert sum(m1["armour"]["label_sources"].values()) == comp["by_source"]["dataset"]
+
+
+def test_seed_ranges_render_gaps_and_singletons() -> None:
+    assert bc.seed_ranges([3, 0, 1, 2, 350, 351, 9]) == "0 to 3, 9, 350 to 351"
+    assert bc.seed_ranges([]) == ""
 
 
 def test_pilot_seeds_are_refused(tmp_path: Path) -> None:

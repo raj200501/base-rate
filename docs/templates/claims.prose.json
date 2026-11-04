@@ -1,10 +1,14 @@
 {
  "corpus.built_at": {"source": "artifacts/corpus/manifest.json", "select": "provenance.built_at", "format": "{}", "note": "when tools/build_corpus.py wrote the banked corpus"},
  "corpus.canary": {"source": "artifacts/corpus/manifest.json", "select": "canary", "format": "{}", "note": "brief rule 9"},
- "e1.audit_n": {"source": "prereg/0002-e1-corpus.md", "select": "label_audit.sample_size", "format": "{:d}"},
+ "corpus.seeds.large.ranges": {"source": "artifacts/report/numbers.json", "select": "corpus.seeds[agent=qwen3-4b-q4_k_m].ranges", "format": "{}", "note": "realized task seeds"},
+ "corpus.seeds.large.runs": {"source": "artifacts/report/numbers.json", "select": "corpus.seeds[agent=qwen3-4b-q4_k_m].runs", "format": "{:,d}"},
+ "corpus.seeds.small.ranges": {"source": "artifacts/report/numbers.json", "select": "corpus.seeds[agent=qwen3-1.7b-q8_0].ranges", "format": "{}", "note": "realized task seeds"},
+ "corpus.seeds.small.runs": {"source": "artifacts/report/numbers.json", "select": "corpus.seeds[agent=qwen3-1.7b-q8_0].runs", "format": "{:,d}"},
+ "e1.audit_n": {"source": "artifacts/corpus/label_audit.json", "select": "sample_size", "format": "{:d}", "note": "records actually audited"},
  "e1.benign_target": {"source": "prereg/0002-e1-corpus.md", "select": "benign_real_target", "format": "{:,d}"},
  "e1.extension_block": {"source": "prereg/0002-e1-corpus.md", "select": "extension_block_seeds_per_domain", "format": "{:d}"},
- "e1.insert_attempts": {"source": "prereg/0002-e1-corpus.md", "select": "insertion.attempts", "format": "{:,d}"},
+ "e1.insert_attempts": {"source": "prereg/0002-e1-corpus.md", "select": "insertion.attempts", "format": "{:,d}", "note": "the planned number"},
  "e1.max_steps": {"source": "prereg/0002-e1-corpus.md", "select": "sampling.max_steps", "format": "{:d}"},
  "e1.seeds.large.end": {"source": "prereg/0002-e1-corpus.md", "select": "subject_models[model=qwen3-4b-q4_k_m].task_seeds[1]", "format": "{:d}"},
  "e1.seeds.large.start": {"source": "prereg/0002-e1-corpus.md", "select": "subject_models[model=qwen3-4b-q4_k_m].task_seeds[0]", "format": "{:d}"},
@@ -13,5 +17,5 @@
  "e1.temperature": {"source": "prereg/0002-e1-corpus.md", "select": "sampling.temperature", "format": "{:g}"},
  "e1.top_k": {"source": "prereg/0002-e1-corpus.md", "select": "sampling.top_k", "format": "{:d}"},
  "e1.top_p": {"source": "prereg/0002-e1-corpus.md", "select": "sampling.top_p", "format": "{:g}"},
- "e1.variants": {"source": "prereg/0002-e1-corpus.md", "select": "variants_per_real_benign_run", "format": "{:d}"}
+ "e1.variants": {"source": "artifacts/corpus/manifest.json", "select": "variants_per_real_benign_run", "format": "{:d}", "note": "as built"}
 }
