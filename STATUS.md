@@ -16,11 +16,11 @@ report, or the review.
 | G2 Static quality | passes | |
 | G3 CI parity | make ci passes locally | CI runs only on main and PRs into main (D14) |
 | G4 Offline demo | make demo matches golden output | |
-| G5 Statistical engine | E0 running (final cells) | finalize, bank, link to E2 headlines |
-| G6 Corpus | E1 generation running (Qwen3-1.7B batch) | 4B batch, insertions, variants, audit, datasheet |
-| G7 Main study | E2 preregistration drafted | freeze after E0, score, analyze |
-| G8 Transfer and cascades | E3 and E4 preregistrations drafted | freeze, analyze |
-| G9 Usable by others | CLI, card, and examples being built by a subagent | README must name the examples |
+| G5 Statistical engine | E0 banked (all 2,376 cells; failures documented, library warns) | E2 headline cross-check once E2 exists |
+| G6 Corpus | E1 running unattended (tools/run_pipeline.sh); oracle amendment 0006 frozen | build, audit, datasheet |
+| G7 Main study | E2 preregistered (headline method composite, from E0) | scoring runs in the pipeline, then analysis |
+| G8 Transfer and cascades | E3 and E4 preregistered | analysis after scoring |
+| G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples |
 | G10 Claim integrity | claimcheck and freshness tools in place | documents not rendered yet |
 | G11 Preregistration integrity | fails: 0003 committed twice (Needs Raj 1) | Raj's decision; confirmatory artifacts |
 | G12 Independent review | not started | reviewer subagent, 1 run per day under CAP_SHARE=0.2 |
@@ -29,17 +29,18 @@ report, or the review.
 
 ## Now
 
-E0 confirmatory run (pinned worktree at the prereg commit) is finishing; E1 real agent
-runs started with Qwen3-1.7B (2,000 planned runs; restart at full width when E0 frees
-the CPU). Subagents: CLI, report card, and examples; certify and cascade tests.
+The unattended pipeline (tools/run_pipeline.sh, log in runs/pipeline/) runs the rest
+of E1 (Qwen3-1.7B batch, Qwen3-4B batch, the stopping rule, insertions, corpus build,
+audit sample) and then all E2 scoring. E0 is banked; E2, E3, and E4 are frozen; the
+E1 oracle amendment (prereg/0006) is frozen and implemented. Waiting on Raj for the
+prereg 0003 decision (Needs Raj 1).
 
 ## Next three actions
 
-1. Finalize E0, choose the E2 headline method from the cells E0 supports, freeze the
-   E2, E3, and E4 preregistrations (docs/drafts/) before any monitor score exists.
-2. Finish E1: Qwen3-4B batch, controlled insertions, corpus build, blind label audit,
-   docs/DATA.md datasheet.
-3. Score the monitors (rules, Qwen3 ladder), run E2 to E4, build the report.
+1. When the corpus is built: commit it, run the blind label audit (subagent), write
+   docs/DATA.md.
+2. When scoring finishes: run E2, E3, E4 (tools/analyze.py), commit the results.
+3. Build the report and README (tools/report.py), then review and the final sequence.
 
 ## Environment
 
