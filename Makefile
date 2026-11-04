@@ -65,10 +65,10 @@ review: ## Independent review (headless opus, else the reviewer subagent)
 	python3 tools/review.py
 
 report: ## Build figures, tables, numbers, and documents from banked artifacts
-	BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/report.py
+	env -u BASERATE_ROOT BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/report.py
 
 reproduce: ## Re-run E2 to E4 from banked scores and rebuild the report; nothing may change
-	BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/reproduce.py
+	env -u BASERATE_ROOT BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/reproduce.py
 
 ship-check: ## Gates G1 to G14 on a fresh clone (full run; the only one that counts)
 	python3 tools/ship_check.py

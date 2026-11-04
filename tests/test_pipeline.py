@@ -14,6 +14,7 @@ import io
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -385,6 +386,9 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     assert (root / e2["scores_file"]).exists()
     e3 = an.run_e3(root / "prereg" / "0004-e3.md")
     an.write("e3", e3)
+    # prereg/0004 (D22): Armour's benign records stay in E3's set, its violations do not
+    full = [t for t in _corpus() if not (t.label == "violation" and t.source == "dataset")]
+    assert e3["set_composition"]["traces"] == len(full)
     assert len(e3["domain_pairs"]) == 2 * 2  # two monitors, two ordered domain pairs
     assert all(
         h["outcome"] in {"supported", "not_supported", "inconclusive"} for h in e3["hypotheses"]
@@ -394,6 +398,11 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     assert [h["id"] for h in e4["hypotheses"]] == ["H4.1-p1", "H4.2-p1"]
     pr = e4["pairs"][0]
     assert pr["test_recall_ci"][0] <= pr["test_recall"] <= pr["test_recall_ci"][1]
+    # the held-out half's own composition, not the whole primary set's
+    test_comp = pr["test_composition"]
+    assert (
+        0 < test_comp["independent_source_runs"] < e4["set_composition"]["independent_source_runs"]
+    )
     # report: figures, tables, registry, and rendered documents
     tdir = root / "docs" / "templates"
     tdir.mkdir(parents=True, exist_ok=True)
@@ -401,6 +410,8 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
         "e2-recall_at_budget",
         "e2-precision_at_budget",
         "e2-dataset",
+        "e2-full",
+        "e3-pairs",
         "e2-fixed",
         "e2-ttd",
         "e2-breakdown",
@@ -429,6 +440,7 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     for tbl in manifest["tables"]:
         text = (root / tbl).read_text()
         assert "synthetic share" in text.lower() and "independent source runs" in text.lower()
+        assert "Traces: " in text, tbl
         assert any(text.strip() in d for d in docs.values()), tbl
     numbers = json.loads((root / "artifacts" / "report" / "numbers.json").read_text())
     traces = _corpus()
@@ -460,7 +472,21 @@ def _check_reproduce(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "bank")
     rpd = _load("reproduce", monkeypatch, root)
+    # the scratch root may sit behind a symlink (macOS puts TMPDIR under /var -> /private/var)
+    real = root.parent / "tmp-real"
+    real.mkdir()
+    (root.parent / "tmp-link").symlink_to(real)
+    monkeypatch.setattr(tempfile, "tempdir", str(root.parent / "tmp-link"))
     assert rpd.main([]) == 0
+    # an output that the build no longer makes is deleted, so the rebuild shows it
+    stale = root / "artifacts" / "report" / "tables" / "old-table.md"
+    stale.write_text("Set: x. Traces: 1. Independent source runs: 1. Synthetic share: 0.\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "a table an earlier build made")
+    problems = []
+    rpd.check_report(problems)
+    assert any("old-table.md" in p for p in problems), problems
+    _git(root, "checkout", "-q", "--", ".")
     # a hand-edited banked estimate does not recompute
     path = root / "artifacts" / "e2" / "results.json"
     banked = path.read_text()
@@ -539,3 +565,52 @@ def test_real_prose_templates_render_and_pass_claimcheck(
     data = (root / "docs" / "DATA.md").read_text()
     assert bc.CANARY in data and "{{" not in data
     assert "[@gebru-datasheets-2021]" in data
+
+
+def test_time_to_detection_gives_ties_only_the_tie_fraction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    an = _load("analyze", monkeypatch, tmp_path)
+    tied = [{"prefix_scores": [0.0, 0.0, 0.0]} for _ in range(300)]
+    out = an.ttd(tied, 0.0, 0.0005, 50, 1)
+    assert out["share_caught"] == pytest.approx(0.0005)
+    assert out["share_detected_at_violating_step"] == pytest.approx(0.0005)
+    assert out["tie_fraction"] == 0.0005
+    above = [{"prefix_scores": [0.1, 0.5]} for _ in range(10)]
+    assert an.ttd(above, 0.3, 0.5, 20, 1)["share_caught"] == 1.0
+    assert an.ttd(above, 0.3, 0.5, 20, 1)["median_delay_steps"] == 1.0
+    # one trace reaches the threshold at step 0 and passes it at step 2: with a tie
+    # fraction of 0.25 the expected delay distribution puts 0.75 of the mass at 2
+    mixed = [{"prefix_scores": [0.3, 0.3, 0.9]}]
+    out = an.ttd(mixed, 0.3, 0.25, 20, 1)
+    assert out["share_detected_at_violating_step"] == pytest.approx(0.25)
+    assert out["median_delay_steps"] == 2.0 and out["share_caught"] == 1.0
+    missed = [{"prefix_scores": [0.1]}]
+    assert "median_delay_steps" not in an.ttd(missed, 0.3, 0.5, 20, 1)
+
+
+def test_report_refuses_an_audit_of_traces_not_in_the_corpus(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    rp = _load("report", monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        rp,
+        "iter_corpus",
+        lambda manifest: iter(
+            [
+                {
+                    "trace_id": "a",
+                    "source": "real_agent",
+                    "label": "benign",
+                    "synthetic": False,
+                    "source_run_id": "a",
+                    "agent_id": "m",
+                    "domain": "hr",
+                    "violation_type": None,
+                    "violation_source": None,
+                }
+            ]
+        ),
+    )
+    with pytest.raises(SystemExit, match="not in the corpus"):
+        rp.corpus_numbers({"shards": []}, {"items": [{"trace_id": "a"}, {"trace_id": "gone"}]})

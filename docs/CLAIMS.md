@@ -42,7 +42,9 @@ what its artifact gives today.
    `python3 tools/claims.py show` prints every claim with its current value.
 5. `make claimcheck` and `make freshness`, then commit the template and the
    rendered documents together.
-6. When an artifact changes, re-render and commit. Freshness fails until you do.
+6. When an artifact changes, run `make report` (which also rebuilds the derived
+   numbers and the templates) and commit. Freshness fails until you do, and
+   `make reproduce` fails while any generated output differs from a fresh build.
 
 ## Templates
 
@@ -203,7 +205,7 @@ only the standard library.
 | `number '0.42' is outside any claim or allowance` | Make it a claim; or, if it is not a result, tag it |
 | `'0.415' for claim X is not a rendering of any committed version ... commit it to bank it` | Commit the artifact, then check again |
 | `does not match its template ...: expected ..., found ...` | Edit the template, not the document, then render |
-| `claim X is stale: the document says '0.412', ... now gives '0.415'` | Render and commit |
+| `claim X is stale: the document says '0.412', ... now gives '0.415'` | `make report`, then commit |
 | `filter [...] matches 2 elements, needs exactly 1` | Add filter fields until one element matches |
 | `{{brief:...}} is not quoted verbatim` | Copy the text from docs/BUILD_BRIEF.md exactly |
 

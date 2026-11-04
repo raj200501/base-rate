@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 TOOLS = Path(__file__).resolve().parent
-ROOT = Path(os.environ.get("BASERATE_ROOT", TOOLS.parent))
+ROOT = Path(os.environ.get("BASERATE_ROOT", TOOLS.parent)).resolve()
 """Data root (a git work tree); tests point it at a temporary repository."""
 ANALYSES = ("e2", "e3", "e4")
 """Each re-runs under the preregistration its banked results file cites."""
@@ -46,9 +46,15 @@ GENERATED = (
 )
 
 
+IGNORED = ("provenance", "scores_sha256")
+"""Fields a correct re-run may change: when and where it ran, and the gzip bytes of the
+score bundle (deflate output differs between zlib builds; ``scores_records_sha256``,
+the hash of the uncompressed records, is compared instead)."""
+
+
 def without_provenance(result: dict[str, Any]) -> dict[str, Any]:
-    """A results artifact without the fields that record when and where it ran."""
-    return {k: v for k, v in result.items() if k != "provenance"}
+    """A results artifact without the fields that a correct re-run may change."""
+    return {k: v for k, v in result.items() if k not in IGNORED}
 
 
 def first_difference(a: Any, b: Any, at: str = "") -> str | None:
@@ -74,7 +80,7 @@ def first_difference(a: Any, b: Any, at: str = "") -> str | None:
 
 def scratch_root(tmp: Path) -> Path:
     """A data root that shares the banked inputs and has empty result directories."""
-    root = tmp / "root"
+    root = tmp.resolve() / "root"
     (root / "artifacts").mkdir(parents=True)
     shutil.copytree(ROOT / "prereg", root / "prereg")
     for name in SHARED:

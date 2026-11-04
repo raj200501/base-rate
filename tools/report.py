@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
-ROOT = Path(os.environ.get("BASERATE_ROOT", REPO))
+ROOT = Path(os.environ.get("BASERATE_ROOT", REPO)).resolve()
 """Data root; tests point it at a temporary tree."""
 OUT = ROOT / "artifacts" / "report"
 FIG = OUT / "figures"
@@ -61,7 +61,8 @@ FAMILY_ORDER = ("rule", "model", "ensemble", "cascade")
 
 
 def style() -> None:
-    """Plain, deterministic chart style."""
+    """Plain, deterministic chart style, independent of any local matplotlibrc."""
+    matplotlib.rcdefaults()
     plt.rcParams.update(
         {
             "svg.hashsalt": "baserate-report",
@@ -202,6 +203,22 @@ def fig_budget_panels(e2: dict[str, Any], metric: str, name: str, log: bool) -> 
     budgets = sorted({e["budget"] for e in e2["estimates"]})
     prevs = sorted({e["prevalence"] for e in e2["estimates"]}, reverse=True)
     fig, axes = plt.subplots(1, len(budgets), figsize=(10, 0.42 * len(mons) + 1.4), sharey=True)
+    shown = [
+        v
+        for e in e2["estimates"]
+        if e["set"] == "primary" and e["metric"] == metric
+        for v in (e["estimate"], e["ci_low"], e["ci_high"])
+        if v > 0
+    ]
+    # a log axis cannot show zero: its lower limit sits below every positive value, and
+    # zero estimates and interval ends are drawn at that limit
+    lo_log = min([1e-3, *shown]) / 2 if log else 0.0
+    has_zero = log and any(
+        v <= 0
+        for e in e2["estimates"]
+        if e["set"] == "primary" and e["metric"] == metric
+        for v in (e["estimate"], e["ci_low"])
+    )
     for ax, b in zip(np.atleast_1d(axes), budgets, strict=True):
         for j, pv in enumerate(prevs):
             ys = np.arange(len(mons)) + (j - 1) * 0.22
@@ -212,6 +229,8 @@ def fig_budget_panels(e2: dict[str, Any], metric: str, name: str, log: bool) -> 
             x = np.array([v["estimate"] for v in vals])
             lo = np.array([v["ci_low"] for v in vals])
             hi = np.array([v["ci_high"] for v in vals])
+            if log:
+                x, lo, hi = (np.maximum(arr, lo_log) for arr in (x, lo, hi))
             ax.hlines(ys, lo, hi, color=SERIES[j], linewidth=2)
             ax.plot(
                 x,
@@ -226,7 +245,7 @@ def fig_budget_panels(e2: dict[str, Any], metric: str, name: str, log: bool) -> 
         ax.set_title(f"{b} reviews per 10,000")
         if log:
             ax.set_xscale("log")
-            ax.set_xlim(1e-3, 1.05)
+            ax.set_xlim(lo_log, 1.05)
         else:
             ax.set_xlim(-0.02, 1.02)
         ax.set_xlabel(metric.replace("_at_budget", "").replace("_", " ") + " (95% interval)")
@@ -234,6 +253,14 @@ def fig_budget_panels(e2: dict[str, Any], metric: str, name: str, log: bool) -> 
     ax0.set_yticks(np.arange(len(mons)), [f"{short(m)}  [{f}]" for f, m in mons])
     ax0.invert_yaxis()
     np.atleast_1d(axes)[-1].legend(loc="lower right", fontsize=8)
+    if has_zero:
+        fig.text(
+            0.01,
+            0.01,
+            "zero values are drawn at the left edge of each panel",
+            fontsize=7,
+            color=INK2,
+        )
     fig.tight_layout()
     return save(fig, name)
 
@@ -409,17 +436,22 @@ def render_fragment(reg: Registry, text: str) -> str:
     return TAG_RE.sub(sub, text)
 
 
-def caption(set_name: str, tags: tuple[str, str]) -> str:
-    """The required caption: analysis set, synthetic share, independent source runs."""
-    return f"Set: {set_name}. Synthetic share: {tags[0]}. Independent source runs: {tags[1]}."
+def caption(set_name: str, tags: tuple[str, str, str]) -> str:
+    """The required caption: the set, its traces and independent runs, its synthetic share."""
+    traces, runs, synthetic = tags
+    return (
+        f"Set: {set_name}. Traces: {traces}. Independent source runs: {runs}. "
+        f"Synthetic share: {synthetic}."
+    )
 
 
-def set_tags(reg: Registry, source: str, path: str) -> tuple[str, str]:
-    """Claim tags for a set's synthetic share and independent source runs."""
+def set_tags(reg: Registry, source: str, path: str) -> tuple[str, str, str]:
+    """Claim tags for a set's trace count, independent source runs, and synthetic share."""
     base = cid_part(f"{source}.{path}")
     return (
-        reg.tag(f"{base}.synthetic_share", source, f"{path}.synthetic_share", "{:.3f}"),
+        reg.tag(f"{base}.traces", source, f"{path}.traces", "{:,d}"),
         reg.tag(f"{base}.runs", source, f"{path}.independent_source_runs", "{:,d}"),
+        reg.tag(f"{base}.synthetic_share", source, f"{path}.synthetic_share", "{:.3f}"),
     )
 
 
@@ -694,12 +726,45 @@ def table_e3(reg: Registry, e3: dict[str, Any]) -> str:
             )
         outcome = reg.tag(f"{cid}.outcome", src, f"{sel}.outcome", "{}")
         rows.append([name(hid), name(h["monitor"]), stat, outcome])
-    cap = caption("full", set_tags(reg, src, "set_composition"))
+    cap = caption(E3_SET, set_tags(reg, src, "set_composition"))
     return framed(
         "E3 hypotheses (transfer)",
         cap,
         md_table(["Hypothesis", "Monitor", "Statistic", "Outcome"], rows),
     )
+
+
+E3_SET = (
+    "full corpus: every benign trace, Armour's included, and the natural and inserted "
+    "violations (prereg/0004)"
+)
+
+
+def table_e3_pairs(reg: Registry, e3: dict[str, Any]) -> str:
+    """E3 domain transfer for every monitor and ordered pair of domains."""
+    src = "artifacts/e3/results.json"
+    rows = []
+    for pr in e3["domain_pairs"]:
+        m, a, b = pr["monitor"], pr["source"], pr["target"]
+        sel = f"domain_pairs[monitor={m},source={a},target={b}]"
+        cid = cid_part(f"e3.pair.{short(m)}.{a}.{b}")
+        rows.append(
+            [
+                name(m),
+                name(a),
+                name(b),
+                ci_tag(reg, f"{cid}.ratio", src, f"{sel}.ratio", f"{sel}.ratio_ci"),
+                ci_tag(reg, f"{cid}.gap", src, f"{sel}.recall_gap", f"{sel}.recall_gap_ci"),
+            ]
+        )
+    cap = caption(E3_SET, set_tags(reg, src, "set_composition"))
+    title = (
+        "E3 domain transfer per ordered pair: realized over intended review rate, and recall "
+        f"at the transferred threshold minus recall at the target's own, estimate "
+        f"[{p('95%')} interval]"
+    )
+    header = ["Monitor", "Tuned on", "Applied to", "Review-rate ratio", "Recall gap"]
+    return framed(title, cap, md_table(header, rows))
 
 
 def table_e4(reg: Registry, e4: dict[str, Any]) -> str:
@@ -730,7 +795,11 @@ def table_e4(reg: Registry, e4: dict[str, Any]) -> str:
                 reg.tag(f"{cid}.h42", src, f"hypotheses[id=H4.2-{idx}].outcome", "{}"),
             ]
         )
-    cap = caption("primary, held-out half", set_tags(reg, src, "set_composition"))
+    first = e4["pairs"][0]["index"]
+    cap = caption(
+        "primary, the held-out half of the source runs",
+        set_tags(reg, src, f"pairs[index={first}].test_composition"),
+    )
     header = [
         "Pair",
         "Stage 1",
@@ -873,8 +942,13 @@ def corpus_numbers(manifest: dict[str, Any], audit: dict[str, Any] | None) -> di
     }
     if audit is not None:
         by_id = {t["trace_id"]: t for t in traces}
-        audited = [by_id[i["trace_id"]] for i in audit["items"] if i["trace_id"] in by_id]
-        out["audit"] = stats(audited)
+        missing = sorted(i["trace_id"] for i in audit["items"] if i["trace_id"] not in by_id)
+        if missing:
+            raise SystemExit(
+                f"label audit items are not in the corpus ({len(missing)}, e.g. {missing[0]}); "
+                "audit the current corpus"
+            )
+        out["audit"] = stats([by_id[i["trace_id"]] for i in audit["items"]])
     return out
 
 
@@ -1111,7 +1185,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         if has("artifacts/corpus/label_audit.json")
         else None
     )
-    numbers: dict[str, Any] = {"schema": "baserate-report-numbers/1"}
+    # every output is rebuilt, so an output that a build no longer makes shows up as a
+    # deletion in git instead of lingering with old numbers
+    for directory in (FIG, TAB):
+        for stale in directory.glob("*") if directory.is_dir() else ():
+            if stale.is_file():
+                stale.unlink()
+    read = (
+        "artifacts/corpus/manifest.json",
+        "artifacts/corpus/label_audit.json",
+        "artifacts/e0/summary.json",
+        E2_SRC,
+        "artifacts/e3/results.json",
+        "artifacts/e4/results.json",
+        "artifacts/citecheck.json",
+    )
+    numbers: dict[str, Any] = {
+        "schema": "baserate-report-numbers/1",
+        "sources": {rel: sha(ROOT / rel) for rel in read if has(rel)},
+    }
     if manifest is not None:
         numbers["corpus"] = corpus_numbers(manifest, audit)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -1135,6 +1227,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             fragments[f"e2-{metric}"] = table_e2(reg, e2, metric)
         if any(e["set"] == "dataset" for e in e2["estimates"]):
             fragments["e2-dataset"] = table_e2(reg, e2, "recall_at_budget", "dataset")
+        if any(e["set"] == "full" for e in e2["estimates"]):
+            fragments["e2-full"] = table_e2(reg, e2, "recall_at_budget", "full")
         fragments["readme-headline"] = table_headline(reg, e2)
         for key, builder in (
             ("e2-fixed", table_fixed),
@@ -1149,6 +1243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         e3 = load("artifacts/e3/results.json")
         figures.append(fig_transfer(e3))
         fragments["e3"] = table_e3(reg, e3)
+        fragments["e3-pairs"] = table_e3_pairs(reg, e3)
     if has("artifacts/e4/results.json"):
         e4 = load("artifacts/e4/results.json")
         figures.append(fig_cascades(e4))

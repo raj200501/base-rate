@@ -93,7 +93,7 @@ def check_document(ws: Workspace, registry: Registry, doc: str) -> tuple[list[st
                 f"{doc}:{line}: claim {piece.text} is stale: the document says {span!r}, "
                 f"{source} now gives {values[piece.text]!r}"
             )
-    return out or [f"{doc}: differs from its rendering; run python3 tools/claims.py render"], 0
+    return out or [f"{doc}: differs from its rendering; run make report and commit"], 0
 
 
 def check(ws: Workspace, docs: Sequence[str]) -> tuple[list[str], int, int]:

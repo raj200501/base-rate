@@ -1142,7 +1142,8 @@ def test_g6_listing_a_shard_twice_does_not_double_the_corpus(tmp_path: Path) -> 
 
 G10_MAKEFILE = (
     f"claimcheck:\n\t{PY} tools/claimcheck.py README.md docs/REPORT.md\n\n"
-    f"freshness:\n\t{PY} tools/freshness.py README.md docs/REPORT.md\n"
+    f"freshness:\n\t{PY} tools/freshness.py README.md docs/REPORT.md\n\n"
+    "reproduce:\n\t@echo 'REPRODUCE: PASS 1 checks'\n"
 )
 
 
@@ -1174,10 +1175,27 @@ def test_g10_control_passes_with_the_recommended_recipes(g10: Any, tmp_path: Pat
 def test_g10_stale_claim_fails_the_full_check_only(g10: Any, tmp_path: Path) -> None:
     edit(g10, ART, '"estimate": 0.4123', '"estimate": 0.4151')
     g10.commit("re-bank without re-rendering")
-    assert "fast: freshness not run" in assert_pass(10, g10, tmp_path / "fast", fast=True)
+    fast = assert_pass(10, g10, tmp_path / "fast", fast=True)
+    assert "fast: freshness and reproduce not run" in fast
     assert_fail(
         10, g10, tmp_path, "make freshness failed", "FRESHNESS: FAIL 4 stale or unresolvable"
     )
+
+
+def test_g10_reproduce_must_pass_in_the_full_check(g10: Any, tmp_path: Path) -> None:
+    edit(g10, "Makefile", "@echo 'REPRODUCE: PASS 1 checks'", "@echo 'REPRODUCE: FAIL 1'; exit 1")
+    g10.commit("a rebuild differs")
+    assert_fail(10, g10, tmp_path, "make reproduce failed")
+
+
+def test_g10_numbers_built_from_older_artifacts_fail(g10: Any, tmp_path: Path) -> None:
+    digest = hashlib.sha256((g10.path / ART).read_bytes()).hexdigest()
+    g10.write_json("artifacts/report/numbers.json", {"sources": {ART: digest}})
+    g10.commit("derived numbers from the current artifact")
+    assert_pass(10, g10, tmp_path / "ok", fast=True)
+    edit(g10, ART, '"estimate": 0.4123', '"estimate": 0.4151')
+    g10.commit("re-bank the artifact, but not the derived numbers")
+    assert_fail(10, g10, tmp_path, "numbers.json was built from older artifacts", fast=True)
 
 
 def test_g10_fabricated_number_fails(g10: Any, tmp_path: Path) -> None:

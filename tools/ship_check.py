@@ -1115,11 +1115,23 @@ def g10(ctx: Ctx) -> str:
         )
     cc = ctx.make("claimcheck", timeout=600)
     need(cc.ok, f"make claimcheck failed: {cc.tail()}")
+    numbers_path = rel(ctx, "artifacts/report/numbers.json")
+    if numbers_path.is_file():
+        sources = load_json(numbers_path).get("sources")
+        need(isinstance(sources, dict) and bool(sources), "numbers.json records no sources")
+        stale = [
+            src
+            for src, digest in sources.items()
+            if not rel(ctx, src).is_file() or sha256_file(rel(ctx, src)) != digest
+        ]
+        need(not stale, f"numbers.json was built from older artifacts: {', '.join(stale)}")
     if ctx.fast:
-        return f"claimcheck passed ({cc.tail()}); fast: freshness not run"
+        return f"claimcheck passed ({cc.tail()}); fast: freshness and reproduce not run"
     fr = ctx.make("freshness", timeout=3600)
     need(fr.ok, f"make freshness failed: {fr.tail()}")
-    return f"claimcheck ({cc.tail()}) and freshness ({fr.tail()}) passed"
+    rp = ctx.make("reproduce", timeout=7200)
+    need(rp.ok and "REPRODUCE: PASS" in rp.tail(), f"make reproduce failed: {rp.tail()}")
+    return f"claimcheck ({cc.tail()}), freshness ({fr.tail()}), and reproduce passed"
 
 
 def g11(ctx: Ctx) -> str:

@@ -52,7 +52,7 @@ from baserate.estimate.bootstrap import cluster_index, cluster_weights, percenti
 from baserate.traces.schema import Trace
 
 REPO = Path(__file__).resolve().parents[1]
-ROOT = Path(os.environ.get("BASERATE_ROOT", REPO))
+ROOT = Path(os.environ.get("BASERATE_ROOT", REPO)).resolve()
 """Data root; tests point it at a temporary tree."""
 sys.path.insert(0, str(REPO / "tools"))
 
@@ -229,36 +229,68 @@ def derived_scores(
     return out
 
 
+def _weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
+    """The lower weighted median, or NaN when no value has positive weight."""
+    keep = weights > 0
+    v, w = values[keep], weights[keep]
+    if v.size == 0:
+        return math.nan
+    order = np.argsort(v, kind="stable")
+    v, w = v[order], w[order]
+    cum = np.cumsum(w)
+    return float(v[int(np.searchsorted(cum, 0.5 * cum[-1]))])
+
+
 def ttd(
-    prefix_recs: Sequence[dict[str, Any]], threshold: float, reps: int, seed: int
+    prefix_recs: Sequence[dict[str, Any]],
+    threshold: float,
+    tie_fraction: float,
+    reps: int,
+    seed: int,
 ) -> dict[str, Any]:
-    """Time to detection among violations with prefix scores."""
-    delays: list[float] = []
+    """Time to detection at the budget threshold (prereg/0003).
+
+    A violation is caught at the first prefix that the budget reviews. At the
+    randomized budget threshold that is the first prefix scoring above it, or,
+    with probability equal to the threshold's tie fraction (one draw per
+    trace), the first prefix scoring at or above it. The shares and the median
+    delay are expected values over that draw, so a monitor whose scores tie at
+    the threshold gets only the tie fraction's credit for them. Violations no
+    prefix of which is reviewed count as missed.
+    """
+    ge: list[float] = []
+    gt: list[float] = []
     for rec in prefix_recs:
-        hit = next((i for i, s in enumerate(rec.get("prefix_scores", [])) if s >= threshold), None)
-        delays.append(math.inf if hit is None else float(hit))
-    d = np.array(delays)
-    caught = np.isfinite(d)
-    out: dict[str, Any] = {"violations": int(d.size), "caught": int(caught.sum())}
-    if d.size == 0:
+        scores = rec.get("prefix_scores", [])
+        ge.append(next((float(i) for i, s in enumerate(scores) if s >= threshold), math.inf))
+        gt.append(next((float(i) for i, s in enumerate(scores) if s > threshold), math.inf))
+    a, b = np.array(ge), np.array(gt)
+    t = float(tie_fraction)
+    out: dict[str, Any] = {"violations": int(a.size), "tie_fraction": t}
+    if a.size == 0:
         return out
+
+    def summary(rows: np.ndarray) -> tuple[float, float, float]:
+        x, y = a[rows], b[rows]
+        fx, fy = np.isfinite(x), np.isfinite(y)
+        now = t * float((x == 0).mean()) + (1 - t) * float((y == 0).mean())
+        caught = t * float(fx.mean()) + (1 - t) * float(fy.mean())
+        values = np.concatenate([x[fx], y[fy]])
+        weights = np.concatenate([np.full(int(fx.sum()), t), np.full(int(fy.sum()), 1 - t)])
+        return now, caught, _weighted_median(values, weights)
+
+    now, caught, med = summary(np.arange(a.size))
     rng = np.random.default_rng(seed)
-    idx = rng.integers(0, d.size, size=(reps, d.size))
-    share_now = (d == 0).mean()
-    boot_now = (d[idx] == 0).mean(axis=1)
-    out["share_detected_at_violating_step"] = float(share_now)
-    out["share_detected_at_violating_step_ci"] = list(percentile_interval(boot_now))
-    out["share_caught"] = float(caught.mean())
-    if caught.any():
-        med = float(np.median(d[caught]))
-        boots = []
-        for row in idx:
-            dd = d[row]
-            dd = dd[np.isfinite(dd)]
-            boots.append(float(np.median(dd)) if dd.size else math.nan)
-        b = np.array([x for x in boots if not math.isnan(x)])
+    boots = [summary(row) for row in rng.integers(0, a.size, size=(reps, a.size))]
+    out["share_detected_at_violating_step"] = now
+    out["share_detected_at_violating_step_ci"] = list(
+        percentile_interval(np.array([s[0] for s in boots]))
+    )
+    out["share_caught"] = caught
+    if not math.isnan(med):
+        meds = np.array([s[2] for s in boots if not math.isnan(s[2])])
         out["median_delay_steps"] = med
-        out["median_delay_steps_ci"] = list(percentile_interval(b)) if b.size else None
+        out["median_delay_steps_ci"] = list(percentile_interval(meds)) if meds.size else None
     return out
 
 
@@ -406,7 +438,13 @@ def run_e2(prereg: Path) -> dict[str, Any]:
                 "prevalence": tcfg["prevalence"],
                 "budget": tcfg["budget_per_10k"],
                 "threshold": op.threshold,
-                **ttd(prefix, op.threshold, 2000, stable_seed(head["seed"], "ttd", mid)),
+                **ttd(
+                    prefix,
+                    op.threshold,
+                    op.tie_fraction,
+                    2000,
+                    stable_seed(head["seed"], "ttd", mid),
+                ),
             }
         )
     # breakdowns on the primary set at the size-ladder setting
@@ -514,6 +552,7 @@ def run_e2(prereg: Path) -> dict[str, Any]:
         "size_ladder": ladder,
         "scores_file": str(scores_path.relative_to(ROOT)),
         "scores_sha256": hashlib.sha256(buf.getvalue()).hexdigest(),
+        "scores_records_sha256": hashlib.sha256(raw).hexdigest(),
         "corpus_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
         "provenance": {
             "git_sha": git_sha(),
@@ -560,7 +599,9 @@ def run_e3(prereg: Path) -> dict[str, Any]:
     cfg = prereg_config(prereg)
     manifest = ROOT / "artifacts" / "corpus" / "manifest.json"
     traces = [t for t in corpus_traces(manifest) if in_set(t, cfg["set"])]
-    traces = [t for t in traces if t.source != "dataset"]
+    # prereg/0004 (D22): every benign trace of the full set, Armour's included, and the
+    # natural and inserted violations; Armour's violations are left out
+    traces = [t for t in traces if not (t.label == "violation" and t.source == "dataset")]
     prev, q = float(cfg["prevalence"]), flag_rate_from_budget(float(cfg["budget_per_10k"]))
     reps, band, floor = int(cfg["resamples"]), cfg["ratio_band"], float(cfg["recall_gap_floor"])
     domains = sorted({t.domain for t in traces})
@@ -739,6 +780,7 @@ def run_e4(prereg: Path) -> dict[str, Any]:
         )
         max_cost = float(cfg["compute_budget_fraction_of_stage2"]) * c2
         train, test = split_by_run(ts, float(cfg["test_fraction"]), int(cfg["split_seed"]))
+        assert test.neg_clusters is not None and test.pos_clusters is not None
         hold = validate_holdout(
             train,
             test,
@@ -807,6 +849,14 @@ def run_e4(prereg: Path) -> dict[str, Any]:
                 ],
                 "n_train_runs": hold.n_train_neg_runs + hold.n_train_pos_runs,
                 "n_test_runs": hold.n_test_neg_runs + hold.n_test_pos_runs,
+                "test_composition": composition(
+                    [
+                        t
+                        for t in traces
+                        if t.source_run_id
+                        in set(test.neg_clusters.tolist()) | set(test.pos_clusters.tolist())
+                    ]
+                ),
             }
         )
         hypotheses.append({"id": f"H4.1-{pair['index']}", "outcome": h41})
