@@ -52,8 +52,8 @@ claimcheck: ## Every number in README.md and docs/REPORT.md traces to an artifac
 freshness: ## Re-derive every live number in README.md and docs/REPORT.md
 	python3 tools/freshness.py README.md docs/REPORT.md
 
-citecheck: ## Validate artifacts/citecheck.json offline
-	@echo "NOT IMPLEMENTED: make citecheck (milestone M2, docs/PLAN.md)"; exit 1
+citecheck: ## Validate artifacts/citecheck.json offline; every [@key] cited must be verified
+	python3 tools/citecheck.py
 
 secrets-scan: ## Scan tracked files and history for secrets
 	python3 tools/secrets_scan.py
