@@ -3,74 +3,74 @@ STATE: ACTIVE
 
 # Status
 
-Updated 2026-10-23 by the heartbeat (bootstrap turn). History: docs/LOG.md.
+Updated 2026-11-04 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
 
 ## Gates
 
-From `python tools/ship_check.py --fast` on the bootstrap commit (fast runs do not count).
+Passing now (fast check): G2, G14. Everything else waits on data (E0 to E4), the
+report, or the review.
 
-| Gate | Fast result | Evidence |
+| Gate | State | What is left |
 |---|---|---|
-| G1 Build and tests | FAIL | tests pass; core packages traces, monitors, estimate, certify, cascade not built |
-| G2 Static quality | PASS | ruff check, ruff format --check, mypy --strict clean |
-| G3 CI parity | FAIL | workflow runs `make ci` on 3.11 and 3.12; `make demo` not built |
-| G4 Offline demo | FAIL | demo and golden output not built |
-| G5 Statistical engine | FAIL | no E0 artifact |
-| G6 Corpus | FAIL | no corpus manifest |
-| G7 Main study | FAIL | no E2 artifact |
-| G8 Transfer and cascades | FAIL | no docs/REPORT.md, no E3 or E4 artifacts |
-| G9 Usable by others | FAIL | examples not written |
-| G10 Claim integrity | FAIL | no docs/REPORT.md; claimcheck and freshness not built |
-| G11 Preregistration integrity | FAIL | no preregistrations |
-| G12 Independent review | FAIL | no review yet |
-| G13 Documentation | FAIL | README.md is still the build brief |
-| G14 Hygiene | PASS | secrets-scan clean; cash_usd = 0; caps respected; tree clean |
+| G1 Build and tests | tests pass | coverage floor is checked at ship-check |
+| G2 Static quality | passes | |
+| G3 CI parity | make ci passes locally | CI runs only on main and PRs into main (D14) |
+| G4 Offline demo | make demo matches golden output | |
+| G5 Statistical engine | E0 running (final cells) | finalize, bank, link to E2 headlines |
+| G6 Corpus | E1 generation running (Qwen3-1.7B batch) | 4B batch, insertions, variants, audit, datasheet |
+| G7 Main study | E2 preregistration drafted | freeze after E0, score, analyze |
+| G8 Transfer and cascades | E3 and E4 preregistrations drafted | freeze, analyze |
+| G9 Usable by others | CLI, card, and examples being built by a subagent | README must name the examples |
+| G10 Claim integrity | claimcheck and freshness tools in place | documents not rendered yet |
+| G11 Preregistration integrity | 2 preregistrations frozen (E0, E1) | confirmatory artifacts |
+| G12 Independent review | not started | reviewer subagent, 1 run per day under CAP_SHARE=0.2 |
+| G13 Documentation | report builder in place; REPORT method sections drafted | results, README, citations |
+| G14 Hygiene | passes | |
 
 ## Now
 
-Bootstrap complete. Next iteration starts milestone M1 (statistical core), the
-critical path for G1, G3, G4, and G9.
+E0 confirmatory run (pinned worktree at the prereg commit) is finishing; E1 real agent
+runs started with Qwen3-1.7B (2,000 planned runs; restart at full width when E0 frees
+the CPU). Subagents: CLI, report card, and examples; certify and cascade tests.
 
 ## Next three actions
 
-1. M1: `baserate.estimate` test-first: prevalence reweighting, exact (Clopper-Pearson),
-   Jeffreys and Bayesian beta intervals, cluster bootstrap by source run, recall and
-   precision at a review budget, stratified and importance-sampled estimators.
-2. M1: `baserate.certify` (closed forms where they exist, simulation otherwise) and
-   `baserate.cascade` (threshold optimization under cost and review budgets, Pareto
-   fronts); CLI `eval`, `certify`, `cascade`, `card`.
-3. M1: recorded fixtures, `make demo` with `demo/golden_output.txt`, the three examples;
-   then tag v0.1. After that, M2: port prereg, claimcheck, freshness, and mutation tests
-   from raise-v1-public (needs `add_repo` read access to that public repository).
+1. Finalize E0, choose the E2 headline method from the cells E0 supports, freeze the
+   E2, E3, and E4 preregistrations (docs/drafts/) before any monitor score exists.
+2. Finish E1: Qwen3-4B batch, controlled insertions, corpus build, blind label audit,
+   docs/DATA.md datasheet.
+3. Score the monitors (rules, Qwen3 ladder), run E2 to E4, build the report.
 
-## Environment (make doctor, 2026-10-23)
+## Environment
 
-- Linux x86_64, 4 CPUs, 15.7 GB RAM, no GPU, 29.9 GB free disk (floor 8 GB).
-- Python 3.11 and 3.12 present; uv 0.11.32. Network reaches PyPI, Hugging Face, ollama.com, arXiv.
-- Docker: client only, no daemon. Ollama, llama.cpp, torch, transformers: not installed.
-- Sandbox: `unshare -rn` (network isolation only); no bubblewrap or Docker (DECISIONS.md D3).
-- Backends: local open-weight models installable, not installed yet. Claude plan
-  **unusable** (billing guard: `ANTHROPIC_BASE_URL` and `CLAUDE_CODE_USE_CCR_V2` are set,
-  DECISIONS.md D2). Free tiers: none configured. Review: `reviewer` subagent fallback.
-- `ALLOW_PUSH` not set; pushes go to the session branch only (DECISIONS.md D1).
+Linux x86_64, 4 CPUs, 15.7 GB RAM, no GPU. llama.cpp b11700 built locally; Qwen3 0.6B,
+1.7B, 4B (Q4_K_M), and 8B (Q4_K_M) pinned and hash-checked in ~/models. Claude backend
+unusable here (billing guard, D2). Sandbox: in-process mock tools only (D3).
+ALLOW_PUSH=1 and CAP_SHARE=0.2 (D9). Commits authored as Raj (D13). CI only on main and
+pull requests into main; make ci passes locally before every push (D14).
 
 ## Usage to date
 
-No model calls. Ledger empty. cash_usd = 0.
+cash_usd = 0 (`make budget`). Local model calls only, logged per batch in
+artifacts/usage/ledger.jsonl. Claude: subagents of this session only (no headless
+children); reviewer runs will be logged against the daily review cap.
 
 ## Needs Raj
 
-None of these blocks progress now; the Definition of Done is reachable without them.
+None of these blocks the Definition of Done.
 
-1. **Confirm pushing.** This cloud session pushes commits to
-   `claude/tender-ptolemy-ilsn9p` only (never main, tags, or force; DECISIONS.md D1).
-   Set `ALLOW_PUSH=1` in the environment to make that explicit, or say stop.
-2. **Claude arms (optional).** Claude subject runs, Claude-judge monitors, and headless
-   `make review` need a machine where `claude` is logged in to the Max plan and none of
-   `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `CLAUDE_CODE_USE_*`
-   is set. Without it the study fields four families without Claude (docs/PLAN.md).
-3. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow third-party
-   code; until then only this project's own tasks with in-process mock tools run.
+1. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
+   agents for misalignment"
+   (https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment) served
+   a bot challenge to scripted access twice. Open it in a browser and confirm the
+   title, date, and the brief's description; until then it is not cited.
+2. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
+   machine where `claude` is logged in to the Max plan with none of
+   `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
+   `CLAUDE_CODE_USE_*` set. The study fields four families without them.
+3. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
+   third-party code; until then only this project's own tasks with in-process mock
+   tools run.
 
 ## Blocked
 
@@ -79,6 +79,6 @@ Nothing.
 ## Backlog (suggestions for Raj, not ladder rungs)
 
 - A machine-readable monitor report card (`baserate card --json`) that states the
-  certification gap in words a safety case can quote ("N more independent benign runs
-  are needed to claim a false-positive rate of at most f"), so a lab can attach it to a
-  monitoring section as is.
+  certification gap in words a safety case can quote (being built).
+- A recorded-fixture adapter for real agent transcripts (Claude Code stream-json,
+  Inspect logs), so a lab can score its own traffic with the same estimators.
