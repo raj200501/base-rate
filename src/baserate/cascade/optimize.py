@@ -584,13 +584,23 @@ class HoldoutResult:
     reps: int
 
 
+def _feasible(points: Sequence[CascadePoint], max_cost: float) -> list[int]:
+    """Indices of the points whose cost is within ``max_cost``."""
+    return [i for i, p in enumerate(points) if p.cost <= max_cost + _TOL]
+
+
 def _select(points: Sequence[CascadePoint], max_cost: float) -> int:
-    """Index of the highest-recall cascade within budget (ties: lowest escalation)."""
-    best, best_recall = -1, -np.inf
-    for i, p in enumerate(points):
-        if p.cost <= max_cost + _TOL and p.recall > best_recall + _TOL:
-            best, best_recall = i, p.recall
-    return best
+    """Index of the highest-recall cascade within budget (ties: lowest escalation).
+
+    Recalls within ``_TOL`` of the best count as ties, the same rule the
+    bootstrap of :func:`validate_holdout` applies to each replicate. Returns
+    -1 when no point is within budget.
+    """
+    feasible = _feasible(points, max_cost)
+    if not feasible:
+        return -1
+    top = max(points[i].recall for i in feasible)
+    return next(i for i in feasible if points[i].recall >= top - _TOL)
 
 
 def validate_holdout(
@@ -649,7 +659,10 @@ def validate_holdout(
         test, prevalence, flag_rate, chosen.threshold, chosen.tie_fraction, c1, c2
     )
     rates = _rates(escalation_rates, flag_rate)
-    feasible = np.flatnonzero(c1 + rates * c2 <= max_cost + _TOL)
+    # the candidate set of the point selection (candidates follow ``rates``), so
+    # every replicate chooses among the same rates even when a realized cost
+    # c1 + e * c2 and the nominal c1 + rate * c2 round to different sides of max_cost
+    feasible = np.asarray(_feasible(sweep.candidates, max_cost), dtype=np.intp)
     rng = np.random.default_rng(seed)
     idx = [
         cluster_index(train.neg_clusters, train.n_neg),

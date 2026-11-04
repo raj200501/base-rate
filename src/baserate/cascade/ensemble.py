@@ -31,7 +31,7 @@ def rank_normalize(scores: ArrayLike, reference: ArrayLike) -> FloatArray:
     """Mid-rank empirical CDF of ``reference`` evaluated at each score.
 
     A score maps to ``(#reference below it + 0.5 * #reference equal to it) /
-    #reference``, a value in [0, 1].
+    #reference``, a value in [0, 1]. A NaN score (not scored) stays NaN.
 
     Args:
         scores: Scores to normalize.
@@ -46,20 +46,23 @@ def rank_normalize(scores: ArrayLike, reference: ArrayLike) -> FloatArray:
     s = np.asarray(scores, dtype=np.float64)
     below = np.searchsorted(ref, s, side="left")
     upto = np.searchsorted(ref, s, side="right")
-    return np.asarray((below + 0.5 * (upto - below)) / ref.size, dtype=np.float64)
+    # searchsorted places NaN above every reference value; keep it missing instead
+    rank = (below + 0.5 * (upto - below)) / ref.size
+    return np.asarray(np.where(np.isnan(s), np.nan, rank), dtype=np.float64)
 
 
 def combine(normalized: Sequence[ArrayLike], how: How = "mean") -> FloatArray:
     """Combine aligned normalized scores of several monitors trace by trace.
 
     Args:
-        normalized: One array per monitor, all of the same length.
+        normalized: One array per monitor, all of the same length (a 2-D
+            array with one row per monitor also works).
         how: ``"mean"`` or ``"max"``.
 
     Returns:
         The ensemble score per trace.
     """
-    if not normalized:
+    if len(normalized) == 0:
         raise ValueError("need at least one monitor")
     stack = np.vstack([np.asarray(a, dtype=np.float64).ravel() for a in normalized])
     if how == "mean":
@@ -86,7 +89,7 @@ def ensemble_scores(
     Returns:
         (benign ensemble scores, violation ensemble scores).
     """
-    if len(neg) != len(pos) or not neg:
+    if len(neg) != len(pos) or len(neg) == 0:
         raise ValueError("need the same positive number of monitors for both classes")
     if reference not in ("pooled", "benign"):
         raise ValueError("reference must be 'pooled' or 'benign'")

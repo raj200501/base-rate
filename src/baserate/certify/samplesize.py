@@ -33,6 +33,16 @@ target at every ``n`` through a checked horizon of at least twice that ``n``
 (``RunPlan.runs``), and report the first crossing separately
 (``RunPlan.first_runs``). Planning at the first crossing is unsafe: a few
 extra runs added for convenience could lower the power below target.
+
+**Adding runs after a look.** :func:`more_runs_fpr` and
+:func:`more_runs_recall` report when the bound on all runs together (old and
+new) would certify. That bound treats the total number of runs as fixed in
+advance. When runs are added because an earlier look at the same claim did
+not certify, the claim is tested twice, and the probability of certifying a
+false claim can exceed ``alpha`` (tools/validate_certify.py measures it). To
+keep ``alpha``, fix the total before looking, or certify on the new runs
+alone (planned with the calculators above) at the part of ``alpha`` that
+earlier looks did not spend.
 """
 
 from __future__ import annotations
@@ -186,6 +196,18 @@ def _check_open_unit(name: str, value: float) -> None:
         raise ValueError(f"{name} must be in (0, 1)")
 
 
+def _check_alpha(alpha: float) -> None:
+    """Alpha in (0, 1), and large enough that the exact upper bound is computable.
+
+    The upper bound evaluates a Beta quantile at ``1 - alpha``; when that
+    rounds to 1 in double precision (alpha below about 1.1e-16) the bound is 1
+    for every sample size, so no plan could certify.
+    """
+    _check_open_unit("alpha", alpha)
+    if 1.0 - alpha == 1.0:
+        raise ValueError("alpha is too small for exact bounds in double precision")
+
+
 def _certifies(
     metric: Metric, events: ArrayLike, runs: ArrayLike, bound: float, alpha: float
 ) -> BoolArray:
@@ -241,16 +263,20 @@ def _event_bound(metric: Metric, bound: float) -> float:
 
 
 def _zero_event_runs(metric: Metric, bound: float, alpha: float) -> int:
-    _check_open_unit("alpha", alpha)
+    _check_alpha(alpha)
     _check_open_unit("max_fpr" if metric == "fpr" else "min_recall", bound)
     denom = math.log1p(-bound) if metric == "fpr" else math.log(bound)
     n = max(math.ceil(math.log(alpha) / denom), 1)
-    # guard the closed form against rounding at exact integers
-    while n > 1 and bool(_certifies(metric, 0, n - 1, bound, alpha)):
-        n -= 1
-    while not bool(_certifies(metric, 0, n, bound, alpha)):
-        n += 1
-    return n
+    if bool(_certifies(metric, 0, n, bound, alpha)) and (
+        n == 1 or not bool(_certifies(metric, 0, n - 1, bound, alpha))
+    ):
+        return n
+    # rounding at an exact integer moved the answer off the closed form: search
+    # with the decision function itself (bounded, unlike a step-by-step walk)
+    found = int(_min_runs(metric, np.zeros(1, dtype=np.int64), bound, alpha, cap=_CAP)[0])
+    if found < 0:
+        raise ValueError(f"no number of runs up to {_CAP} certifies this target")
+    return found
 
 
 def zero_fp_runs(max_fpr: float, alpha: float = 0.05) -> int:
@@ -303,7 +329,7 @@ def events_allowed(
     Returns:
         Integer array shaped like ``runs``; -1 where even zero events do not certify.
     """
-    _check_open_unit("alpha", alpha)
+    _check_alpha(alpha)
     _check_open_unit("bound", bound)
     n = np.asarray(runs, dtype=np.int64)
     if np.any(n < 1):
@@ -314,6 +340,8 @@ def events_allowed(
     # the bound exceeds events / runs, so at most bound * runs events can certify
     k_max = math.floor(_event_bound(metric, bound) * top) + 2
     nk = _min_runs(metric, np.arange(k_max + 1, dtype=np.int64), bound, alpha, cap=_CAP)
+    # -1 marks event counts that no run count up to the cap certifies
+    nk = np.where(nk < 0, np.iinfo(np.int64).max, nk)
     return (np.searchsorted(nk, n, side="right") - 1).astype(np.int64)
 
 
@@ -522,7 +550,7 @@ def split_alpha(
     Returns:
         (alpha_recall, alpha_fpr).
     """
-    _check_open_unit("alpha", alpha)
+    _check_alpha(alpha)
     _check_open_unit("recall_share", recall_share)
     if split == "bonferroni":
         return alpha * recall_share, alpha * (1.0 - recall_share)
@@ -570,6 +598,9 @@ def joint_plan(
     """
     a_r, a_f = split_alpha(alpha, split, recall_share)
     n_assumed = (true_recall is not None) + (true_fpr is not None)
+    if n_assumed:
+        # validate before taking a root: a negative power would give a complex arm power
+        _check_open_unit("power", power)
     arm_power = power ** (1.0 / n_assumed) if n_assumed else None
     rec = (
         _zero_plan("recall", min_recall, a_r)
@@ -607,7 +638,7 @@ def _more_runs(
     power: float | None,
     n_max: int,
 ) -> MoreRuns:
-    _check_open_unit("alpha", alpha)
+    _check_alpha(alpha)
     _check_open_unit("bound", bound)
     if runs < 1 or not 0 <= events <= runs:
         raise ValueError("need runs >= 1 and 0 <= events <= runs")
@@ -681,6 +712,9 @@ def more_runs_fpr(
     unreachable because ``k / n >= max_fpr``. With ``power``, also (c) the
     additional runs from which the probability of certifying stays at or
     above ``power`` when future false positives are Binomial at ``k / n``.
+    The answers assume one analysis of all runs; see "Adding runs after a
+    look" in the module docstring before extending a study that failed to
+    certify.
 
     Args:
         false_positives: Runs with a false positive so far (k).
@@ -709,7 +743,8 @@ def more_runs_recall(
     Same answers as :func:`more_runs_fpr`, with misses as the events: (a) all
     additional runs are detected, (b) misses continue at the observed rate,
     unreachable when the observed recall is at or below ``min_recall``, and
-    (c) the stays-above power rule.
+    (c) the stays-above power rule. The same caveat on adding runs after a
+    look applies.
 
     Args:
         detected: Violation runs detected so far.
