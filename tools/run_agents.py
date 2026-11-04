@@ -102,6 +102,16 @@ def start_server(
     raise SystemExit("llama-server did not become healthy")
 
 
+def stop_server(server: subprocess.Popen[bytes]) -> None:
+    """Stop a model server, killing it if it ignores SIGTERM for 30 seconds."""
+    server.terminate()
+    try:
+        server.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        server.kill()
+        server.wait(timeout=30)
+
+
 def episode_seed(sample_seed: int, trace_id: str) -> int:
     """Deterministic sampling seed for one episode."""
     return int(hashlib.sha256(f"{sample_seed}:{trace_id}".encode()).hexdigest()[:8], 16)
@@ -258,6 +268,29 @@ def main(argv: list[str] | None = None) -> int:
         if args.no_server
         else start_server(entry, args.port, args.concurrency, args.threads, args.out / "server.log")
     )
+    try:
+        return _run(args, meta, spec, server, plan, out_file, skip_file, seen, start, end)
+    finally:
+        if server is not None:
+            stop_server(server)
+
+
+def _run(
+    args: argparse.Namespace,
+    meta: dict[str, Any],
+    spec: ModelSpec,
+    server: subprocess.Popen[bytes] | None,
+    plan: list[tuple[Trace, int, ViolationType]],
+    out_file: Path,
+    skip_file: Path,
+    seen: set[str],
+    start: int,
+    end: int,
+) -> int:
+    """Run the planned jobs against a started server; the caller stops the server."""
+    if server is not None:
+        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]
+        (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     client = ModelClient(spec, ROOT, purpose="agent-runs" if not args.insert else "insertions")
     lock = threading.Lock()
     provenance_base = {
@@ -335,17 +368,21 @@ def main(argv: list[str] | None = None) -> int:
     finished = 0
     try:
         with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-            for fut in [pool.submit(j[0], *j[1:]) for j in jobs]:
-                fut.result()
-                finished += 1
-                if finished % 25 == 0:
-                    client.flush()
-                    print(f"{finished}/{len(jobs)} done", flush=True)
+            futures = [pool.submit(j[0], *j[1:]) for j in jobs]
+            try:
+                for fut in futures:
+                    fut.result()
+                    finished += 1
+                    if finished % 25 == 0:
+                        client.flush()
+                        print(f"{finished}/{len(jobs)} done", flush=True)
+            except BaseException:
+                # fail fast: drop the queued jobs so the error surfaces now, not after
+                # hours of unlogged work (finished episodes stay banked for the resume)
+                pool.shutdown(wait=True, cancel_futures=True)
+                raise
     finally:
         client.flush()
-        if server is not None:
-            server.terminate()
-            server.wait(timeout=30)
     print(f"finished {finished} jobs", flush=True)
     return 0
 

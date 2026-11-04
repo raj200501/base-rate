@@ -755,9 +755,14 @@ def run_e3(prereg: Path) -> dict[str, Any]:
 def median_seconds(set_name: str, monitor: str) -> float:
     """Median recorded scoring time per trace (the E4 cost proxy)."""
     recs = load_scores(set_name, monitor)
-    secs = [float(r["seconds"]) for r in recs.values() if r.get("seconds") is not None]
+    # a record served from the response cache took no model time, so it is left out
+    secs = [
+        float(r["seconds"])
+        for r in recs.values()
+        if r.get("seconds") is not None and not r.get("cached", False)
+    ]
     if not secs:
-        raise SystemExit(f"{monitor} has no recorded per-trace times")
+        raise SystemExit(f"{monitor} has no recorded per-trace times outside the cache")
     return float(np.median(secs))
 
 

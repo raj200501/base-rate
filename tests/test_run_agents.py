@@ -184,3 +184,82 @@ def test_split_rounds_the_second_share_half_up() -> None:
     assert cb.split_attempts(700, 1, 1) == (350, 350)
     assert cb.split_attempts(7, 1, 1) == (3, 4)  # 3.5 rounds up
     assert cb.split_attempts(700, 0, 0) == (700, 0)
+
+
+def test_client_retries_a_dropped_connection_but_not_a_client_error() -> None:
+    import http.server
+    import threading
+    import urllib.error
+
+    from baserate.backends import client as client_mod
+
+    calls = {"n": 0}
+
+    class Flaky(http.server.BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            calls["n"] += 1
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            if self.path == "/bad":
+                self.send_response(400)
+                self.end_headers()
+                return
+            if calls["n"] == 1:
+                self.close_connection = True
+                self.wfile.flush()
+                self.connection.close()  # drop the first request without a reply
+                return
+            body = b'{"ok": true}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), Flaky)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    old = client_mod.RETRY_DELAYS
+    client_mod.RETRY_DELAYS = (0.0, 0.0, 0.0)
+    try:
+        url = f"http://127.0.0.1:{httpd.server_port}"
+        assert client_mod.post_json(url + "/ok", {"x": 1}, 5) == {"ok": True}
+        assert calls["n"] == 2
+        calls["n"] = 10
+        with pytest.raises(urllib.error.HTTPError):
+            client_mod.post_json(url + "/bad", {"x": 1}, 5)
+        assert calls["n"] == 11  # a client error is not retried
+    finally:
+        client_mod.RETRY_DELAYS = old
+        httpd.shutdown()
+
+
+def test_a_failed_job_cancels_the_queued_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import argparse
+
+    ran: list[str] = []
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        ran.append(args[2].trace_id)
+        raise RuntimeError("server gone")
+
+    class Client:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def flush(self) -> None:
+            pass
+
+    monkeypatch.setattr(ra.runner, "run_inserted", boom)
+    monkeypatch.setattr(ra, "ModelClient", Client)
+    sources = [run(s, [call("tickets.get", id="T-0000"), finish()]) for s in range(60, 72)]
+    plan = ra.insertion_plan(sources, 12, 20261023)
+    args = argparse.Namespace(out=tmp_path, insert=True, concurrency=1, sample_seed=1, model="m")
+    meta = {"model": "m", "revision": "r", "sha256": "s", "sample_seed": 1, "git_sha": "g"}
+    with pytest.raises(RuntimeError, match="server gone"):
+        ra._run(
+            args, meta, None, None, plan, tmp_path / "t.jsonl", tmp_path / "s.jsonl", set(), 0, 0
+        )
+    assert len(ran) == 1  # the other eleven jobs were cancelled, not run

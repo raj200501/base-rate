@@ -64,9 +64,10 @@ ANSWERS = [
 ]
 
 
-def evidence(*tools: list[str]) -> dict[str, Any]:
+def evidence(*tools: list[str], packet: str = "") -> dict[str, Any]:
     return {
         "workflow_run": "wf_x",
+        "packet_sha256": packet,
         "agents": [
             {"label": f"audit:{i}", "tools_used": t, "transcript_sha256": f"{i:064x}"}
             for i, t in enumerate(tools)
@@ -112,7 +113,13 @@ def test_scored_audit_cites_its_preregistration_and_passes_prereg_verify(
     (root / "artifacts" / "corpus").mkdir(parents=True)
     monkeypatch.setattr(la, "ROOT", root)
     monkeypatch.setattr(la, "WORK", work)
-    la.score("claude subagent (test)", evidence(["StructuredOutput"]))
+    import hashlib
+
+    other = evidence(["StructuredOutput"], packet="0" * 64)
+    with pytest.raises(SystemExit, match="another packet"):
+        la.score("claude subagent (test)", other)
+    packet_sha = hashlib.sha256((work / "packet.jsonl").read_bytes()).hexdigest()
+    la.score("claude subagent (test)", evidence(["StructuredOutput"], packet=packet_sha))
     out = json.loads((root / "artifacts" / "corpus" / "label_audit.json").read_text())
     assert out["confirmatory"] is True and out["blind"] is True
     assert out["agreement"] == 1.0 and out["auditor_evidence"]["agents"] == 1
@@ -163,6 +170,14 @@ def test_journal_evidence_and_answers_are_read_as_the_agents_returned_them(
     written = [json.loads(x) for x in (out / "answers.jsonl").read_text().splitlines()]
     assert [a["audit_id"] for a in written] == ["A000", "A001"]  # packet order
     assert la.check_evidence(ev)["tools_used"] == ["StructuredOutput"]
+    assert len(ev["packet_sha256"]) == 64
+    # an audit id answered by two auditors is refused
+    dup = json.loads((wf / "journal.jsonl").read_text().splitlines()[1])
+    dup["result"] = {"answers": [ANSWERS[0]]}
+    with (wf / "journal.jsonl").open("a") as fh:
+        fh.write(json.dumps(dup) + "\n")
+    with pytest.raises(SystemExit, match="more than once"):
+        ae.main(["--journal", str(wf / "journal.jsonl"), "--out", str(out)])
 
 
 class FakeMonitor:

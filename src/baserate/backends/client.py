@@ -17,10 +17,12 @@ OpenAI-compatible chat endpoint. There is no paid API backend.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import threading
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -30,6 +32,39 @@ from typing import Any
 
 from baserate import budget as budget_mod
 from baserate.guard import current_problems
+
+RETRY_DELAYS = (2.0, 4.0, 8.0)
+"""Seconds to wait before each retry of a request that failed in transit."""
+
+
+def _transient(exc: BaseException) -> bool:
+    """A failure in transit (connection refused or dropped, timeout, server busy)."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in {502, 503, 504}
+    return isinstance(
+        exc, urllib.error.URLError | http.client.HTTPException | ConnectionError | TimeoutError
+    )
+
+
+def post_json(url: str, payload: Mapping[str, Any], timeout: float) -> dict[str, Any]:
+    """POST JSON and parse the reply, retrying failures in transit a few times.
+
+    Requests are deterministic (fixed seed), so a retry asks for the same
+    reply; a server that stays down still fails after the last retry.
+    """
+    body = json.dumps(payload).encode()
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data: dict[str, Any] = json.loads(resp.read())
+                return data
+        except Exception as exc:
+            if attempt == len(RETRY_DELAYS) or not _transient(exc):
+                raise
+            time.sleep(RETRY_DELAYS[attempt])
+    raise AssertionError("unreachable")
+
 
 Message = Mapping[str, str]
 
@@ -126,13 +161,7 @@ class ModelClient:
                 self.usage.cached += 1
             return {**out, "cached": True}
         start = time.monotonic()
-        req = urllib.request.Request(
-            f"{self.model.endpoint}/v1/chat/completions",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read())
+        data = post_json(f"{self.model.endpoint}/v1/chat/completions", payload, timeout)
         elapsed = time.monotonic() - start
         msg = data["choices"][0]["message"]
         out = {
@@ -184,13 +213,7 @@ class ModelClient:
                 self.usage.cached += 1
             return {**out, "cached": True}
         start = time.monotonic()
-        req = urllib.request.Request(
-            f"{self.model.endpoint}/completion",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read())
+        data = post_json(f"{self.model.endpoint}/completion", payload, timeout)
         elapsed = time.monotonic() - start
         out = {
             "content": str(data.get("content", "")),

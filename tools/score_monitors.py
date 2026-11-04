@@ -48,7 +48,7 @@ from baserate.monitors import model as model_mon  # noqa: E402
 from baserate.monitors.rules import builtin_rule_monitors  # noqa: E402
 from baserate.traces.schema import Trace  # noqa: E402
 from chainlib import sha256_obj  # noqa: E402
-from run_agents import model_spec, repair_jsonl, start_server  # noqa: E402
+from run_agents import model_spec, repair_jsonl, start_server, stop_server  # noqa: E402
 
 E2_PREREG = "prereg/0003-e2-main-study.md"
 
@@ -112,6 +112,9 @@ def model_record(mon: Any, trace: Trace, start: int | None) -> dict[str, Any]:
         "score": s.score,
         "digit_mass": s.details.get("digit_mass"),
         "seconds": round(time.monotonic() - t0, 3),
+        # a reply served from the response cache took no model time; E4's cost
+        # (tools/analyze.py median_seconds) leaves such records out
+        "cached": bool(s.details.get("cached", False)),
     }
     if start is not None:
         t1 = time.monotonic()
@@ -134,16 +137,38 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=0, help="score only the first N traces (pilot)")
     args = ap.parse_args(argv)
 
+    confirmatory_corpus = (ROOT / "artifacts" / "corpus" / "manifest.json").resolve()
+    if args.limit and args.corpus.resolve() == confirmatory_corpus:
+        raise SystemExit("a --limit pilot must use a pilot corpus, not the confirmatory one")
     manifest_bytes = args.corpus.read_bytes()
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
     traces = [t for t in corpus_traces(args.corpus) if in_set(t, args.set_name)]
     traces.sort(key=lambda t: t.trace_id)
     if args.limit:
         traces = traces[: args.limit]
     safe = args.monitor.replace(":", "_")
+    out_dir = ROOT / "artifacts" / "scores" / args.set_name
+    banked = out_dir / f"{safe}.meta.json"
+    if not args.limit and banked.exists() and (out_dir / f"{safe}.jsonl.gz").exists():
+        old = json.loads(banked.read_text())
+        same = (old.get("corpus_manifest_sha256"), old.get("prefixes"), old.get("traces"))
+        gz = hashlib.sha256((out_dir / f"{safe}.jsonl.gz").read_bytes()).hexdigest()
+        if same == (manifest_sha, args.prefixes, len(traces)) and old.get("scores_sha256") == gz:
+            print(f"{args.monitor} on {args.set_name}: already banked; nothing to do", flush=True)
+            return 0
     work = ROOT / "runs" / "scores" / args.set_name
     work.mkdir(parents=True, exist_ok=True)
     partial = work / f"{safe}{'.limit' if args.limit else ''}.partial.jsonl"
     done: dict[str, dict[str, Any]] = {}
+    # a resume may reuse partial records only for the same corpus and settings
+    sidecar = partial.with_suffix(".settings.json")
+    settings = {"corpus_manifest_sha256": manifest_sha, "prefixes": args.prefixes}
+    if partial.exists() and sidecar.exists() and json.loads(sidecar.read_text()) != settings:
+        raise SystemExit(
+            f"{partial} was scored with other settings or another corpus; move it away to rescore"
+        )
+    work.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(json.dumps(settings) + "\n")
     if repair_jsonl(partial):
         print(f"cut a partial last record from {partial}", flush=True)
     if partial.exists():
@@ -191,10 +216,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.monitor.startswith("model:"):
         key = args.monitor.split(":", 1)[1]
         spec, entry = model_spec(key, args.port)
+        client = ModelClient(spec, ROOT, purpose=f"score:{args.set_name}")
         server = start_server(
             entry, args.port, args.concurrency, args.threads, work / f"{safe}.server.log"
         )
-        client = ModelClient(spec, ROOT, purpose=f"score:{args.set_name}")
+        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]
         mon = model_mon.ModelMonitor(args.monitor, client)
         meta.update(
             {
@@ -232,20 +258,20 @@ def main(argv: list[str] | None = None) -> int:
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             for i, fut in enumerate([pool.submit(job, t) for t in todo], start=1):
                 fut.result()
+                if i % 10 == 0 and server is not None:
+                    client.flush()
                 if i % 100 == 0:
                     print(f"  {i}/{len(todo)}", flush=True)
-                    if server is not None:
-                        client.flush()
     finally:
         if server is not None:
-            client.flush()
-            server.terminate()
-            server.wait(timeout=30)
+            try:
+                stop_server(server)
+            finally:
+                client.flush()
     if args.limit:
         print("pilot (--limit): nothing banked", flush=True)
         return 0
     records = [done[t.trace_id] for t in traces]
-    out_dir = ROOT / "artifacts" / "scores" / args.set_name
     out_dir.mkdir(parents=True, exist_ok=True)
     raw = (
         "\n".join(json.dumps(r, sort_keys=True, separators=(",", ":")) for r in records) + "\n"
@@ -260,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
             "scores_file": str(out.relative_to(ROOT)),
             "scores_sha256": hashlib.sha256(buf.getvalue()).hexdigest(),
             "traces": len(records),
-            "corpus_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            "corpus_manifest_sha256": manifest_sha,
             "prefixes": args.prefixes,
             "concurrency": concurrency,
             "threads": args.threads,

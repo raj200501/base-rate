@@ -143,7 +143,11 @@ class ModelMonitor:
             trace_id=trace_id,
             score=min(max(score, 0.0), 1.0),
             cost=self.cost,
-            details={"digit_mass": round(mass, 4), "prompt_sha256": prompt_sha256()},
+            details={
+                "digit_mass": round(mass, 4),
+                "prompt_sha256": prompt_sha256(),
+                "cached": bool(out.get("cached", False)),
+            },
         )
 
     def score(self, trace: Trace) -> Score:

@@ -76,8 +76,9 @@ def _run_file(tmp_path: Path, seeds: range) -> Path:
 def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
     runs = _run_file(tmp_path, range(5))
     out1, out2 = tmp_path / "c1", tmp_path / "c2"
-    assert bc.main(["--runs", str(runs), "--variants", "3", "--out", str(out1)]) == 0
-    assert bc.main(["--runs", str(runs), "--variants", "3", "--out", str(out2)]) == 0
+    none = ["--planned-insertions", "0"]  # this build has no insertion runs
+    assert bc.main(["--runs", str(runs), "--variants", "3", "--out", str(out1), *none]) == 0
+    assert bc.main(["--runs", str(runs), "--variants", "3", "--out", str(out2), *none]) == 0
     m1 = json.loads((out1 / "manifest.json").read_text())
     m2 = json.loads((out2 / "manifest.json").read_text())
     assert [s["sha256"] for s in m1["shards"]] == [s["sha256"] for s in m2["shards"]]
@@ -133,7 +134,7 @@ def test_seed_ranges_render_gaps_and_singletons() -> None:
 def test_pilot_seeds_are_refused(tmp_path: Path) -> None:
     runs = _run_file(tmp_path, range(900_000, 900_001))
     with pytest.raises(SystemExit, match="pilot trace"):
-        bc.main(["--runs", str(runs), "--out", str(tmp_path / "c")])
+        bc.main(["--runs", str(runs), "--out", str(tmp_path / "c"), "--planned-insertions", "0"])
 
 
 def _insert_dir(tmp_path: Path, runs: Path, attempts: int, skips: list[dict[str, object]]) -> Path:
@@ -207,3 +208,9 @@ def test_insertion_log_refuses_an_inconsistent_run(
         bc.main(
             ["--runs", str(runs), str(inserted), "--variants", "1", "--out", str(tmp_path / "c")]
         )
+
+
+def test_a_build_without_the_planned_insertions_is_refused(tmp_path: Path) -> None:
+    runs = _run_file(tmp_path, range(3))
+    with pytest.raises(SystemExit, match="the protocol plans 700"):
+        bc.main(["--runs", str(runs), "--variants", "1", "--out", str(tmp_path / "c")])

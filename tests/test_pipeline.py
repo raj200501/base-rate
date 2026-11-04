@@ -673,3 +673,40 @@ def test_references_show_the_verified_title(
         if ref.get("verified"):
             title = rp.display_title(ref)
             assert "(Crossref" not in title and not title.startswith("["), title
+
+
+def test_scoring_safeguards(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = "prereg/0003-e2-main-study.md"  # score metadata cites the real E2 plan
+    (root / real).write_bytes((REPO / real).read_bytes())
+    sm = _load("score_monitors", monkeypatch, root)
+    base = ["--monitor", "rule:armour-baseline", "--set", "primary"]
+    assert sm.main(base) == 0
+    meta_path = root / "artifacts" / "scores" / "primary" / "rule_armour-baseline.meta.json"
+    first = meta_path.read_text()
+    meta = json.loads(first)
+    assert meta["confirmatory"] is True and meta["prereg"] == real
+    assert len(meta["prereg_config_sha256"]) == 64
+    # a second run finds it banked and leaves its provenance alone
+    assert sm.main(base) == 0
+    assert meta_path.read_text() == first
+    # other settings on the same partial records are refused, not silently reused
+    with pytest.raises(SystemExit, match="other settings"):
+        sm.main([*base, "--prefixes"])
+    # a pilot may not score the confirmatory corpus
+    with pytest.raises(SystemExit, match="pilot corpus"):
+        sm.main([*base, "--limit", "3"])
+
+
+def test_e4_cost_leaves_out_cached_records(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    an = _load("analyze", monkeypatch, tmp_path)
+    recs = {
+        "a": {"seconds": 2.0},
+        "b": {"seconds": 4.0},
+        "c": {"seconds": 0.001, "cached": True},
+        "d": {"seconds": 0.001, "cached": True},
+    }
+    monkeypatch.setattr(an, "load_scores", lambda s, m: recs)
+    assert an.median_seconds("primary", "model:m") == 3.0
+    monkeypatch.setattr(an, "load_scores", lambda s, m: {"c": recs["c"]})
+    with pytest.raises(SystemExit, match="outside the cache"):
+        an.median_seconds("primary", "model:m")

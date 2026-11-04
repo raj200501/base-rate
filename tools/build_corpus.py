@@ -158,7 +158,7 @@ def insertion_log(
             r[skip["reason"]] += 1
             r["attempts"] += 1
     expected = planned_insertions() if planned_total is None else planned_total
-    if runs and planned != expected:
+    if planned != expected:
         raise SystemExit(
             f"insertion runs planned {planned} attempts; the protocol plans {expected}"
         )

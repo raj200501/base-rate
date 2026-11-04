@@ -87,10 +87,23 @@ def main(argv: list[str] | None = None) -> int:
     unknown = sorted({a.get("audit_id") for a in answers} - set(order), key=str)
     if unknown:
         raise SystemExit(f"answers for audit ids not in the packet: {unknown[:3]}")
+    ids = [a["audit_id"] for a in answers]
+    twice = sorted({i for i in ids if ids.count(i) > 1})
+    if twice:
+        raise SystemExit(f"audit ids answered more than once: {twice[:3]}")
     answers.sort(key=lambda a: order[a["audit_id"]])
+    packet_sha = hashlib.sha256((args.out / "packet.jsonl").read_bytes()).hexdigest()
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "evidence.json").write_text(
-        json.dumps({"workflow_run": args.journal.parent.name, "agents": evidence}, indent=1) + "\n"
+        json.dumps(
+            {
+                "workflow_run": args.journal.parent.name,
+                "packet_sha256": packet_sha,
+                "agents": evidence,
+            },
+            indent=1,
+        )
+        + "\n"
     )
     (args.out / "answers.jsonl").write_text(
         "".join(json.dumps(a, sort_keys=True) + "\n" for a in answers)

@@ -154,6 +154,9 @@ def check_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
 def score(auditor: str, evidence: dict[str, Any]) -> None:
     """Join answers with the key and bank the audit artifact."""
     proof = check_evidence(evidence)
+    packet_sha = hashlib.sha256((WORK / "packet.jsonl").read_bytes()).hexdigest()
+    if evidence.get("packet_sha256") != packet_sha:
+        raise SystemExit("the auditors' answers belong to another packet than packet.jsonl")
     key = {r["audit_id"]: r for r in map(json.loads, (WORK / "key.jsonl").read_text().splitlines())}
     answers = {
         r["audit_id"]: r

@@ -21,7 +21,10 @@ wait_for() {  # wait while a process matching $1 runs
 }
 
 benign_real() {  # benign real-agent runs under the fixed oracle (prereg/0006)
-  $RUN tools/count_benign.py
+  local n
+  n=$($RUN tools/count_benign.py) || { step "benign count failed"; exit 1; }
+  [[ "$n" =~ ^[0-9]+$ ]] || { step "benign count is not a number: ${n}"; exit 1; }
+  echo "$n"
 }
 
 step "wait for any running 1.7B corpus batch"
@@ -52,7 +55,9 @@ done
 step "benign real runs: $(benign_real)"
 
 # Insertions: 700 attempts split by each model's share of benign real runs.
-read -r n17 n4 < <($RUN tools/count_benign.py --split 700)
+split=$($RUN tools/count_benign.py --split 700) || { step "insertion split failed"; exit 1; }
+read -r n17 n4 <<< "${split}"
+[[ "${n17}" =~ ^[0-9]+$ && "${n4}" =~ ^[0-9]+$ ]] || { step "bad insertion split: ${split}"; exit 1; }
 step "insertions: ${n17} on 1.7B runs, ${n4} on 4B runs"
 if [ "${n17}" -gt 0 ]; then
   $RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --insert --max-inserts "${n17}" \
