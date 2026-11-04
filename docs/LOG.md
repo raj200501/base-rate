@@ -38,3 +38,13 @@ Iteration history moved out of STATUS.md. Newest last.
   model server was killed for memory once and every server now caps its prompt cache
   (D24); the data artifacts now cite their preregistrations so prereg-verify orders them.
 
+- The pipeline finished both insertion runs, built and banked the corpus, drew the audit
+  sample, and scored the rule monitors and the Qwen3-0.6B monitor on the primary set
+  (all committed). The 0.6B dataset step then stopped on a response cache race (two
+  identical requests shared one temporary file); fixed with a test. Its first restart
+  was stopped before the build step, which would have rewritten the banked manifest
+  (new build time and commit, so a new hash that the score files would not match); the
+  build now keeps a current corpus (`--keep-current`: same input hashes and options,
+  intact shards), and the pipeline was restarted.
+- The blind label audit now has each auditor read only its own batch file, and the
+  evidence check allows nothing else.
