@@ -90,7 +90,14 @@ def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
         with gzip.open(shard["path"], "rt") as fh:
             records += [json.loads(line) for line in fh]
     assert len(records) == comp["traces"] == sum(s["records"] for s in m1["shards"])
+    # the canary is in the manifest and in every record, and readers drop it
+    assert m1["canary"] == bc.CANARY and "canary GUID" in bc.CANARY
+    assert all(r["canary"] == bc.CANARY for r in records)
     traces = [Trace.from_dict(r) for r in records]
+    assert all(
+        "canary" not in t.to_dict() and bc.CANARY not in json.dumps(t.monitor_view())
+        for t in traces
+    )
     assert len({t.trace_id for t in traces}) == len(traces)
     # variants stay in their source run's cluster; Armour traces are grouped (D12)
     real_runs = {t.source_run_id for t in traces if t.source == "real_agent"}

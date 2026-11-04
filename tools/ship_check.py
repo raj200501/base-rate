@@ -821,6 +821,11 @@ def g6(ctx: Ctx) -> str:
     synthetic = 0
     shards = manifest.get("shards", [])
     need(bool(shards), "manifest lists no shards")
+    canary = manifest.get("canary")
+    need(
+        isinstance(canary, str) and "canary" in canary.lower(),
+        "manifest has no canary string (brief rule 9)",
+    )
     paths = [str(s["path"]) for s in shards]
     need(len(paths) == len(set(paths)), "manifest lists a shard more than once")
     seen_ids: set[str] = set()
@@ -831,6 +836,7 @@ def g6(ctx: Ctx) -> str:
         need(sha256_file(p) == shard["sha256"], f"hash mismatch: {shard['path']}")
         for t in iter_shard(p):
             need(str(t["trace_id"]) not in seen_ids, f"duplicate trace_id {t['trace_id']}")
+            need(t.get("canary") == canary, f"trace {t['trace_id']} lacks the corpus canary")
             seen_ids.add(str(t["trace_id"]))
             runs.add(str(t["source_run_id"]))
             procedural = t.get("source") == "procedural"
@@ -871,6 +877,7 @@ def g6(ctx: Ctx) -> str:
     )
     data_md = rel(ctx, "docs/DATA.md")
     need(data_md.is_file(), "docs/DATA.md missing")
+    need(canary in data_md.read_text(encoding="utf-8"), "docs/DATA.md does not state the canary")
     dtext = data_md.read_text(encoding="utf-8").lower()
     gaps = [s for s in DATASHEET_SECTIONS if s not in dtext]
     need(not gaps, f"datasheet lacks: {', '.join(gaps)}")

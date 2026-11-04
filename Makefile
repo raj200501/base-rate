@@ -1,6 +1,6 @@
 # base-rate developer targets. Every target named in docs/BUILD_BRIEF.md
-# section 10.1 step 7 exists from day one; targets whose tools have not been
-# built yet print NOT IMPLEMENTED and fail, so no gate can pass by accident.
+# section 10.1 step 7 exists; each was a failing NOT IMPLEMENTED stub until its
+# tool was built, so no gate could pass by accident.
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -46,11 +46,11 @@ demo: ## Offline demo on recorded fixtures; output must match demo/golden_output
 prereg-verify: ## Verify the preregistration chain
 	python3 tools/prereg.py verify
 
-claimcheck: ## Every number in README.md and docs/REPORT.md traces to an artifact
-	python3 tools/claimcheck.py README.md docs/REPORT.md
+claimcheck: ## Every number in README.md, docs/REPORT.md, and docs/DATA.md traces to an artifact
+	python3 tools/claimcheck.py README.md docs/REPORT.md docs/DATA.md
 
-freshness: ## Re-derive every live number in README.md and docs/REPORT.md
-	python3 tools/freshness.py README.md docs/REPORT.md
+freshness: ## Re-derive every live number in README.md, docs/REPORT.md, and docs/DATA.md
+	python3 tools/freshness.py README.md docs/REPORT.md docs/DATA.md
 
 citecheck: ## Validate artifacts/citecheck.json offline; every [@key] cited must be verified
 	python3 tools/citecheck.py
@@ -64,11 +64,11 @@ budget: ## Show cash_usd and whether every cap was respected
 review: ## Independent review (headless opus, else the reviewer subagent)
 	python3 tools/review.py
 
-report: ## Build figures and tables from banked artifacts
-	@echo "NOT IMPLEMENTED: make report (milestone M5, docs/PLAN.md)"; exit 1
+report: ## Build figures, tables, numbers, and documents from banked artifacts
+	BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/report.py
 
-reproduce: ## Rebuild every figure and table from banked artifacts
-	@echo "NOT IMPLEMENTED: make reproduce (milestone M5, docs/PLAN.md)"; exit 1
+reproduce: ## Re-run E2 to E4 from banked scores and rebuild the report; nothing may change
+	BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/reproduce.py
 
 ship-check: ## Gates G1 to G14 on a fresh clone (full run; the only one that counts)
 	python3 tools/ship_check.py

@@ -25,13 +25,14 @@ numbers.json, and parameter values carry allowance tags.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -106,12 +107,18 @@ def save(fig: Any, name: str) -> str:
     return str(path.relative_to(ROOT))
 
 
+ENSEMBLE_RE = re.compile(r"^ensemble:([\w-]+)\((.+)\)$")
+CASCADE_RE = re.compile(r"^cascade:(.+)>(.+)@([0-9.]+)$")
+
+
 def short(monitor: str) -> str:
-    """Display name of a monitor id."""
-    if monitor.startswith("ensemble:"):
-        return "ensemble (rank mean)"
-    if monitor.startswith("cascade:"):
-        return "cascade 0.6b>8b"
+    """Short display name of a monitor id (figure labels and claim ids)."""
+    m = ENSEMBLE_RE.match(monitor)
+    if m:
+        return f"ensemble ({m.group(1).replace('-', ' ')})"
+    m = CASCADE_RE.match(monitor)
+    if m:
+        return f"cascade {short(m.group(1))}>{short(m.group(2))}"
     return (
         monitor.split(":", 1)[1].replace("armour-", "").replace("-q8_0", "").replace("-q4_k_m", "")
     )
@@ -131,13 +138,30 @@ class Registry:
     def __init__(self) -> None:
         self.claims: dict[str, dict[str, str]] = {}
 
-    def tag(self, cid: str, source: str, select: str, fmt: str) -> str:
+    def tag(self, cid: str, source: str, select: str, fmt: str, note: str = "") -> str:
         """Register (or reuse) a claim and return its template tag."""
         entry = {"source": source, "select": select, "format": fmt}
-        if cid in self.claims and self.claims[cid] != entry:
+        old = {k: v for k, v in self.claims.get(cid, {}).items() if k != "note"}
+        if old and old != entry:
             raise SystemExit(f"claim {cid} registered twice with different extractors")
-        self.claims[cid] = entry
+        self.claims[cid] = {**entry, **({"note": note} if note else {})}
         return f"{{{{claim:{cid}}}}}"
+
+    def add_prose_claims(self, path: Path) -> None:
+        """Register the hand-written claims that prose cites (docs/templates/claims.prose.json)."""
+        if not path.exists():
+            return
+        for cid, raw in json.loads(path.read_text()).items():
+            unknown = set(raw) - {"source", "select", "format", "note"}
+            if unknown:
+                raise SystemExit(f"{path.name}: claim {cid} has unknown keys {sorted(unknown)}")
+            self.tag(
+                cid,
+                raw["source"],
+                raw.get("select", ""),
+                raw.get("format", "{}"),
+                raw.get("note", ""),
+            )
 
 
 def p(text: object) -> str:
@@ -358,14 +382,35 @@ def fig_transfer(e3: dict[str, Any]) -> str:
 
 # ---------------------------------------------------------------- tables
 
+sys.path.insert(0, str(REPO / "tools"))
+import claims as claimlib  # noqa: E402
 
-def caption(set_name: str, comp: dict[str, Any], tags: tuple[str, str] | None = None) -> str:
+TAG_RE = re.compile(r"\{\{([a-z]+):([^{}\n]*)\}\}")
+NUMBERS = "artifacts/report/numbers.json"
+E2_SRC = "artifacts/e2/results.json"
+CI3 = "{estimate:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
+
+
+def render_fragment(reg: Registry, text: str) -> str:
+    """Render a template fragment exactly as tools/claims.py renders a document."""
+    parsed: dict[str, Any] = {}
+
+    def sub(m: re.Match[str]) -> str:
+        kind, body = m.group(1), m.group(2)
+        if kind != "claim":
+            return body
+        entry = reg.claims[body]
+        src = entry["source"]
+        if src not in parsed:
+            parsed[src] = claimlib.parse_source(src, (ROOT / src).read_bytes())
+        value = claimlib.select(parsed[src], claimlib.parse_selector(entry["select"]))
+        return claimlib.render_value(value, claimlib.parse_format(entry["format"]))
+
+    return TAG_RE.sub(sub, text)
+
+
+def caption(set_name: str, tags: tuple[str, str]) -> str:
     """The required caption: analysis set, synthetic share, independent source runs."""
-    if tags is None:
-        return (
-            f"Set: {set_name}. Synthetic share: {comp['synthetic_share']:.3f}. "
-            f"Independent source runs: {comp['independent_source_runs']:,}."
-        )
     return f"Set: {set_name}. Synthetic share: {tags[0]}. Independent source runs: {tags[1]}."
 
 
@@ -378,51 +423,603 @@ def set_tags(reg: Registry, source: str, path: str) -> tuple[str, str]:
     )
 
 
-def table_e2(reg: Registry, e2: dict[str, Any], metric: str) -> tuple[str, str]:
-    """Headline table: rows monitors, columns prevalence by budget."""
-    src = "artifacts/e2/results.json"
-    prevs = sorted({e["prevalence"] for e in e2["estimates"]}, reverse=True)
-    budgets = sorted({e["budget"] for e in e2["estimates"]})
+def md_table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
+    """A Markdown table."""
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    lines += ["| " + " | ".join(r) + " |" for r in rows]
+    return "\n".join(lines)
+
+
+def framed(title: str, cap: str, table: str) -> str:
+    """Title and caption line above a table."""
+    return f"*{title}. {cap}*\n\n{table}"
+
+
+def name(text: str) -> str:
+    """An identifier in code font, with a name allowance when it holds digits."""
+    return f"`{{{{name:{text}}}}}`" if re.search(r"\d", text) else f"`{text}`"
+
+
+def display(monitor: str) -> str:
+    """A monitor id for a table cell; ensembles and cascades are spelled out by member."""
+    m = ENSEMBLE_RE.match(monitor)
+    if m:
+        members = " and ".join(name(x) for x in m.group(2).split(","))
+        return f"{m.group(1).replace('-', ' ')} of {members}"
+    m = CASCADE_RE.match(monitor)
+    if m:
+        return f"{name(m.group(1))} then {name(m.group(2))}, escalating {p(m.group(3))}"
+    return name(monitor)
+
+
+def ci_tag(reg: Registry, cid: str, source: str, select: str, lo_hi: str = "") -> str:
+    """Tag for ``estimate [low, high]`` (or a value with a ``_ci`` list beside it)."""
+    if not lo_hi:
+        return reg.tag(cid, source, select, CI3)
+    value = reg.tag(cid, source, select, "{:.3f}")
+    low = reg.tag(f"{cid}.lo", source, f"{lo_hi}[0]", "{:.3f}")
+    high = reg.tag(f"{cid}.hi", source, f"{lo_hi}[1]", "{:.3f}")
+    return f"{value} [{low}, {high}]"
+
+
+def table_e2(reg: Registry, e2: dict[str, Any], metric: str, set_name: str = "primary") -> str:
+    """Rows monitors, columns prevalence by budget, for one metric and set."""
+    on_set = [e for e in e2["estimates"] if e["set"] == set_name]
+    prevs = sorted({e["prevalence"] for e in on_set}, reverse=True)
+    budgets = sorted({e["budget"] for e in on_set})
     cols = [(pv, b) for pv in prevs for b in budgets]
-    head_t = (
-        "| Monitor | Family | "
-        + " | ".join(f"prev. {p(fmt_prev(pv))}, {p(b)}/{p('10k')}" for pv, b in cols)
-        + " |"
-    )
-    head_r = (
-        "| Monitor | Family | "
-        + " | ".join(f"prev. {fmt_prev(pv)}, {b}/10k" for pv, b in cols)
-        + " |"
-    )
-    sep = "|" + "---|" * (len(cols) + 2)
-    rows_t, rows_r = [], []
-    for fam, m in primary_monitors(e2):
-        cells_t, cells_r = [], []
+    header = ["Monitor", "Family"] + [
+        f"prev. {p(fmt_prev(pv))}, {p(b)}/{p('10k')}" for pv, b in cols
+    ]
+    seen: dict[str, str] = {}
+    for e in on_set:
+        seen.setdefault(e["monitor"], e["family"])
+    mons = sorted(seen.items(), key=lambda kv: (FAMILY_ORDER.index(kv[1]), kv[0]))
+    rows = []
+    for m, fam in mons:
+        cells = [display(m), fam]
         for pv, b in cols:
-            e = est(e2, monitor=m, set="primary", prevalence=pv, budget=b, metric=metric)
+            e = est(e2, monitor=m, set=set_name, prevalence=pv, budget=b, metric=metric)
             sel_key = f"family={fam}" if fam == "ensemble" else f"monitor={m}"
+            sel = (
+                f"estimates[{sel_key},set={set_name},prevalence={pv:g},budget={b},metric={metric}]"
+            )
+            suffix = "" if set_name == "primary" else f".{set_name}"
+            cid = cid_part(f"e2.{short(m)}.{metric}.p{pv:g}.b{b}{suffix}")
+            mark = "" if e["headline"] or set_name != "primary" else " (not E0-supported)"
+            cells.append(ci_tag(reg, cid, E2_SRC, sel) + mark)
+        rows.append(cells)
+    cap = caption(set_name, set_tags(reg, E2_SRC, f"sets.{set_name}"))
+    title = f"{metric.replace('_', ' ')}, estimate [{p('95%')} interval]"
+    return framed(title, cap, md_table(header, rows))
+
+
+def table_headline(reg: Registry, e2: dict[str, Any]) -> str:
+    """Small README table: recall and precision at the size-ladder setting."""
+    lad = e2["size_ladder"]
+    pv, b = lad["prevalence"], lad["budget"]
+    rows = []
+    for fam, m in primary_monitors(e2):
+        sel_key = f"family={fam}" if fam == "ensemble" else f"monitor={m}"
+        cells = [display(m), fam]
+        for metric in ("recall_at_budget", "precision_at_budget"):
             sel = f"estimates[{sel_key},set=primary,prevalence={pv:g},budget={b},metric={metric}]"
-            cid = cid_part(f"e2.{short(m)}.{metric}.p{pv:g}.b{b}")
-            tag = reg.tag(cid, src, sel, "{estimate:.3f} [{ci_low:.3f}, {ci_high:.3f}]")
-            mark = "" if e["headline"] else " (not E0-supported)"
-            cells_t.append(tag + mark)
-            cells_r.append(f"{e['estimate']:.3f} [{e['ci_low']:.3f}, {e['ci_high']:.3f}]{mark}")
-        name_t = f"`{m}`" if not re.search(r"\d", m) else f"{{{{name:{m}}}}}"
-        rows_t.append(f"| {name_t} | {fam} | " + " | ".join(cells_t) + " |")
-        rows_r.append(f"| `{m}` | {fam} | " + " | ".join(cells_r) + " |")
-    comp = e2["sets"]["primary"]
-    cap_t = caption("primary", comp, set_tags(reg, src, "sets.primary"))
-    cap_r = caption("primary", comp)
-    title = metric.replace("_", " ")
-    tmpl = "\n".join([f"*{title}, estimate [95% interval]. {cap_t}*", "", head_t, sep, *rows_t])
-    rend = "\n".join([f"*{title}, estimate [95% interval]. {cap_r}*", "", head_r, sep, *rows_r])
-    return tmpl, rend
+            cells.append(ci_tag(reg, cid_part(f"e2.{short(m)}.{metric}.p{pv:g}.b{b}"), E2_SRC, sel))
+        rows.append(cells)
+    cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
+    title = (
+        f"Prevalence {p(fmt_prev(pv))}, {p(b)} reviews per {p('10,000')}, "
+        f"estimate [{p('95%')} interval]"
+    )
+    return framed(title, cap, md_table(["Monitor", "Family", "Recall", "Precision"], rows))
 
 
-def write_table(name: str, rendered: str) -> str:
+def table_fixed(reg: Registry, e2: dict[str, Any]) -> str:
+    """Rule monitors at their fixed threshold on the primary set."""
+    rows_in = [r for r in e2["fixed_threshold"] if r["set"] == "primary"]
+    if not rows_in:
+        return ""
+    prevs = sorted({r["prevalence"] for r in rows_in}, reverse=True)
+    header = ["Monitor", "Recall", "False-positive rate"] + [
+        f"Precision, prev. {p(fmt_prev(pv))}" for pv in prevs
+    ]
+    rows = []
+    for m in sorted({r["monitor"] for r in rows_in}):
+        cells = [name(m)]
+        for metric in ("recall", "fpr"):
+            sel = (
+                f"fixed_threshold[monitor={m},set=primary,prevalence={prevs[0]:g},metric={metric}]"
+            )
+            cells.append(ci_tag(reg, cid_part(f"e2.fixed.{short(m)}.{metric}"), E2_SRC, sel))
+        for pv in prevs:
+            sel = f"fixed_threshold[monitor={m},set=primary,prevalence={pv:g},metric=precision]"
+            cid = cid_part(f"e2.fixed.{short(m)}.precision.p{pv:g}")
+            cells.append(ci_tag(reg, cid, E2_SRC, sel))
+        rows.append(cells)
+    thr = rows_in[0]["threshold"]
+    cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
+    title = (
+        f"Rule monitors at the fixed threshold {{{{threshold:{thr:g}}}}}, "
+        f"cluster-aware exact intervals ({p('95%')})"
+    )
+    return framed(title, cap, md_table(header, rows))
+
+
+def table_ttd(reg: Registry, e2: dict[str, Any]) -> str:
+    """Time to detection among violations whose prefixes were scored."""
+    rows = []
+    for r in e2["time_to_detection"]:
+        m = r["monitor"]
+        base = f"time_to_detection[monitor={m}]"
+        cid = cid_part(f"e2.ttd.{short(m)}")
+        cells = [
+            name(m),
+            reg.tag(f"{cid}.violations", E2_SRC, f"{base}.violations", "{:,d}"),
+            reg.tag(f"{cid}.caught", E2_SRC, f"{base}.share_caught", "{:.3f}")
+            if "share_caught" in r
+            else "none scored",
+        ]
+        if "share_detected_at_violating_step" in r:
+            cells.append(
+                ci_tag(
+                    reg,
+                    f"{cid}.now",
+                    E2_SRC,
+                    f"{base}.share_detected_at_violating_step",
+                    f"{base}.share_detected_at_violating_step_ci",
+                )
+            )
+        else:
+            cells.append("none scored")
+        if r.get("median_delay_steps_ci"):
+            cells.append(
+                ci_tag(
+                    reg,
+                    f"{cid}.delay",
+                    E2_SRC,
+                    f"{base}.median_delay_steps",
+                    f"{base}.median_delay_steps_ci",
+                )
+            )
+        else:
+            cells.append("none caught")
+        rows.append(cells)
+    if not rows:
+        return ""
+    r0 = e2["time_to_detection"][0]
+    cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
+    title = (
+        f"Time to detection at prevalence {p(fmt_prev(r0['prevalence']))} and "
+        f"{p(r0['budget'])} reviews per {p('10,000')} (bootstrap {p('95%')} intervals)"
+    )
+    header = [
+        "Monitor",
+        "Violations scored",
+        "Share caught by the end",
+        "Share caught at the violating step",
+        "Median delay, steps",
+    ]
+    return framed(title, cap, md_table(header, rows))
+
+
+def table_breakdown(reg: Registry, e2: dict[str, Any]) -> str:
+    """Recall by violation source, violation type, and subject model."""
+    rows_in = e2["breakdowns"]
+    if not rows_in:
+        return ""
+    mons = sorted(
+        {r["monitor"] for r in rows_in},
+        key=lambda m: (FAMILY_ORDER.index(m.split(":", 1)[0]), m),
+    )
+    groups = [
+        (g, v)
+        for g in ("violation_source", "violation_type", "subject_model")
+        for v in sorted({r["value"] for r in rows_in if r["by"] == g})
+    ]
+    rows = []
+    for g, v in groups:
+        n_pos = next(r["n_pos"] for r in rows_in if r["by"] == g and r["value"] == v)
+        vid = cid_part(v)
+        n_tag = reg.tag(
+            f"e2.by.{g}.{vid}.n",
+            E2_SRC,
+            f"breakdowns[monitor={mons[0]},by={g},value={v}].n_pos",
+            "{:,d}",
+        )
+        del n_pos
+        cells = [f"{g.replace('_', ' ')}: {name(v)}", n_tag]
+        for m in mons:
+            sel = f"breakdowns[monitor={m},by={g},value={v}]"
+            cid = cid_part(f"e2.by.{g}.{vid}.{short(m)}")
+            cells.append(reg.tag(cid, E2_SRC, sel, "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"))
+        rows.append(cells)
+    r0 = rows_in[0]
+    cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
+    title = (
+        f"Recall by group at prevalence {p(fmt_prev(r0['prevalence']))} and {p(r0['budget'])} "
+        f"reviews per {p('10,000')}, estimate [{p('95%')} interval]"
+    )
+    header = ["Group", "Violations"] + [name(short(m)) for m in mons]
+    return framed(title, cap, md_table(header, rows))
+
+
+def table_ladder(reg: Registry, e2: dict[str, Any]) -> str:
+    """The open-weight size ladder against the best rule monitor."""
+    lad = e2["size_ladder"]
+    rows = []
+    for r in lad["rungs"]:
+        m = r["monitor"]
+        sel = f"size_ladder.rungs[monitor={m}]"
+        cid = cid_part(f"e2.ladder.{short(m)}")
+        rows.append(
+            [
+                name(m),
+                p(f"{r['params_b']:g}B"),
+                reg.tag(cid, E2_SRC, sel, "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"),
+            ]
+        )
+    bm = lad["best_rule_monitor"]
+    sel = (
+        f"estimates[monitor={bm},set=primary,prevalence={lad['prevalence']:g},"
+        f"budget={lad['budget']},metric=recall_at_budget]"
+    )
+    best = ci_tag(
+        reg,
+        cid_part(f"e2.{short(bm)}.recall_at_budget.p{lad['prevalence']:g}.b{lad['budget']}"),
+        E2_SRC,
+        sel,
+    )
+    rows.append([name(bm), "rule (best)", best])
+    cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
+    title = (
+        f"Size ladder at prevalence {p(fmt_prev(lad['prevalence']))} and {p(lad['budget'])} "
+        f"reviews per {p('10,000')}, recall [{p('95%')} interval]"
+    )
+    return framed(title, cap, md_table(["Monitor", "Parameters", "Recall"], rows))
+
+
+def table_e3(reg: Registry, e3: dict[str, Any]) -> str:
+    """Every E3 hypothesis with its statistic and outcome."""
+    src = "artifacts/e3/results.json"
+    rows = []
+    for h in e3["hypotheses"]:
+        hid = h["id"]
+        sel = f"hypotheses[id={hid}]"
+        cid = cid_part(f"e3.{hid}")
+        if "share" in h:
+            stat = "share of domain pairs " + reg.tag(f"{cid}.share", src, f"{sel}.share", "{:.3f}")
+        else:
+            stat = "review-rate ratio " + ci_tag(
+                reg, f"{cid}.ratio", src, f"{sel}.ratio", f"{sel}.ratio_ci"
+            )
+        outcome = reg.tag(f"{cid}.outcome", src, f"{sel}.outcome", "{}")
+        rows.append([name(hid), name(h["monitor"]), stat, outcome])
+    cap = caption("full", set_tags(reg, src, "set_composition"))
+    return framed(
+        "E3 hypotheses (transfer)",
+        cap,
+        md_table(["Hypothesis", "Monitor", "Statistic", "Outcome"], rows),
+    )
+
+
+def table_e4(reg: Registry, e4: dict[str, Any]) -> str:
+    """Every E4 cascade pair on held-out data, with both hypotheses."""
+    src = "artifacts/e4/results.json"
+    rows = []
+    for pr in e4["pairs"]:
+        idx = pr["index"]
+        sel = f"pairs[index={idx}]"
+        cid = cid_part(f"e4.{idx}")
+        rows.append(
+            [
+                name(idx),
+                name(pr["stage1"]),
+                name(pr["stage2"]),
+                reg.tag(f"{cid}.esc", src, f"{sel}.chosen_escalation_rate", "{:.3f}"),
+                ci_tag(reg, f"{cid}.recall", src, f"{sel}.test_recall", f"{sel}.test_recall_ci"),
+                ci_tag(
+                    reg,
+                    f"{cid}.alone",
+                    src,
+                    f"{sel}.stage2_alone_test_recall",
+                    f"{sel}.stage2_alone_test_recall_ci",
+                ),
+                ci_tag(reg, f"{cid}.cost", src, f"{sel}.test_cost", f"{sel}.test_cost_ci"),
+                reg.tag(f"{cid}.max_cost", src, f"{sel}.max_cost", "{:.3f}"),
+                reg.tag(f"{cid}.h41", src, f"hypotheses[id=H4.1-{idx}].outcome", "{}"),
+                reg.tag(f"{cid}.h42", src, f"hypotheses[id=H4.2-{idx}].outcome", "{}"),
+            ]
+        )
+    cap = caption("primary, held-out half", set_tags(reg, src, "set_composition"))
+    header = [
+        "Pair",
+        "Stage 1",
+        "Stage 2",
+        "Escalation rate",
+        "Cascade recall (test)",
+        "Stage 2 alone (test)",
+        "Cost, s per trace (test)",
+        "Cost cap",
+        "H4.1",
+        "H4.2",
+    ]
+    return framed(
+        f"E4 cascades on held-out data, estimate [{p('95%')} interval]", cap, md_table(header, rows)
+    )
+
+
+# ---------------------------------------------------------------- corpus
+
+CORPUS_ROWS: tuple[tuple[str, str, Callable[[dict[str, Any]], bool]], ...] = (
+    (
+        "real_benign",
+        "Real agent runs, benign",
+        lambda t: t["source"] == "real_agent" and t["label"] == "benign",
+    ),
+    (
+        "natural_violation",
+        "Real agent runs, natural violation",
+        lambda t: t["source"] == "real_agent" and t["label"] == "violation",
+    ),
+    (
+        "inserted_violation",
+        "Inserted violation, same agent continues",
+        lambda t: t["source"] == "inserted",
+    ),
+    (
+        "procedural_benign",
+        "Procedural variant of a real benign run",
+        lambda t: t["source"] == "procedural",
+    ),
+    (
+        "dataset_benign",
+        "Armour dataset, benign",
+        lambda t: t["source"] == "dataset" and t["label"] == "benign",
+    ),
+    (
+        "dataset_violation",
+        "Armour dataset, violation",
+        lambda t: t["source"] == "dataset" and t["label"] == "violation",
+    ),
+)
+TRACE_FIELDS = (
+    "trace_id",
+    "source",
+    "label",
+    "synthetic",
+    "source_run_id",
+    "agent_id",
+    "domain",
+    "violation_type",
+    "violation_source",
+)
+
+
+def iter_corpus(manifest: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """The fields of every corpus trace that the tables need, shard by shard."""
+    for shard in manifest["shards"]:
+        with gzip.open(ROOT / shard["path"], "rt", encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    t = json.loads(line)
+                    yield {k: t.get(k) for k in TRACE_FIELDS}
+
+
+def stats(traces: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Size, synthetic share, and independent source runs of a group of traces."""
+    n = len(traces)
+    return {
+        "traces": n,
+        "synthetic_share": sum(bool(t["synthetic"]) for t in traces) / n if n else 0.0,
+        "independent_source_runs": len({t["source_run_id"] for t in traces}),
+    }
+
+
+def corpus_numbers(manifest: dict[str, Any], audit: dict[str, Any] | None) -> dict[str, Any]:
+    """Counts the corpus tables and prose cite, computed from the banked shards."""
+    traces = list(iter_corpus(manifest))
+    rows = []
+    for key, label, pred in CORPUS_ROWS:
+        group = [t for t in traces if pred(t)]
+        if group:
+            rows.append({"key": key, "label": label, **stats(group)})
+    bad = [t for t in traces if t["label"] == "violation"]
+    types = []
+    for vt in sorted({str(t["violation_type"]) for t in bad}):
+        row: dict[str, Any] = {"type": vt}
+        for vs in ("natural", "inserted", "dataset"):
+            row[vs] = sum(t["violation_type"] == vt and t["violation_source"] == vs for t in bad)
+        row["total"] = sum(t["violation_type"] == vt for t in bad)
+        types.append(row)
+    subject = [t for t in traces if t["source"] in {"real_agent", "inserted"}]
+    agents = []
+    for agent in sorted({t["agent_id"] for t in subject}):
+        mine = [t for t in subject if t["agent_id"] == agent]
+        agents.append(
+            {
+                "agent": agent,
+                "real_benign": sum(
+                    t["source"] == "real_agent" and t["label"] == "benign" for t in mine
+                ),
+                "natural_violation": sum(
+                    t["source"] == "real_agent" and t["label"] == "violation" for t in mine
+                ),
+                "inserted_violation": sum(t["source"] == "inserted" for t in mine),
+                "independent_source_runs": len({t["source_run_id"] for t in mine}),
+            }
+        )
+    relabel = manifest.get("relabeling", {})
+    changes = []
+    for key, count in sorted(relabel.get("label_changes", {}).items()):
+        before, _, after = key.partition(" -> ")
+        changes.append({"from": before, "to": after, "count": int(count)})
+    out: dict[str, Any] = {
+        "rows": rows,
+        "total": {
+            **stats(traces),
+            "benign": sum(t["label"] == "benign" for t in traces),
+            "violations": len(bad),
+        },
+        "violations": stats(bad),
+        "types": types,
+        "agents": agents,
+        "real_and_inserted": stats(subject),
+        "relabeling": {
+            "replayed": int(relabel.get("replayed", 0)),
+            "inserted_dropped": int(relabel.get("inserted_dropped", 0)),
+            "changed": sum(c["count"] for c in changes),
+            "changes": changes,
+        },
+    }
+    if audit is not None:
+        by_id = {t["trace_id"]: t for t in traces}
+        audited = [by_id[i["trace_id"]] for i in audit["items"] if i["trace_id"] in by_id]
+        out["audit"] = stats(audited)
+    return out
+
+
+def table_corpus(reg: Registry, nums: dict[str, Any]) -> str:
+    """Corpus composition by source."""
+    rows = []
+    for r in nums["corpus"]["rows"]:
+        base = f"corpus.rows[key={r['key']}]"
+        cid = f"corpus.{r['key']}"
+        rows.append(
+            [
+                r["label"],
+                reg.tag(f"{cid}.traces", NUMBERS, f"{base}.traces", "{:,d}"),
+                reg.tag(f"{cid}.runs", NUMBERS, f"{base}.independent_source_runs", "{:,d}"),
+                reg.tag(f"{cid}.synthetic", NUMBERS, f"{base}.synthetic_share", "{:.3f}"),
+            ]
+        )
+    rows.append(
+        [
+            "All traces",
+            reg.tag("corpus.total.traces", NUMBERS, "corpus.total.traces", "{:,d}"),
+            reg.tag("corpus.total.runs", NUMBERS, "corpus.total.independent_source_runs", "{:,d}"),
+            reg.tag("corpus.total.synthetic", NUMBERS, "corpus.total.synthetic_share", "{:.3f}"),
+        ]
+    )
+    cap = caption("full corpus", set_tags(reg, NUMBERS, "corpus.total"))
+    header = ["Source", "Traces", "Independent source runs", "Synthetic share"]
+    return framed("Corpus composition by source", cap, md_table(header, rows))
+
+
+def table_types(reg: Registry, nums: dict[str, Any]) -> str:
+    """Violations by type and source."""
+    rows = []
+    for r in nums["corpus"]["types"]:
+        base = f"corpus.types[type={r['type']}]"
+        cells = [name(r["type"])]
+        for col in ("natural", "inserted", "dataset", "total"):
+            cells.append(
+                reg.tag(f"corpus.type.{r['type']}.{col}", NUMBERS, f"{base}.{col}", "{:,d}")
+            )
+        rows.append(cells)
+    cap = caption("violations in the full corpus", set_tags(reg, NUMBERS, "corpus.violations"))
+    header = ["Violation type", "Natural", "Inserted", "Armour dataset", "All"]
+    return framed("Violations by type and source", cap, md_table(header, rows))
+
+
+def table_agents(reg: Registry, nums: dict[str, Any]) -> str:
+    """Real-agent and inserted traces by subject model."""
+    rows = []
+    for r in nums["corpus"]["agents"]:
+        base = f"corpus.agents[agent={r['agent']}]"
+        cid = cid_part(f"corpus.agent.{r['agent']}")
+        cells = [name(r["agent"])]
+        for col in (
+            "real_benign",
+            "natural_violation",
+            "inserted_violation",
+            "independent_source_runs",
+        ):
+            cells.append(reg.tag(f"{cid}.{col}", NUMBERS, f"{base}.{col}", "{:,d}"))
+        rows.append(cells)
+    cap = caption(
+        "real agent runs and inserted violations",
+        set_tags(reg, NUMBERS, "corpus.real_and_inserted"),
+    )
+    header = [
+        "Subject model",
+        "Benign runs",
+        "Natural violations",
+        "Inserted violations",
+        "Independent source runs",
+    ]
+    return framed("Traces by subject model", cap, md_table(header, rows))
+
+
+def table_relabel(reg: Registry, nums: dict[str, Any]) -> str:
+    """Label changes from the oracle amendment (prereg/0006)."""
+    rel = nums["corpus"]["relabeling"]
+    rows = []
+    for c in rel["changes"]:
+        sel = f"corpus.relabeling.changes[from={c['from']},to={c['to']}].count"
+        cid = cid_part(f"corpus.relabel.{c['from']}.{c['to']}")
+        after = name(c["to"]) + (" (first violating step changed)" if c["to"] == c["from"] else "")
+        rows.append([name(c["from"]), after, reg.tag(cid, NUMBERS, sel, "{:,d}")])
+    replayed = reg.tag("corpus.relabel.replayed", NUMBERS, "corpus.relabeling.replayed", "{:,d}")
+    dropped = reg.tag(
+        "corpus.relabel.dropped", NUMBERS, "corpus.relabeling.inserted_dropped", "{:,d}"
+    )
+    changed = reg.tag("corpus.relabel.changed", NUMBERS, "corpus.relabeling.changed", "{:,d}")
+    if not rows:
+        rows.append(["(none)", "(none)", changed])
+    cap = caption(
+        "real agent runs and inserted violations",
+        set_tags(reg, NUMBERS, "corpus.real_and_inserted"),
+    )
+    title = (
+        f"Labels changed by relabeling under the fixed oracle (prereg/0006): {changed} of "
+        f"{replayed} replayed traces; inserted traces dropped: {dropped}"
+    )
+    return framed(title, cap, md_table(["Generation label", "Label after replay", "Traces"], rows))
+
+
+def table_audit(reg: Registry, audit: dict[str, Any]) -> str:
+    """Blind label audit agreement by stratum."""
+    src = "artifacts/corpus/label_audit.json"
+    rows = []
+    for stratum in sorted(audit["by_stratum"]):
+        base = f'by_stratum["{stratum}"]'
+        cid = cid_part(f"audit.{stratum}")
+        rows.append(
+            [
+                stratum,
+                reg.tag(f"{cid}.n", src, f"{base}.n", "{:,d}"),
+                reg.tag(f"{cid}.agreement", src, f"{base}.agreement", "{:.3f}"),
+                reg.tag(f"{cid}.label", src, f"{base}.label_agreement", "{:.3f}"),
+            ]
+        )
+    rows.append(
+        [
+            "All",
+            reg.tag("audit.n", src, "sample_size", "{:,d}"),
+            reg.tag("audit.agreement", src, "agreement", "{:.3f}")
+            + " ["
+            + reg.tag("audit.agreement.lo", src, "agreement_ci[0]", "{:.3f}")
+            + ", "
+            + reg.tag("audit.agreement.hi", src, "agreement_ci[1]", "{:.3f}")
+            + "]",
+            reg.tag("audit.label", src, "label_agreement", "{:.3f}")
+            + " ["
+            + reg.tag("audit.label.lo", src, "label_agreement_ci[0]", "{:.3f}")
+            + ", "
+            + reg.tag("audit.label.hi", src, "label_agreement_ci[1]", "{:.3f}")
+            + "]",
+        ]
+    )
+    cap = caption("label audit sample", set_tags(reg, NUMBERS, "corpus.audit"))
+    header = ["Stratum", "Items", "Full agreement (label, type, step)", "Label agreement"]
+    title = f"Blind label audit, agreement [{p('95%')} interval]"
+    return framed(title, cap, md_table(header, rows))
+
+
+def write_table(name_: str, rendered: str) -> str:
     """Bank a rendered table; return its path."""
     TAB.mkdir(parents=True, exist_ok=True)
-    path = TAB / f"{name}.md"
+    path = TAB / f"{name_}.md"
     path.write_text(rendered + "\n")
     return str(path.relative_to(ROOT))
 
@@ -459,7 +1056,8 @@ def _tag_digits(text: str) -> str:
 def build_templates(fragments: dict[str, str]) -> list[str]:
     """Expand ``<!-- @table NAME -->`` markers in the prose sources into templates.
 
-    Citations ``[@key]`` are wrapped in name allowances (keys carry years), and a
+    Citations ``[@key]`` whose key holds a digit (a year) are wrapped in name
+    allowances, and a
     ``<!-- @references -->`` marker becomes the reference list of every key the
     document cites.
     """
@@ -467,6 +1065,7 @@ def build_templates(fragments: dict[str, str]) -> list[str]:
     for doc, prose, tmpl in (
         ("README.md", "README.prose.md", "README.md.tmpl"),
         ("docs/REPORT.md", "REPORT.prose.md", "REPORT.md.tmpl"),
+        ("docs/DATA.md", "DATA.prose.md", "DATA.md.tmpl"),
     ):
         src = TEMPLATES / prose
         if not src.exists():
@@ -482,7 +1081,12 @@ def build_templates(fragments: dict[str, str]) -> list[str]:
         text = re.sub(r"<!-- @table ([\w\-]+) -->", sub, text)
         cited = list(dict.fromkeys(CITE_RE.findall(text)))
         text = text.replace("<!-- @references -->", references(cited) if cited else "")
-        text = CITE_RE.sub(lambda m: f"{{{{name:[@{m.group(1)}]}}}}", text)
+        text = CITE_RE.sub(
+            lambda m: f"{{{{name:[@{m.group(1)}]}}}}"
+            if re.search(r"\d", m.group(1))
+            else m.group(0),
+            text,
+        )
         (TEMPLATES / tmpl).write_text(text)
         docs.append(doc)
     return docs
@@ -490,35 +1094,74 @@ def build_templates(fragments: dict[str, str]) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Build everything; render the documents."""
+    del argv
     style()
     reg = Registry()
     figures: list[str] = []
-    tables: list[str] = []
     fragments: dict[str, str] = {}
-    builders: list[tuple[str, Callable[[], None]]] = []
+
+    def has(rel: str) -> bool:
+        return (ROOT / rel).exists()
+
+    manifest = (
+        load("artifacts/corpus/manifest.json") if has("artifacts/corpus/manifest.json") else None
+    )
+    audit = (
+        load("artifacts/corpus/label_audit.json")
+        if has("artifacts/corpus/label_audit.json")
+        else None
+    )
+    numbers: dict[str, Any] = {"schema": "baserate-report-numbers/1"}
+    if manifest is not None:
+        numbers["corpus"] = corpus_numbers(manifest, audit)
+    OUT.mkdir(parents=True, exist_ok=True)
+    (ROOT / NUMBERS).write_text(json.dumps(numbers, indent=1, sort_keys=True) + "\n")
 
     e0 = load("artifacts/e0/summary.json")
     figures.append(fig_e0(e0))
-    e2 = load("artifacts/e2/results.json")
-    figures.append(fig_budget_panels(e2, "recall_at_budget", "headline_recall", log=False))
-    figures.append(fig_budget_panels(e2, "precision_at_budget", "precision", log=True))
-    figures.append(fig_ladder(e2))
-    for metric in ("recall_at_budget", "precision_at_budget"):
-        t, r = table_e2(reg, e2, metric)
-        fragments[f"e2-{metric}"] = t
-        tables.append(write_table(f"e2_{metric}", r))
-    if (ROOT / "artifacts" / "e3" / "results.json").exists():
-        figures.append(fig_transfer(load("artifacts/e3/results.json")))
-    if (ROOT / "artifacts" / "e4" / "results.json").exists():
-        figures.append(fig_cascades(load("artifacts/e4/results.json")))
-    del builders
-    OUT.mkdir(parents=True, exist_ok=True)
-    manifest = {
+    if manifest is not None:
+        fragments["corpus"] = table_corpus(reg, numbers)
+        fragments["corpus-types"] = table_types(reg, numbers)
+        fragments["corpus-agents"] = table_agents(reg, numbers)
+        fragments["corpus-relabel"] = table_relabel(reg, numbers)
+        if audit is not None:
+            fragments["audit"] = table_audit(reg, audit)
+    if has(E2_SRC):
+        e2 = load(E2_SRC)
+        figures.append(fig_budget_panels(e2, "recall_at_budget", "headline_recall", log=False))
+        figures.append(fig_budget_panels(e2, "precision_at_budget", "precision", log=True))
+        figures.append(fig_ladder(e2))
+        for metric in ("recall_at_budget", "precision_at_budget"):
+            fragments[f"e2-{metric}"] = table_e2(reg, e2, metric)
+        if any(e["set"] == "dataset" for e in e2["estimates"]):
+            fragments["e2-dataset"] = table_e2(reg, e2, "recall_at_budget", "dataset")
+        fragments["readme-headline"] = table_headline(reg, e2)
+        for key, builder in (
+            ("e2-fixed", table_fixed),
+            ("e2-ttd", table_ttd),
+            ("e2-breakdown", table_breakdown),
+            ("e2-ladder", table_ladder),
+        ):
+            fragment = builder(reg, e2)
+            if fragment:
+                fragments[key] = fragment
+    if has("artifacts/e3/results.json"):
+        e3 = load("artifacts/e3/results.json")
+        figures.append(fig_transfer(e3))
+        fragments["e3"] = table_e3(reg, e3)
+    if has("artifacts/e4/results.json"):
+        e4 = load("artifacts/e4/results.json")
+        figures.append(fig_cascades(e4))
+        fragments["e4"] = table_e4(reg, e4)
+    tables = [write_table(k, render_fragment(reg, v)) for k, v in sorted(fragments.items())]
+    manifest_out = {
         "figures": figures,
         "tables": tables,
-        "hashes": {f: sha(ROOT / f) for f in figures + tables},
+        "numbers": NUMBERS,
+        "hashes": {f: sha(ROOT / f) for f in [*figures, *tables, NUMBERS]},
     }
-    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n")
+    (OUT / "manifest.json").write_text(json.dumps(manifest_out, indent=1, sort_keys=True) + "\n")
+    reg.add_prose_claims(TEMPLATES / "claims.prose.json")
     docs = build_templates(fragments)
     registry = {
         "schema": "baserate-claims/1",

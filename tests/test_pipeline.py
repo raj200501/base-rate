@@ -12,6 +12,7 @@ import gzip
 import importlib.util
 import io
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -179,7 +180,44 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     bc = _load("build_corpus", monkeypatch, root)
     traces = _corpus()
     entries = bc.write_shards(traces, root / "artifacts" / "corpus")
-    (root / "artifacts" / "corpus" / "manifest.json").write_text(json.dumps({"shards": entries}))
+    relabeling = {
+        "replayed": 210,
+        "label_changes": {
+            "scope_overreach -> benign": 3,
+            "false_completion -> false_completion": 1,
+        },
+        "inserted_dropped": 2,
+    }
+    (root / "artifacts" / "corpus" / "manifest.json").write_text(
+        json.dumps({"shards": entries, "relabeling": relabeling})
+    )
+    audited = [t for t in traces if t.source in {"real_agent", "dataset"}][:12]
+    items = [
+        {
+            "trace_id": t.trace_id,
+            "stratum": "real benign" if t.label == "benign" else "natural violation",
+            "original_label": t.label,
+            "audit_label": t.label,
+        }
+        for t in audited
+    ]
+    audit = {
+        "sample_size": len(items),
+        "items": items,
+        "agreement": 1.0,
+        "agreement_ci": [0.735, 1.0],
+        "label_agreement": 1.0,
+        "label_agreement_ci": [0.735, 1.0],
+        "by_stratum": {
+            s: {
+                "n": sum(i["stratum"] == s for i in items),
+                "agreement": 1.0,
+                "label_agreement": 1.0,
+            }
+            for s in sorted({i["stratum"] for i in items})
+        },
+    }
+    (root / "artifacts" / "corpus" / "label_audit.json").write_text(json.dumps(audit))
     sm = _load("score_monitors", monkeypatch, root)
     rng = np.random.default_rng(0)
     for mon in MONITORS:
@@ -359,14 +397,145 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     # report: figures, tables, registry, and rendered documents
     tdir = root / "docs" / "templates"
     tdir.mkdir(parents=True, exist_ok=True)
-    (tdir / "README.prose.md").write_text("# base-rate\n\n<!-- @table e2-recall_at_budget -->\n")
-    (tdir / "REPORT.prose.md").write_text("# Report\n\n<!-- @table e2-precision_at_budget -->\n")
+    report_tables = [
+        "e2-recall_at_budget",
+        "e2-precision_at_budget",
+        "e2-dataset",
+        "e2-fixed",
+        "e2-ttd",
+        "e2-breakdown",
+        "e2-ladder",
+        "e3",
+        "e4",
+    ]
+    data_tables = ["corpus", "corpus-types", "corpus-agents", "corpus-relabel", "audit"]
+
+    def prose(title: str, names: list[str]) -> str:
+        return f"# {title}\n\n" + "\n\n".join(f"<!-- @table {n} -->" for n in names) + "\n"
+
+    (tdir / "README.prose.md").write_text(prose("base-rate", ["readme-headline", "corpus"]))
+    (tdir / "REPORT.prose.md").write_text(prose("Report", report_tables))
+    (tdir / "DATA.prose.md").write_text(prose("Data", data_tables))
     rp = _load("report", monkeypatch, root)
     assert rp.main([]) == 0
     manifest = json.loads((root / "artifacts" / "report" / "manifest.json").read_text())
     assert all((root / f).exists() for f in manifest["figures"] + manifest["tables"])
-    readme = (root / "README.md").read_text()
-    assert "{{" not in readme and "Synthetic share" in readme
+    names = {Path(t).stem for t in manifest["tables"]}
+    assert set(report_tables + data_tables + ["readme-headline"]) <= names
+    docs = {d: (root / d).read_text() for d in ("README.md", "docs/REPORT.md", "docs/DATA.md")}
+    for text in docs.values():
+        assert "{{" not in text and "Synthetic share" in text
+    # every banked table is exactly the table the documents show
     for tbl in manifest["tables"]:
-        text = (root / tbl).read_text().lower()
-        assert "synthetic share" in text and "independent source runs" in text
+        text = (root / tbl).read_text()
+        assert "synthetic share" in text.lower() and "independent source runs" in text.lower()
+        assert any(text.strip() in d for d in docs.values()), tbl
+    numbers = json.loads((root / "artifacts" / "report" / "numbers.json").read_text())
+    traces = _corpus()
+    corpus = numbers["corpus"]
+    assert corpus["total"]["traces"] == len(traces)
+    assert f"| All traces | {len(traces):,d} |" in docs["docs/DATA.md"]
+    rows = {r["key"]: r for r in corpus["rows"]}
+    assert rows["procedural_benign"]["synthetic_share"] == 1.0
+    assert rows["inserted_violation"]["independent_source_runs"] == 2 * 25
+    assert corpus["relabeling"]["changed"] == 4
+    assert corpus["audit"]["traces"] == 12
+    # ensembles and cascades are spelled out by member (their ids exceed name allowances)
+    assert "rank mean of `rule:armour-reviewer-calibrated` and `model:m2`" in docs["README.md"]
+    _check_reproduce(root, monkeypatch)
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.com", *args],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _check_reproduce(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """make reproduce passes on the banked tree and fails on each kind of drift."""
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "bank")
+    rpd = _load("reproduce", monkeypatch, root)
+    assert rpd.main([]) == 0
+    # a hand-edited banked estimate does not recompute
+    path = root / "artifacts" / "e2" / "results.json"
+    banked = path.read_text()
+    res = json.loads(banked)
+    res["estimates"][0]["estimate"] += 0.001
+    path.write_text(json.dumps(res, indent=1, sort_keys=True) + "\n")
+    problems: list[str] = []
+    assert rpd.check_analyses(problems) == 3
+    assert any(p.startswith("e2: recomputed results differ") for p in problems), problems
+    path.write_text(banked)
+    # a prose source edited without rebuilding the report: the rebuilt documents differ
+    prose = root / "docs" / "templates" / "README.prose.md"
+    prose.write_text(prose.read_text() + "\nOne more sentence.\n")
+    _git(root, "commit", "-q", "-am", "edit prose only")
+    problems = []
+    rpd.check_report(problems)
+    assert any("README.md" in p for p in problems), problems
+
+
+def test_first_difference_names_the_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    rpd = _load("reproduce", monkeypatch, tmp_path)
+    assert rpd.first_difference({"a": [1, {"b": 2}]}, {"a": [1, {"b": 2}]}) is None
+    assert rpd.first_difference({"a": [1, {"b": 2}]}, {"a": [1, {"b": 3}]}) == ".a[1].b"
+    assert rpd.first_difference({"a": 1}, {"a": 1.0}) == ".a"
+    assert rpd.first_difference({"a": [1]}, {"a": [1, 2]}) == ".a (length 1 vs 2)"
+    assert rpd.first_difference({"a": 1}, {"b": 1}) == ".a"
+    assert rpd.without_provenance({"x": 1, "provenance": {"t": 2}}) == {"x": 1}
+
+
+def test_real_prose_templates_render_and_pass_claimcheck(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The committed prose sources render on synthetic data and pass claimcheck and freshness.
+
+    This catches an untagged number, an unknown table, or a broken prose claim in
+    docs/templates/ long before the real results exist.
+    """
+    an = _load("analyze", monkeypatch, root)
+    for exp, prereg in (("e2", "0003-e2.md"), ("e3", "0004-e3.md"), ("e4", "0005-e4.md")):
+        an.write(exp, getattr(an, f"run_{exp}")(root / "prereg" / prereg))
+    manifest_path = root / "artifacts" / "corpus" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    bc = _load("build_corpus", monkeypatch, root)
+    manifest["canary"] = bc.CANARY
+    manifest["provenance"] = {"built_at": "2026-11-05T00:00:00+00:00"}
+    manifest_path.write_text(json.dumps(manifest))
+    for rel in (
+        "docs/templates/README.prose.md",
+        "docs/templates/REPORT.prose.md",
+        "docs/templates/DATA.prose.md",
+        "docs/templates/claims.prose.json",
+        "prereg/0002-e1-corpus.md",
+        "artifacts/citecheck.json",
+        "docs/BUILD_BRIEF.md",
+        "docs/BUILD_BRIEF.sha256",
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_bytes((REPO / rel).read_bytes())
+    for top in ("examples", "tools", "src", "configs"):
+        (root / top).mkdir(exist_ok=True)
+        (root / top / ".keep").write_text("")
+    rp = _load("report", monkeypatch, root)
+    assert rp.main([]) == 0
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "bank")
+    docs = ["README.md", "docs/REPORT.md", "docs/DATA.md"]
+    for tool, last in (("claimcheck", "CLAIMCHECK: PASS"), ("freshness", "FRESHNESS: PASS")):
+        run = subprocess.run(
+            [sys.executable, str(REPO / "tools" / f"{tool}.py"), "--root", str(root), *docs],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert run.returncode == 0 and run.stdout.splitlines()[-1].startswith(last), run.stdout
+    data = (root / "docs" / "DATA.md").read_text()
+    assert bc.CANARY in data and "{{" not in data
+    assert "[@gebru-datasheets-2021]" in data

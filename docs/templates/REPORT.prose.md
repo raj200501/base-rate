@@ -33,14 +33,19 @@ corpus of agent trajectories in mock-tool domains, built for this purpose, and t
 monitor families: rule monitors, a size ladder of small open-weight model monitors with
 one frozen prompt, an ensemble, and a cascade.
 
-The contributions are: (1) estimators and interval methods for recall and precision at
-a review budget under case-control sampling and source-run clustering, with a
-preregistered coverage study (E0); (2) a labeled corpus with step-level labels for five
-abstract violation types, separating natural, inserted, and dataset violations (E1);
-(3) a preregistered main study of the monitor families at three prevalences and three
-review budgets (E2); (4) preregistered tests of threshold transfer (E3) and of cascade
-selection on held-out data (E4); and (5) sample-size calculators that state how many more
-independent runs a claim would need (RQ2).
+The contributions are:
+
+1. estimators and interval methods for recall and precision at a review budget under
+   case-control sampling and source-run clustering, with a preregistered coverage study
+   (E0);
+2. a labeled corpus with step-level labels for five abstract violation types, separating
+   natural, inserted, and dataset violations (E1);
+3. a preregistered main study of the monitor families at three prevalences and three
+   review budgets (E2);
+4. preregistered tests of threshold transfer (E3) and of cascade selection on held-out
+   data (E4); and
+5. sample-size calculators that state how many more independent runs a claim would need
+   (RQ2).
 
 ## 2. Related work
 

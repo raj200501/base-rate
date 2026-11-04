@@ -2,7 +2,7 @@
 
 <!-- @prose finding -->
 
-![Recall at a fixed human-review budget across prevalences, every monitor on the primary set, with 95% intervals](artifacts/report/figures/headline_recall.svg)
+![Recall at a fixed human-review budget across prevalences, every monitor on the primary set, with {{param:95%}} intervals](artifacts/report/figures/headline_recall.svg)
 
 <!-- @table readme-headline -->
 
