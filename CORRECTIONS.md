@@ -25,3 +25,19 @@ to accept this. Raj decides the remedy (STATUS.md, "Needs Raj").
 What does not change: prereg/0004-e3-transfer.md and prereg/0005-e4-cascades.md
 were frozen in 8e2836c and are untouched since. The E2 analysis uses the final
 content of 0003, which is also what its config hash records.
+
+## 2026-11-04 Resolution of the preregistration 0003 double commit
+
+The entry above said the gate would not be changed and that Raj would choose
+the remedy. Raj delegated the choice, and the checks were changed as recorded
+in DECISIONS.md D19 (committed before the change): a preregistration whose
+config holds an explicit `TO_BE_SET` placeholder is a self-declared draft, and
+it is frozen by its first commit without one. Under that rule 0003 was a draft
+at 8e2836c and froze at 72fc428; in the config the freezing commit changed
+only the value the draft left unset (the prose gained the paragraph that
+explains the choice), and both commits precede every monitor score. The rule
+is general, it keeps every other condition of the old check, and mutation
+tests show each of its conditions can fail. `make prereg-verify` prints a note
+naming both commits, and the G11 line of ship-check names 0003 as frozen after
+a declared draft. The history was not rewritten, so the original commit
+remains in the log for anyone to inspect.

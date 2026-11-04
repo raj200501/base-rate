@@ -12,4 +12,13 @@ machine-readable plan (grid, thresholds, sample sizes, seeds, exclusions,
 stopping rules). Artifacts cite the file in `prereg` and the SHA-256 of the
 canonical JSON of that block in `prereg_config_sha256`.
 
-Drafts live outside this directory until they are frozen.
+Drafts live outside this directory until they are frozen. The checks also
+define a draft stage inside it (DECISIONS.md D19): a file whose config block
+holds a string value `TO_BE_SET` or `TO_BE_SET_<WORDS>` declares itself
+unfinished, and it is frozen by the first commit whose config holds none.
+Every earlier commit must hold a placeholder, the freezing commit may change
+the config only where a draft held one, nothing may cite the file or amend it
+before it is frozen, and a file that still holds a placeholder fails the
+checks. After the freezing commit the file never changes. Only
+`0003-e2-main-study.md` went through this stage (draft 8e2836c, frozen
+72fc428; CORRECTIONS.md).

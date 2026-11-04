@@ -490,3 +490,213 @@ def test_config_parsing_agrees_with_ship_check(repo: Any, tmp_path: Path) -> Non
     ctx = ship_check.Ctx(orig=repo.path, clone=repo.path, tmp=tmp_path, fast=True, env={})
     _, config = ship_check.prereg_config(ctx, P1)
     assert ship_check.canonical_sha256(config) == prereg.config_sha256(repo.read(P1))
+
+
+# ------------------------------------------------------- draft stage (D19)
+
+DRAFT: dict[str, Any] = {**CONFIG, "method": "TO_BE_SET_FROM_E0"}
+FINAL: dict[str, Any] = {**CONFIG, "method": "composite"}
+
+
+def history(
+    tmp_path: Path, configs: list[dict[str, Any]], *, artifact_at: int | None = None
+) -> Any:
+    """One commit of P1 per config (its prose changes each time), then the artifact.
+
+    With ``artifact_at = i`` the artifact, which cites the last config, is
+    committed right after version ``i`` of P1 instead of at the end.
+    """
+    repo = h.Repo.init(tmp_path / "drafted")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    for i, config in enumerate(configs):
+        repo.write(P1, h.prereg_text(config, body=f"Plan prose, version {i}.\n"))
+        repo.commit(f"plan version {i}")
+        if artifact_at == i:
+            repo.write_json(ART, linked(config=configs[-1]))
+            repo.commit("bank")
+    if artifact_at is None:
+        repo.write_json(ART, linked(config=configs[-1]))
+        repo.commit("bank")
+    return repo
+
+
+def plan_commits(repo: Any) -> list[str]:
+    return repo.git("log", "--reverse", "--format=%H", "--", P1).splitlines()
+
+
+def test_draft_then_freeze_passes_and_is_noted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = history(tmp_path, [DRAFT, FINAL])
+    draft, freeze = plan_commits(repo)
+    notes: list[str] = []
+    found, n, m = prereg.verify(repo.path, notes)
+    assert (found, n, m) == ([], 1, 1)
+    assert notes == [
+        f"{P1}: frozen in {freeze[:12]} after draft commit(s) {draft[:12]} "
+        "that held a TO_BE_SET placeholder"
+    ]
+    assert prereg.main(["verify", "--root", str(repo.path)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out == [
+        f"note: {notes[0]}",
+        "PREREG-VERIFY: PASS 1 preregistrations, 1 linked artifacts",
+    ]
+
+
+def test_two_drafts_then_freeze_passes(tmp_path: Path) -> None:
+    first = {**CONFIG, "method": "TO_BE_SET", "seed": "TO_BE_SET_LATER"}
+    second = {**CONFIG, "method": "composite", "seed": "TO_BE_SET_LATER"}
+    repo = history(tmp_path, [first, second, {**CONFIG, "method": "composite", "seed": 7}])
+    notes: list[str] = []
+    assert prereg.verify(repo.path, notes)[0] == []
+    one, two, _ = plan_commits(repo)
+    assert f"draft commit(s) {one[:12]}, {two[:12]} that held" in notes[0]
+
+
+DRAFT_CASES: list[tuple[str, list[dict[str, Any]], int | None, str]] = [
+    (
+        "edited-after-freezing",
+        [DRAFT, FINAL, FINAL],
+        None,
+        "changed after it was frozen; touched by 3 commits",
+    ),
+    (
+        "placeholder-put-back-after-freezing",
+        [DRAFT, FINAL, DRAFT],
+        None,
+        "changed after it was frozen; touched by 3 commits",
+    ),
+    (
+        "still-a-draft-at-head",
+        [DRAFT],
+        None,
+        "still a draft: its config holds a TO_BE_SET placeholder at /method",
+    ),
+    (
+        "freeze-changes-a-value-the-draft-fixed",
+        [DRAFT, {**FINAL, "nominal": 0.9}],
+        None,
+        "changes a config value that draft",
+    ),
+    (
+        "freeze-adds-a-key",
+        [DRAFT, {**FINAL, "extra": 1}],
+        None,
+        "changes a config value that draft",
+    ),
+    (
+        "freeze-drops-a-key",
+        [DRAFT, {k: v for k, v in FINAL.items() if k != "nominal"}],
+        None,
+        "changes a config value that draft",
+    ),
+    (
+        "second-draft-changes-a-value-the-first-fixed",
+        [DRAFT, {**DRAFT, "nominal": 0.9}, {**FINAL, "nominal": 0.9}],
+        None,
+        "changes a config value that draft",
+    ),
+    (
+        "lookalike-value-is-not-a-placeholder",
+        [{**CONFIG, "method": "TO_BE_SETTLED"}, FINAL],
+        None,
+        "changed after it was frozen; touched by 2 commits",
+    ),
+    (
+        "lower-case-value-is-not-a-placeholder",
+        [{**CONFIG, "method": "to_be_set"}, FINAL],
+        None,
+        "changed after it was frozen; touched by 2 commits",
+    ),
+    (
+        "artifact-between-draft-and-freeze",
+        [DRAFT, FINAL],
+        0,
+        f"not strictly after {P1} was frozen in",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("configs", "artifact_at", "needle"),
+    [c[1:] for c in DRAFT_CASES],
+    ids=[c[0] for c in DRAFT_CASES],
+)
+def test_draft_rules(
+    tmp_path: Path, configs: list[dict[str, Any]], artifact_at: int | None, needle: str
+) -> None:
+    assert_fails(history(tmp_path, configs, artifact_at=artifact_at), needle)
+
+
+def test_artifact_in_the_freezing_commit_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "same")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("draft")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.write_json(ART, linked(config=FINAL))
+    repo.commit("freeze and bank together")
+    assert_fails(repo, f"not strictly after {P1} was frozen")
+
+
+def test_placeholder_in_prose_only_is_not_a_draft(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "prose")
+    repo.write(P1, h.prereg_text(CONFIG, body="Method: TO_BE_SET.\n"))
+    repo.commit("plan")
+    repo.write(P1, h.prereg_text(CONFIG, body="Method: composite.\n"))
+    repo.commit("fill the prose")
+    assert_fails(repo, "changed after it was frozen; touched by 2 commits")
+
+
+def test_commit_with_an_unparsable_config_is_not_a_draft(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "broken")
+    repo.write(P1, h.prereg_text(DRAFT).replace('"method"', '"method" "'))
+    repo.commit("broken plan")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("repair")
+    assert_fails(repo, "changed after it was frozen; touched by 2 commits")
+
+
+def test_amendment_of_a_draft_must_follow_its_freeze(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "amend")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("draft")
+    repo.write(P2, h.prereg_text(CONFIG, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("amend the draft")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("freeze")
+    assert_fails(repo, f"{P2}: amends {P1}, which was not committed strictly earlier")
+
+
+def test_placeholder_paths_finds_nested_values_only_of_the_exact_form() -> None:
+    config = {
+        "a": ["x", "TO_BE_SET"],
+        "b": {"c": "TO_BE_SET_FROM_E0", "d": "TO_BE_SETTLED"},
+        "e": "to_be_set",
+        "f": "TO_BE_SET_",
+        "g": 3,
+    }
+    assert prereg.placeholder_paths(config) == ["/a/1", "/b/c"]
+
+
+FILL_CASES: list[tuple[Any, Any, bool]] = [
+    ({"a": "TO_BE_SET", "b": 1}, {"a": {"x": [1, 2]}, "b": 1}, True),
+    ({"a": [1, "TO_BE_SET"]}, {"a": [1, "composite"]}, True),
+    ({"a": 1}, {"a": 1.0}, False),
+    ({"a": 1}, {"a": True}, False),
+    ({"a": 0}, {"a": False}, False),
+    ({"a": [1, 2]}, {"a": [1]}, False),
+    ({"a": 1}, {"a": 1, "b": 2}, False),
+    ({"a": "TO_BE_SET", "b": 1}, {"a": 5}, False),
+    ({"a": {"b": 1}}, {"a": [1]}, False),
+    ({"a": None}, {"a": None}, True),
+]
+
+
+@pytest.mark.parametrize(("draft", "final", "expected"), FILL_CASES)
+def test_fills_only_placeholders_agrees_with_ship_check(
+    draft: Any, final: Any, expected: bool
+) -> None:
+    assert prereg.fills_only_placeholders(draft, final) is expected
+    assert ship_check.keeps_fixed_values(draft, final) is expected
+    assert bool(prereg.placeholder_paths(draft)) == ship_check.has_placeholder(draft)

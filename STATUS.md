@@ -1,4 +1,4 @@
-goal_turn: 2
+goal_turn: 3
 STATE: ACTIVE
 
 # Status
@@ -22,7 +22,7 @@ report, or the review.
 | G8 Transfer and cascades | E3 and E4 preregistered | analysis after scoring |
 | G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples |
 | G10 Claim integrity | claimcheck and freshness tools in place | documents not rendered yet |
-| G11 Preregistration integrity | fails: 0003 committed twice (Needs Raj 1) | Raj's decision; confirmatory artifacts |
+| G11 Preregistration integrity | prereg-verify passes; draft-stage rule (D19) settles 0003 | E2 to E4 artifacts must cite their preregs |
 | G12 Independent review | not started | reviewer subagent, 1 run per day under CAP_SHARE=0.2 |
 | G13 Documentation | report builder in place; REPORT method sections drafted | results, README, citations |
 | G14 Hygiene | passes | |
@@ -32,8 +32,9 @@ report, or the review.
 The unattended pipeline (tools/run_pipeline.sh, log in runs/pipeline/) runs the rest
 of E1 (Qwen3-1.7B batch, Qwen3-4B batch, the stopping rule, insertions, corpus build,
 audit sample) and then all E2 scoring. E0 is banked; E2, E3, and E4 are frozen; the
-E1 oracle amendment (prereg/0006) is frozen and implemented. Waiting on Raj for the
-prereg 0003 decision (Needs Raj 1).
+E1 oracle amendment (prereg/0006) is frozen and implemented. The prereg 0003 double
+commit is settled by the draft-stage rule (D19, Raj delegated the choice): 0003 was a
+draft at 8e2836c and froze at 72fc428, and both checks name it.
 
 ## Next three actions
 
@@ -58,31 +59,18 @@ children); reviewer runs will be logged against the daily review cap.
 
 ## Needs Raj
 
-Item 1 blocks gate G11 (and therefore the Definition of Done); the others do not.
+None of these blocks the Definition of Done.
 
-1. **Decide how to resolve the double commit of prereg/0003-e2-main-study.md**
-   (CORRECTIONS.md, DECISIONS.md D18). Its first commit (8e2836c) carried the
-   unfinished draft with the placeholder `TO_BE_SET_FROM_E0`; the next commit
-   (72fc428, the same minute, before any monitor score) set the method to
-   `composite`. G11 fails because a preregistration was edited after it was
-   committed, and I will not change the check myself. Options, pick one:
-   (a) allow a one-time rewrite and force-push of the unmerged branch
-   `claude/tender-ptolemy-ilsn9p` that removes 0003 from commit 8e2836c, keeping
-   the CORRECTIONS.md entry; (b) rule that a preregistration whose config holds
-   an explicit `TO_BE_SET` placeholder is an unfrozen draft, so 0003 was frozen
-   at 72fc428, and I implement exactly that rule in tools/prereg.py and
-   tools/ship_check.py with mutation tests; or (c) leave G11 failing and ship
-   with the deviation disclosed.
-2. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
+1. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
    agents for misalignment"
    (https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment) served
    a bot challenge to scripted access twice. Open it in a browser and confirm the
    title, date, and the brief's description; until then it is not cited.
-3. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
+2. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
    machine where `claude` is logged in to the Max plan with none of
    `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
    `CLAUDE_CODE_USE_*` set. The study fields four families without them.
-4. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
+3. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
    third-party code; until then only this project's own tasks with in-process mock
    tools run.
 

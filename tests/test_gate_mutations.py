@@ -22,6 +22,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -242,6 +243,119 @@ def test_g11_own_checks_catch_a_rename_without_make_prereg_verify(tmp_path: Path
     repo = g11_repo(tmp_path / "repo", makefile="prereg-verify:\n\ttrue\n")
     _rename_and_loosen(repo)
     assert_fail(11, repo, tmp_path, "prereg")
+
+
+# G11 draft stage (DECISIONS.md D19): a config holding a TO_BE_SET placeholder is
+# an unfinished draft, frozen by the first commit without one. These cases use a
+# Makefile whose prereg-verify always passes, so each failure comes from the
+# gate's own checks; tests/test_prereg.py covers the same rules in the tool.
+
+DRAFT: dict[str, Any] = {**CONFIG, "method": "TO_BE_SET_FROM_E0"}
+FINAL: dict[str, Any] = {**CONFIG, "method": "composite"}
+NOOP_VERIFY = "prereg-verify:\n\ttrue\n"
+
+
+def g11_history(
+    path: Path,
+    configs: list[dict[str, Any]],
+    *,
+    makefile: str = NOOP_VERIFY,
+    artifact_at: int | None = None,
+) -> Any:
+    """Tools, then one commit of P1 per config, then the artifact citing the last config."""
+    repo = h.Repo.init(path)
+    repo.write("Makefile", makefile)
+    copy_tools(repo, "chainlib.py", "prereg.py")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.commit("tools")
+    for i, config in enumerate(configs):
+        repo.write(P1, h.prereg_text(config, body=f"Plan prose, version {i}.\n"))
+        repo.commit(f"plan version {i}")
+        if artifact_at == i:
+            repo.write_json(ART, confirmatory(configs[-1]))
+            repo.commit("bank")
+    if artifact_at is None:
+        repo.write_json(ART, confirmatory(configs[-1]))
+        repo.commit("bank")
+    return repo
+
+
+@pytest.mark.parametrize("makefile", [NOOP_VERIFY, VERIFY_RECIPE], ids=["own-checks", "with-tool"])
+def test_g11_draft_then_freeze_passes_and_is_named(tmp_path: Path, makefile: str) -> None:
+    repo = g11_history(tmp_path / "repo", [DRAFT, FINAL], makefile=makefile)
+    evidence = assert_pass(11, repo, tmp_path)
+    assert evidence == (
+        "1 preregistrations frozen; 1 confirmatory artifacts cite earlier preregs; "
+        "frozen after a declared draft: 0001"
+    )
+
+
+G11_DRAFT_CASES: list[tuple[str, list[dict[str, Any]], int | None, str]] = [
+    (
+        "edited-after-freezing",
+        [DRAFT, FINAL, FINAL],
+        None,
+        f"{P1} changed after it was frozen (3 commits)",
+    ),
+    (
+        "placeholder-put-back",
+        [DRAFT, FINAL, DRAFT],
+        None,
+        f"{P1} changed after it was frozen (3 commits)",
+    ),
+    ("still-a-draft", [DRAFT], None, f"{P1} is still a draft"),
+    (
+        "freeze-changes-a-fixed-value",
+        [DRAFT, {**FINAL, "budgets_per_10k": [100]}],
+        None,
+        "its freezing commit changes a value that draft",
+    ),
+    (
+        "freeze-adds-a-key",
+        [DRAFT, {**FINAL, "extra": 1}],
+        None,
+        "its freezing commit changes a value that draft",
+    ),
+    (
+        "lookalike-is-not-a-placeholder",
+        [{**CONFIG, "method": "TO_BE_SETTLED"}, FINAL],
+        None,
+        f"{P1} changed after it was frozen (2 commits)",
+    ),
+    ("artifact-before-the-freeze", [DRAFT, FINAL], 0, f"{P1} was not committed before {ART}"),
+]
+
+
+@pytest.mark.parametrize(
+    ("configs", "artifact_at", "needle"),
+    [c[1:] for c in G11_DRAFT_CASES],
+    ids=[c[0] for c in G11_DRAFT_CASES],
+)
+def test_g11_draft_mutations_fail(
+    tmp_path: Path, configs: list[dict[str, Any]], artifact_at: int | None, needle: str
+) -> None:
+    repo = g11_history(tmp_path / "repo", configs, artifact_at=artifact_at)
+    assert_fail(11, repo, tmp_path, needle)
+
+
+@pytest.mark.parametrize(
+    ("configs", "artifact_at"),
+    [(c[1], c[2]) for c in G11_DRAFT_CASES],
+    ids=[c[0] for c in G11_DRAFT_CASES],
+)
+def test_g11_draft_mutations_also_fail_the_tool(
+    tmp_path: Path, configs: list[dict[str, Any]], artifact_at: int | None
+) -> None:
+    repo = g11_history(tmp_path / "repo", configs, makefile=VERIFY_RECIPE, artifact_at=artifact_at)
+    ok = subprocess.run(
+        [PY, "tools/prereg.py", "verify"],
+        cwd=repo.path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ok.returncode == 1, ok.stdout
+    assert ok.stdout.splitlines()[-1].startswith("PREREG-VERIFY: FAIL"), ok.stdout
 
 
 # ======================================================================= G14

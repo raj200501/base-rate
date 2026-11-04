@@ -281,6 +281,85 @@ def first_commit(repo: Path, path: str) -> str | None:
     return shas[-1] if shas else None
 
 
+# A prereg-config string value that marks the file as an unfinished draft (DECISIONS.md D19).
+PLACEHOLDER_RE = re.compile(r"^TO_BE_SET(?:_[A-Z0-9]+)*$")
+
+
+def has_placeholder(value: Any) -> bool:
+    """Whether a JSON value holds a draft placeholder at any depth."""
+    if isinstance(value, str):
+        return PLACEHOLDER_RE.match(value) is not None
+    if isinstance(value, dict):
+        return any(has_placeholder(v) for v in value.values())
+    if isinstance(value, list):
+        return any(has_placeholder(v) for v in value)
+    return False
+
+
+def keeps_fixed_values(draft: Any, final: Any) -> bool:
+    """Whether ``final`` equals ``draft`` everywhere ``draft`` holds no placeholder."""
+    if isinstance(draft, str) and PLACEHOLDER_RE.match(draft):
+        return True
+    if isinstance(draft, dict):
+        return (
+            isinstance(final, dict)
+            and set(draft) == set(final)
+            and all(keeps_fixed_values(draft[k], final[k]) for k in draft)
+        )
+    if isinstance(draft, list):
+        return (
+            isinstance(final, list)
+            and len(draft) == len(final)
+            and all(keeps_fixed_values(d, f) for d, f in zip(draft, final, strict=True))
+        )
+    return type(draft) is type(final) and bool(draft == final)
+
+
+def prereg_commits(repo: Path, path: str) -> list[str]:
+    """Non-merge commits in HEAD's history that touched ``path``, oldest first."""
+    out = git(
+        repo,
+        "log",
+        "--format=%H",
+        "--full-history",
+        "--no-merges",
+        "--no-renames",
+        "--topo-order",
+        "--reverse",
+        "--",
+        path,
+    )
+    return out.splitlines()
+
+
+def config_at(repo: Path, rev: str, path: str) -> Any:
+    """The parsed prereg-config block of ``path`` at ``rev``, or None."""
+    try:
+        text = git(repo, "show", f"{rev}:{path}")
+    except subprocess.CalledProcessError:
+        return None
+    blocks = re.findall(r"```json prereg-config\n(.*?)```", text, re.S)
+    if len(blocks) != 1:
+        return None
+    try:
+        return json.loads(blocks[0])
+    except ValueError:
+        return None
+
+
+def freeze_commit(repo: Path, path: str) -> tuple[str | None, list[str]]:
+    """(commit that froze a preregistration, the draft commits before it).
+
+    The freezing commit is the first commit whose config holds no
+    ``TO_BE_SET`` placeholder; commits before it are drafts (D19).
+    """
+    commits = prereg_commits(repo, path)
+    for i, commit in enumerate(commits):
+        if not has_placeholder(config_at(repo, commit, path)):
+            return commit, commits[:i]
+    return None, commits
+
+
 def drift_allowed(path: str) -> bool:
     """Whether a path may change between the reviewed commit and HEAD (brief 10.1 step 8)."""
     return path in REVIEW_DRIFT_FILES or any(path.startswith(d) for d in REVIEW_DRIFT_DIRS)
@@ -366,8 +445,8 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
     """Verify an artifact's preregistration citation; return the frozen config.
 
     The cited file must exist, its config hash must match the artifact's
-    ``prereg_config_sha256``, and its adding commit must strictly precede the
-    artifact's first commit.
+    ``prereg_config_sha256``, and the commit that froze it (not a draft of
+    it) must strictly precede the artifact's first commit.
     """
     prereg_path = str(artifact.get("prereg", ""))
     _, config = prereg_config(ctx, prereg_path)
@@ -375,7 +454,7 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
         artifact.get("prereg_config_sha256") == canonical_sha256(config),
         f"{artifact_rel}: prereg_config_sha256 does not match {prereg_path}",
     )
-    p_commit = first_commit(ctx.clone, prereg_path)
+    p_commit = freeze_commit(ctx.clone, prereg_path)[0]
     a_commit = first_commit(ctx.clone, artifact_rel)
     need(p_commit is not None and a_commit is not None, f"{artifact_rel} or prereg not committed")
     assert p_commit is not None and a_commit is not None
@@ -939,9 +1018,33 @@ def g11(ctx: Ctx) -> str:
         ctx.clone, "log", "--format=%H", "--no-renames", "--diff-filter=D", "--", "prereg/"
     )
     need(not deleted, "a preregistration file was deleted")
+    drafted = []
     for p in preregs:
-        commits = git(ctx.clone, "log", "--format=%H", "--no-renames", "--", p).splitlines()
-        need(len(commits) == 1, f"{p} changed after it was frozen ({len(commits)} commits)")
+        commits = prereg_commits(ctx.clone, p)
+        frozen, drafts = freeze_commit(ctx.clone, p)
+        need(frozen is not None, f"{p} is still a draft (its config holds a TO_BE_SET placeholder)")
+        assert frozen is not None
+        need(
+            len(commits) == len(drafts) + 1,
+            f"{p} changed after it was frozen ({len(commits)} commits)",
+        )
+        final = config_at(ctx.clone, frozen, p)
+        for d in drafts:
+            need(
+                is_strict_ancestor(ctx.clone, d, frozen),
+                f"{p}: draft {d[:12]} does not precede its freezing commit",
+            )
+            need(
+                keeps_fixed_values(config_at(ctx.clone, d, p), final),
+                f"{p}: its freezing commit changes a value that draft {d[:12]} had fixed",
+            )
+        need(
+            git(ctx.clone, "rev-parse", f"HEAD:{p}")
+            == git(ctx.clone, "rev-parse", f"{frozen}:{p}"),
+            f"{p} at HEAD differs from its freezing commit",
+        )
+        if drafts:
+            drafted.append(p.removeprefix("prereg/").split("-", 1)[0])
     confirmatory = []
     for art in tracked(ctx, "artifacts/*.json"):
         if art.startswith("artifacts/review/"):
@@ -956,9 +1059,10 @@ def g11(ctx: Ctx) -> str:
     need(bool(confirmatory), "no confirmatory artifacts yet")
     pv = ctx.make("prereg-verify", timeout=600)
     need(pv.ok, f"make prereg-verify failed: {pv.tail()}")
+    after_draft = f"; frozen after a declared draft: {', '.join(drafted)}" if drafted else ""
     return (
         f"{len(preregs)} preregistrations frozen; "
-        f"{len(confirmatory)} confirmatory artifacts cite earlier preregs"
+        f"{len(confirmatory)} confirmatory artifacts cite earlier preregs{after_draft}"
     )
 
 

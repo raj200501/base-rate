@@ -15,18 +15,25 @@ The contract (docs/PLAN.md "Artifact contracts", prereg/README.md):
   front matter between ``---`` lines holding ``id``, ``title``,
   ``experiment``, and ``date`` (ISO ``YYYY-MM-DD``), and has exactly one
   fenced block tagged ``json prereg-config`` holding a JSON object.
-- A preregistration is frozen by its commit: exactly one ordinary commit
-  touches it (the one that adds it), and it is never modified, renamed, or
-  deleted afterwards. Its content at HEAD and in the working tree equals what
-  that commit added.
+- A preregistration is frozen by its commit: normally exactly one ordinary
+  commit touches it (the one that adds it), and it is never modified,
+  renamed, or deleted afterwards. Its content at HEAD, in the index, and in
+  the working tree equals the frozen content.
+- Draft stage (DECISIONS.md D19): a file whose config holds a string value
+  ``TO_BE_SET`` or ``TO_BE_SET_<WORDS>`` declares itself an unfinished draft.
+  It is frozen by the first commit whose config holds no such value; every
+  earlier commit must hold one, and the freezing commit may change the config
+  only where a draft held a placeholder. A file still holding a placeholder
+  at HEAD fails. Everything below counts from the freezing commit.
 - An amendment names the original in front matter (``amends: prereg/....md``);
-  the original must exist and be committed strictly earlier.
+  the original must exist and be frozen strictly before the amendment.
 - Every tracked JSON file under ``artifacts/`` with a ``prereg`` field cites
   an existing preregistration, carries ``prereg_config_sha256`` equal to the
   SHA-256 of the canonical JSON of that preregistration's config block, and
   every commit that touched the artifact comes strictly after the commit that
-  froze the preregistration. An artifact with ``"confirmatory": true`` must
-  cite one. Exploratory artifacts omit the ``prereg`` field.
+  froze the preregistration (not merely after a draft of it). An artifact
+  with ``"confirmatory": true`` must cite one. Exploratory artifacts omit the
+  ``prereg`` field.
 
 Commands:
   verify [--root DIR]       check all of the above using DIR's git history
@@ -34,7 +41,8 @@ Commands:
 
 The last stdout line of ``verify`` is ``PREREG-VERIFY: PASS <n> preregistrations,
 <m> linked artifacts`` or ``PREREG-VERIFY: FAIL <reason count>`` with the reasons
-above it. Exit 0 only on PASS. Stdlib only.
+above it (``- `` lines) and a ``note: `` line for each file frozen after a
+draft. Exit 0 only on PASS. Stdlib only.
 """
 
 from __future__ import annotations
@@ -54,6 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from chainlib import (  # noqa: E402
     GitError,
+    blob_bytes,
     blob_id,
     change_status,
     commits_following,
@@ -75,6 +84,8 @@ CONFIG_RE = re.compile(r"```json prereg-config\n(.*?)```", re.S)
 FRONT_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*?)[ \t]*$")
 REQUIRED_KEYS = ("id", "title", "experiment", "date")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# A config string value that marks the file as an unfinished draft (D19).
+PLACEHOLDER_RE = re.compile(r"^TO_BE_SET(?:_[A-Z0-9]+)*$")
 
 
 class PreregError(ValueError):
@@ -88,7 +99,8 @@ class Prereg:
     path: str
     front: dict[str, str] = field(default_factory=dict)
     config_sha256: str | None = None
-    add_commit: str | None = None
+    freeze_commit: str | None = None
+    drafts: list[str] = field(default_factory=list)
 
 
 def parse_front_matter(text: str) -> tuple[dict[str, str], list[str]]:
@@ -156,6 +168,41 @@ def parse_config(text: str) -> dict[str, Any]:
     return config
 
 
+def placeholder_paths(config: Any, at: str = "") -> list[str]:
+    """JSON paths (``/key/0`` style) of every draft placeholder in ``config``."""
+    if isinstance(config, str):
+        return [at or "/"] if PLACEHOLDER_RE.match(config) else []
+    if isinstance(config, dict):
+        return [p for k, v in config.items() for p in placeholder_paths(v, f"{at}/{k}")]
+    if isinstance(config, list):
+        return [p for i, v in enumerate(config) for p in placeholder_paths(v, f"{at}/{i}")]
+    return []
+
+
+def fills_only_placeholders(draft: Any, final: Any) -> bool:
+    """Whether ``final`` equals ``draft`` except where ``draft`` holds a placeholder.
+
+    Objects must keep the same keys and lists the same length; a placeholder
+    may be replaced by any value, and every other value must stay equal and of
+    the same JSON type (``1`` is not ``1.0`` or ``true``).
+    """
+    if isinstance(draft, str) and PLACEHOLDER_RE.match(draft):
+        return True
+    if isinstance(draft, dict):
+        return (
+            isinstance(final, dict)
+            and draft.keys() == final.keys()
+            and all(fills_only_placeholders(draft[k], final[k]) for k in draft)
+        )
+    if isinstance(draft, list):
+        return (
+            isinstance(final, list)
+            and len(draft) == len(final)
+            and all(fills_only_placeholders(d, f) for d, f in zip(draft, final, strict=True))
+        )
+    return type(draft) is type(final) and bool(draft == final)
+
+
 def config_sha256(text: str) -> str:
     """SHA-256 of the canonical JSON of a preregistration's config block."""
     return sha256_obj(parse_config(text))
@@ -204,32 +251,74 @@ def _read(root: Path, rel: str) -> str | None:
         return None
 
 
-def _check_frozen(root: Path, path: str, problems: list[str]) -> str | None:
-    """Check that one tracked preregistration is untouched since its commit.
+def _config_at(root: Path, rev: str, path: str) -> dict[str, Any] | None:
+    """The config block of ``path`` at ``rev``, or None if absent or invalid."""
+    oid = blob_id(root, rev, path)
+    if oid is None:
+        return None
+    try:
+        return parse_config(blob_bytes(root, oid).decode("utf-8"))
+    except (PreregError, UnicodeDecodeError):
+        return None
+
+
+def _check_frozen(root: Path, path: str, problems: list[str]) -> tuple[str | None, list[str]]:
+    """Check that one tracked preregistration is untouched since it was frozen.
+
+    The freezing commit is the first commit whose config holds no draft
+    placeholder (normally the commit that adds the file). Commits before it
+    are drafts; see the module docstring for what they may change.
 
     Returns:
-        The commit that added it, or None if that cannot be determined.
+        (the freezing commit, or None if there is none; the draft commits,
+        oldest first).
     """
-    commits = commits_touching(root, path)
+    commits = commits_touching(root, path, oldest_first=True)
     if not commits:
         problems.append(f"{path}: tracked but not added by any ordinary commit")
-        return None
-    add = commits[-1]
-    if len(commits) > 1:
-        shas = ", ".join(_short(c) for c in reversed(commits))
+        return None, []
+    if change_status(root, commits[0], path) != "A":
+        problems.append(f"{path}: its first commit {_short(commits[0])} does not add it")
+    configs = [_config_at(root, c, path) for c in commits]
+    first_final = next(
+        (i for i, cfg in enumerate(configs) if cfg is None or not placeholder_paths(cfg)), None
+    )
+    if first_final is None:
+        held = ", ".join(placeholder_paths(configs[-1]))
         problems.append(
-            f"{path}: changed after it was frozen; touched by {len(commits)} commits ({shas})"
+            f"{path}: still a draft: its config holds a TO_BE_SET placeholder at {held} "
+            f"in {_short(commits[-1])}; a preregistration must be frozen"
         )
-    if change_status(root, add, path) != "A":
-        problems.append(f"{path}: its first commit {_short(add)} does not add it")
-    frozen_blob = blob_id(root, add, path)
+        return None, commits
+    freeze, drafts = commits[first_final], commits[:first_final]
+    if first_final + 1 < len(commits):
+        shas = ", ".join(_short(c) for c in commits)
+        problems.append(
+            f"{path}: changed after it was frozen; touched by {len(commits)} commits ({shas}); "
+            f"frozen in {_short(freeze)}"
+        )
+    final = configs[first_final]
+    for draft, cfg in zip(drafts, configs[:first_final], strict=True):
+        if not is_strict_ancestor(root, draft, freeze):
+            problems.append(
+                f"{path}: draft {_short(draft)} does not precede the freezing commit "
+                f"{_short(freeze)}"
+            )
+        if final is None or not fills_only_placeholders(cfg, final):
+            problems.append(
+                f"{path}: freezing commit {_short(freeze)} changes a config value that draft "
+                f"{_short(draft)} had fixed; only its placeholders may change"
+            )
+    frozen_blob = blob_id(root, freeze, path)
     if blob_id(root, "HEAD", path) != frozen_blob:
-        problems.append(f"{path}: content at HEAD differs from its freezing commit {_short(add)}")
+        problems.append(
+            f"{path}: content at HEAD differs from its freezing commit {_short(freeze)}"
+        )
     if blob_id(root, "", path) != frozen_blob:
         problems.append(f"{path}: staged changes to a frozen preregistration")
     if (root / path).is_file() and hash_object(root, root / path) != frozen_blob:
         problems.append(f"{path}: modified in the working tree since it was frozen")
-    return add
+    return freeze, drafts
 
 
 def _collect_preregs(root: Path, problems: list[str]) -> dict[str, Prereg]:
@@ -249,7 +338,8 @@ def _collect_preregs(root: Path, problems: list[str]) -> dict[str, Prereg]:
         if not NAME_RE.match(path):
             problems.append(f"{path}: unexpected file; preregistrations are prereg/NNNN-name.md")
             continue
-        prereg = Prereg(path=path, add_commit=_check_frozen(root, path, problems))
+        freeze, drafts = _check_frozen(root, path, problems)
+        prereg = Prereg(path=path, freeze_commit=freeze, drafts=drafts)
         text = _read(root, path)
         if text is None:
             problems.append(f"{path}: missing from the working tree or not UTF-8")
@@ -280,7 +370,7 @@ def _check_unique(preregs: dict[str, Prereg], problems: list[str]) -> None:
 
 
 def _check_amendments(root: Path, preregs: dict[str, Prereg], problems: list[str]) -> None:
-    """An amendment must cite an existing preregistration committed strictly earlier."""
+    """An amendment must cite an existing preregistration frozen strictly earlier."""
     for path, prereg in sorted(preregs.items()):
         target = prereg.front.get("amends")
         if target is None:
@@ -289,12 +379,12 @@ def _check_amendments(root: Path, preregs: dict[str, Prereg], problems: list[str
         if target == path or original is None:
             problems.append(f"{path}: amends {target!r}, which is not another preregistration")
             continue
-        if prereg.add_commit is None or original.add_commit is None:
+        if prereg.freeze_commit is None or original.freeze_commit is None:
             problems.append(f"{path}: cannot order it against {target}: commit unknown")
-        elif not is_strict_ancestor(root, original.add_commit, prereg.add_commit):
+        elif not is_strict_ancestor(root, original.freeze_commit, prereg.freeze_commit):
             problems.append(
                 f"{path}: amends {target}, which was not committed strictly earlier "
-                f"({_short(original.add_commit)} vs {_short(prereg.add_commit)})"
+                f"({_short(original.freeze_commit)} vs {_short(prereg.freeze_commit)})"
             )
 
 
@@ -339,23 +429,26 @@ def _check_artifacts(root: Path, preregs: dict[str, Prereg], problems: list[str]
         commits = set(commits_touching(root, art)) | set(commits_following(root, art))
         if not commits:
             problems.append(f"{art}: not committed")
-        elif prereg.add_commit is None:
+        elif prereg.freeze_commit is None:
             problems.append(f"{art}: cannot order it against {cited}: commit unknown")
         else:
-            early = sorted(c for c in commits if not is_strict_ancestor(root, prereg.add_commit, c))
+            frozen = prereg.freeze_commit
+            early = sorted(c for c in commits if not is_strict_ancestor(root, frozen, c))
             if early:
                 problems.append(
                     f"{art}: committed in {', '.join(_short(c) for c in early)}, not strictly "
-                    f"after {cited} was frozen in {_short(prereg.add_commit)}"
+                    f"after {cited} was frozen in {_short(frozen)}"
                 )
     return linked
 
 
-def verify(root: Path) -> tuple[list[str], int, int]:
+def verify(root: Path, notes: list[str] | None = None) -> tuple[list[str], int, int]:
     """Verify every preregistration and every artifact that cites one.
 
     Args:
         root: Any directory inside the repository's work tree.
+        notes: If given, receives one line per preregistration that was
+            frozen after a draft stage (D19), naming both commits.
 
     Returns:
         (problems, number of preregistrations, number of linked artifacts).
@@ -371,12 +464,23 @@ def verify(root: Path) -> tuple[list[str], int, int]:
     except GitError as exc:
         problems.append(f"git history unavailable: {exc}")
         return problems, 0, 0
+    if notes is not None:
+        for path, prereg in sorted(preregs.items()):
+            if prereg.drafts and prereg.freeze_commit is not None:
+                drafts = ", ".join(_short(c) for c in prereg.drafts)
+                notes.append(
+                    f"{path}: frozen in {_short(prereg.freeze_commit)} after draft "
+                    f"commit(s) {drafts} that held a TO_BE_SET placeholder"
+                )
     return problems, len(preregs), linked
 
 
 def cmd_verify(root: Path) -> int:
     """Print the verification report; return the exit code."""
-    problems, n, m = verify(root)
+    notes: list[str] = []
+    problems, n, m = verify(root, notes)
+    for note in notes:
+        print(f"note: {note}")
     for problem in problems:
         print(f"- {problem}")
     if problems:

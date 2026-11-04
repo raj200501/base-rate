@@ -102,16 +102,22 @@ def history_paths(root: Path, prefix: str) -> list[str]:
     return sorted({ln for ln in out.splitlines() if ln.strip()})
 
 
-def commits_touching(root: Path, path: str, *, merges: bool = False) -> list[str]:
+def commits_touching(
+    root: Path, path: str, *, merges: bool = False, oldest_first: bool = False
+) -> list[str]:
     """Commits in HEAD's history that touched ``path``, newest first.
 
     Uses ``--full-history`` (side branches count) and ``--no-renames`` (a
     rename is a deletion of the old name and an addition of the new one).
-    Merge commits are left out unless ``merges`` is true.
+    Merge commits are left out unless ``merges`` is true. With
+    ``oldest_first`` the list is in reverse topological order, so a commit
+    always comes after its ancestors even when commit dates tie.
     """
     args = ["log", "--full-history", "--no-renames", "--format=%H"]
     if not merges:
         args.append("--no-merges")
+    if oldest_first:
+        args += ["--topo-order", "--reverse"]
     return git(root, *args, "--", path).splitlines()
 
 
