@@ -17,33 +17,34 @@ Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on dat
 | G3 CI parity | make ci passes locally | CI runs only on main and PRs into main (D14) |
 | G4 Offline demo | make demo matches golden output | |
 | G5 Statistical engine | E0 banked (all 2,376 cells; failures documented, library warns) | E2 headline cross-check once E2 exists |
-| G6 Corpus | E1 running unattended (tools/run_pipeline.sh); oracle amendment 0006 frozen | build, audit, datasheet |
-| G7 Main study | E2 preregistered (headline method composite, from E0) | scoring runs in the pipeline, then analysis |
-| G8 Transfer and cascades | E3 and E4 preregistered | analysis after scoring |
-| G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples |
-| G10 Claim integrity | claimcheck and freshness cover README, REPORT, and DATA; prose sources pass on synthetic data | render on real results |
-| G11 Preregistration integrity | prereg-verify passes; draft-stage rule (D19) settles 0003 | E2 to E4 artifacts must cite their preregs |
-| G12 Independent review | not started | reviewer subagent, 1 run per day under CAP_SHARE=0.2 |
-| G13 Documentation | every table built; make report and make reproduce work; datasheet drafted | results prose, README render |
+| G6 Corpus | 1.7B batch done (2,000 runs); 4B batch running; insertion amended (prereg/0007); canary in every record | insertions, build, blind audit (workflow ready), datasheet render |
+| G7 Main study | E2 preregistered; score metadata cites prereg/0003; time to detection honors the tie fraction | scoring in the pipeline, then analysis |
+| G8 Transfer and cascades | E3 and E4 preregistered; E3 set fixed to its prereg (D22); E4 cost timing fixed | analysis after scoring |
+| G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples (render) |
+| G10 Claim integrity | claimcheck and freshness cover README, REPORT, DATA; numbers.json source hashes and make reproduce checked | render on real results |
+| G11 Preregistration integrity | prereg-verify passes (7 preregistrations); merges, renames, amendments, shallow clones handled in both checks | confirmatory artifacts after the pipeline |
+| G12 Independent review | two adversarial review rounds run and fixed (D21) | final make review |
+| G13 Documentation | every table built; G13 rejects unwritten sections; method, limitations, datasheet drafted | results prose, README finding |
 | G14 Hygiene | passes | |
 
 ## Now
 
-The unattended pipeline (tools/run_pipeline.sh, log in runs/pipeline/) runs the rest
-of E1 (Qwen3-1.7B batch, Qwen3-4B batch, the stopping rule, insertions, corpus build,
-audit sample) and then all E2 scoring. The VM was reclaimed at about 04:17 UTC and
-rebooted at 07:10; the pipeline was restarted at 07:12 from 1,064 of 2,000 banked
-1.7B runs, and a two-hour waiter now keeps the session active (D20). E0 is banked; E2, E3, and E4 are frozen; the
-E1 oracle amendment (prereg/0006) is frozen and implemented. The prereg 0003 double
-commit is settled by the draft-stage rule (D19, Raj delegated the choice): 0003 was a
-draft at 8e2836c and froze at 72fc428, and both checks name it.
+The unattended pipeline (tools/run_pipeline.sh) is in the Qwen3-4B corpus batch; then
+insertions under prereg/0007, the corpus build, the audit sample, and all E2 scoring. The
+VM was reclaimed once (D20) and the 4B server was killed once for memory (D24); each time
+the pipeline resumed from its banked runs, and a tracked waiter keeps the session active.
+Two adversarial review rounds over this session's changes found and fixed defects in the
+insertion code (prereg/0007), the G11 checks (merges, renames, amendments), the analysis
+(time-to-detection ties, the E3 set), the report and reproduce tooling, and the documents.
 
 ## Next three actions
 
-1. When the corpus is built: commit it, run the blind label audit (subagent), write
-   docs/DATA.md.
-2. When scoring finishes: run E2, E3, E4 (tools/analyze.py), commit the results.
-3. Build the report and README (tools/report.py), then review and the final sequence.
+1. After the corpus build: commit it, run the blind label audit workflow
+   (scratchpad audit.mjs), bank evidence with tools/audit_evidence.py and
+   tools/label_audit.py score, render docs/DATA.md.
+2. After scoring: run E2, E3, E4 (tools/analyze.py), commit, then make report.
+3. Write the results prose, README finding and limitations (insertion and relabeling
+   tables into the report), then make review and the final sequence.
 
 ## Environment
 
