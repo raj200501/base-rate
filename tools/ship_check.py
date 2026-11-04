@@ -782,7 +782,9 @@ def g6(ctx: Ctx) -> str:
     agree = sum(
         1
         for i in items
-        if i["audit_label"] == i["original_label"] and i.get("audit_step") == i.get("original_step")
+        if i["audit_label"] == i["original_label"]
+        and i.get("audit_type") == i.get("original_type")
+        and i.get("audit_step") == i.get("original_step")
     )
     need(
         math.isclose(agree / len(items), float(audit["agreement"]), abs_tol=1e-9),
