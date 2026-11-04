@@ -27,6 +27,7 @@ E0); calls in a configuration where E0 found under-coverage emit
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -275,6 +276,13 @@ def recall_at_budget(
         if warn
         else ()
     )
+    if warn and (neg_weights is not None or pos_weights is not None):
+        found = (*found, support.WEIGHTED)
+        warnings.warn(
+            "sampling weights were passed; weighted designs were not validated in E0",
+            support.UnsupportedCellWarning,
+            stacklevel=2,
+        )
     return BudgetEstimate(
         point=point,
         recall=rec,

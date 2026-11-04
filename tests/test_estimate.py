@@ -466,3 +466,11 @@ def test_cluster_bootstrap_rate_with_unequal_clusters() -> None:
     clusters = ["a", "a", "b", "c", "c", "c", "d"]
     iv = rate_interval(flags, clusters, method="cluster_bootstrap", reps=300)
     assert iv.lower <= iv.estimate <= iv.upper
+
+
+def test_weights_trigger_the_unvalidated_design_warning() -> None:
+    rng = np.random.default_rng(14)
+    neg, pos = rng.normal(size=500), rng.normal(2, 1, size=50)
+    with pytest.warns(UnsupportedCellWarning, match="weighted designs"):
+        est = recall_at_budget(neg, pos, 1e-2, 0.02, "plugin_cp", neg_weights=np.ones(500))
+    assert support.WEIGHTED in est.warnings

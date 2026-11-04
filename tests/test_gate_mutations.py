@@ -16,6 +16,7 @@ regression tests.
 
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import importlib.util
@@ -455,36 +456,52 @@ def test_g12_drift_allowance_does_not_cover_lookalike_paths(g12: Any, tmp_path: 
 
 P0 = "prereg/0001-e0.md"
 SUMMARY = "artifacts/e0/summary.json"
+E2_RESULTS = "artifacts/e2/results.json"
 E0_CONFIG: dict[str, Any] = {
     "nominal": 0.95,
+    "tolerance": 0.015,
     "grid": {
-        "estimators": ["wilson", "cluster_boot"],
+        "estimators": ["budget_recall:plugin_cp", "budget_recall:composite"],
         "prevalences": [0.01, 0.001],
-        "sample_sizes": [1000],
+        "budgets_per_10k": [20],
+        "sample_sizes": ["n1000_p100"],
         "score_distributions": ["beta"],
     },
+    "designs": {"n1000_p100": {"neg_clusters": 1000, "neg_cluster_size": 1, "n_pos": 100}},
 }
 
 
+def pack(covered: int, reps: int) -> str:
+    """Bit-packed hit record (numpy packbits order) with ``covered`` leading hits."""
+    data = bytearray((reps + 7) // 8)
+    for i in range(covered):
+        data[i // 8] |= 1 << (7 - i % 8)
+    return base64.b64encode(bytes(data)).decode()
+
+
+def cell_id(est: str, prev: float) -> str:
+    return f"{est}|beta|n1000_p100|p{prev:g}|b20"
+
+
 def e0_cells() -> list[dict[str, Any]]:
-    """One passing cell per grid point; bootstrap cells use the lower replicate floor."""
+    """One passing cell per grid point; resampling cells use the lower replicate floor."""
     cells = []
     for est in E0_CONFIG["grid"]["estimators"]:
         for prev in E0_CONFIG["grid"]["prevalences"]:
-            boot = est == "cluster_boot"
-            reps = 500 if boot else 2000
+            reps = 500 if est.endswith("composite") else 2000
+            covered = round(reps * 0.95)
             cells.append(
                 {
-                    "id": f"{est}-{prev}-1000-beta",
+                    "id": cell_id(est, prev),
                     "estimator": est,
                     "prevalence": prev,
-                    "sample_size": 1000,
+                    "budget_per_10k": 20,
+                    "sample_size": "n1000_p100",
                     "score_distribution": "beta",
                     "replicates": reps,
-                    "covered": round(reps * 0.95),
-                    "refits_by_bootstrap": boot,
+                    "covered": covered,
+                    "hits_b64": pack(covered, reps),
                     "passes": True,
-                    "used_by_e2_headline": prev == 0.001,
                 }
             )
     return cells
@@ -500,6 +517,21 @@ def summary(cells: list[dict[str, Any]] | None = None, **extra: Any) -> dict[str
     }
 
 
+E2_HEADLINE = {
+    "estimates": [
+        {
+            "headline": True,
+            "method": "plugin_cp",
+            "prevalence": 0.001,
+            "budget": 20,
+            "n_neg": 1200,
+            "n_pos": 90,
+            "clustered": False,
+        }
+    ]
+}
+
+
 @pytest.fixture(scope="module")
 def g5_base(tmp_path_factory: pytest.TempPathFactory) -> Any:
     repo = h.Repo.init(tmp_path_factory.mktemp("g5") / "base")
@@ -507,7 +539,8 @@ def g5_base(tmp_path_factory: pytest.TempPathFactory) -> Any:
     repo.commit("freeze the E0 grid")
     repo.write_json(SUMMARY, summary())
     repo.write("artifacts/e0/coverage.svg", "<svg xmlns='http://www.w3.org/2000/svg'/>\n")
-    repo.commit("bank E0")
+    repo.write_json(E2_RESULTS, E2_HEADLINE)
+    repo.commit("bank E0 and E2")
     return repo
 
 
@@ -524,30 +557,40 @@ def with_cells(repo: Any, change: Callable[[list[dict[str, Any]]], None]) -> Non
 
 
 def _fail_cell(cell: dict[str, Any], passes: bool) -> None:
-    cell.update(covered=1800, passes=passes)
+    covered = round(cell["replicates"] * 0.9)
+    cell.update(covered=covered, hits_b64=pack(covered, cell["replicates"]), passes=passes)
 
 
 def test_g5_control_passes(g5: Any, tmp_path: Path) -> None:
     evidence = assert_pass(5, g5, tmp_path)
-    assert (
-        evidence
-        == "4 cells recomputed, 0 below criterion (documented), headline cells pass, 1 plots"
-    )
+    assert "4 cells recounted from banked hits, 0 below criterion" in evidence
+    assert "1 cells behind E2 headlines pass" in evidence
 
 
 def test_g5_failing_cell_that_is_documented_passes(g5: Any, tmp_path: Path) -> None:
     with_cells(g5, lambda c: _fail_cell(c[0], passes=False))
-    g5.write_json("src/baserate/estimate/unsupported_cells.json", [c["id"] for c in e0_cells()[:1]])
-    g5.write("docs/UNSUPPORTED.md", f"# Unsupported cells\n\n- {e0_cells()[0]['id']}\n")
+    g5.write_json(
+        "src/baserate/estimate/unsupported_cells.json", {"cells": [{"id": e0_cells()[0]["id"]}]}
+    )
+    g5.write("docs/UNSUPPORTED.md", f"# Unsupported cells\n\n- `{e0_cells()[0]['id']}`\n")
     g5.commit("document the unsupported cell")
     assert "1 below criterion" in assert_pass(5, g5, tmp_path)
+
+
+def _extra_cell(c: list[dict[str, Any]]) -> None:
+    c.append({**c[0], "id": "budget_recall:plugin_cp|beta|n1000_p100|p0.5|b20", "prevalence": 0.5})
 
 
 G5_CASES: list[tuple[str, Callable[[Any], None], str]] = [
     (
         "pass-flag-inconsistent-with-recomputed-coverage",
         lambda r: with_cells(r, lambda c: _fail_cell(c[0], passes=True)),
-        "cell wilson-0.01-1000-beta pass flag disagrees",
+        f"cell {cell_id('budget_recall:plugin_cp', 0.01)} pass flag disagrees",
+    ),
+    (
+        "covered-count-does-not-recount-from-hits",
+        lambda r: with_cells(r, lambda c: c[0].update(covered=1990)),
+        "covered count does not recount",
     ),
     (
         "missing-grid-cell",
@@ -555,24 +598,43 @@ G5_CASES: list[tuple[str, Callable[[Any], None], str]] = [
         "1 preregistered cells missing",
     ),
     (
+        "cell-outside-the-grid",
+        lambda r: with_cells(r, _extra_cell),
+        "1 cells outside the preregistered grid",
+    ),
+    (
+        "duplicate-cell",
+        lambda r: with_cells(r, lambda c: c.append(dict(c[0]))),
+        "duplicate E0 cell",
+    ),
+    (
         "too-few-replicates",
-        lambda r: with_cells(r, lambda c: c[0].update(replicates=1999, covered=1899)),
-        "cell wilson-0.01-1000-beta has 1999 replicates < 2000",
+        lambda r: with_cells(
+            r, lambda c: c[0].update(replicates=1999, covered=1899, hits_b64=pack(1899, 1999))
+        ),
+        "has 1999 replicates < 2000",
     ),
     (
         "bootstrap-cell-below-its-floor",
-        lambda r: with_cells(r, lambda c: c[2].update(replicates=499, covered=474)),
+        lambda r: with_cells(
+            r, lambda c: c[2].update(replicates=499, covered=474, hits_b64=pack(474, 499))
+        ),
         "has 499 replicates < 500",
     ),
     (
         "failing-headline-cell",
         lambda r: with_cells(r, lambda c: _fail_cell(c[1], passes=False)),
-        "E2 headline cells fail: wilson-0.001-1000-beta",
+        f"E2 headline cells fail: {cell_id('budget_recall:plugin_cp', 0.001)}",
     ),
     (
         "failing-cell-undocumented",
         lambda r: with_cells(r, lambda c: _fail_cell(c[0], passes=False)),
         "failing cells lack a library warning entry",
+    ),
+    (
+        "e2-results-missing",
+        lambda r: (r.git("rm", "-q", E2_RESULTS), r.commit()),
+        "no E2 results",
     ),
     (
         "plots-missing",
@@ -598,6 +660,18 @@ def test_g5_mutations_fail(
 ) -> None:
     mutate(g5)
     assert_fail(5, g5, tmp_path, needle)
+
+
+def test_g5_rejects_a_looser_tolerance_than_the_brief(tmp_path: Path) -> None:
+    loose = {**E0_CONFIG, "tolerance": 0.03}
+    repo = h.Repo.init(tmp_path / "loose")
+    repo.write(P0, h.prereg_text(loose, experiment="E0"))
+    repo.commit("freeze a loose grid")
+    repo.write_json(SUMMARY, {**summary(), "prereg_config_sha256": chainlib.sha256_obj(loose)})
+    repo.write("artifacts/e0/coverage.svg", "<svg xmlns='http://www.w3.org/2000/svg'/>\n")
+    repo.write_json(E2_RESULTS, E2_HEADLINE)
+    repo.commit("bank")
+    assert_fail(5, repo, tmp_path, "looser than")
 
 
 # ======================================================================== G6

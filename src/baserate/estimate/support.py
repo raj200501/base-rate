@@ -20,6 +20,8 @@ from importlib import resources
 from typing import Any
 
 DATA_FILE = "unsupported_cells.json"
+WEIGHTED = "weighted-design"
+"""Pseudo cell id reported when sampling weights are used (not validated in E0)."""
 
 
 class UnsupportedCellWarning(UserWarning):

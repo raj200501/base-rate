@@ -21,6 +21,7 @@ Stdlib only, so it runs before ``make setup``.
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import hashlib
 import io
@@ -591,46 +592,123 @@ def g4(ctx: Ctx) -> str:
     return f"demo {proc.secs:.0f}s offline ({isolation}), matches {DEMO_GOLDEN}"
 
 
+E0_FIELDS = (
+    ("estimators", "estimator"),
+    ("prevalences", "prevalence"),
+    ("budgets_per_10k", "budget_per_10k"),
+    ("sample_sizes", "sample_size"),
+    ("score_distributions", "score_distribution"),
+)
+E0_RESAMPLING = frozenset({"cluster_bootstrap", "bayesian_bootstrap", "composite"})
+
+
+def _e0_norm(value: Any) -> str:
+    """Canonical text of a grid value (numbers by value, so 1e-3 equals 0.001)."""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int | float):
+        return f"{float(value):g}"
+    return str(value)
+
+
+def e0_cell_id(estimator: str, dist: str, design: str, prevalence: float, budget: float) -> str:
+    """The id tools/run_e0.py gives a cell."""
+    return f"{estimator}|{dist}|{design}|p{prevalence:g}|b{budget:g}"
+
+
+def closest_design(designs: dict[str, Any], n_neg: int, n_pos: int, clustered: bool) -> str:
+    """The E0 design an E2 estimate relies on (the frozen headline rule of prereg 0001)."""
+    pool = [
+        (name, d) for name, d in designs.items() if (int(d["neg_cluster_size"]) > 1) == clustered
+    ]
+    need(bool(pool), f"no E0 design with clustered={clustered}")
+
+    def dist(d: dict[str, Any]) -> float:
+        nn = int(d["neg_clusters"]) * int(d["neg_cluster_size"])
+        return abs(math.log(nn) - math.log(n_neg)) + abs(
+            math.log(int(d["n_pos"])) - math.log(n_pos)
+        )
+
+    return min(pool, key=lambda item: (dist(item[1]), item[0]))[0]
+
+
+def count_hits(b64: str, reps: int) -> int:
+    """Covered replicates in a bit-packed (numpy packbits, MSB first) hit record."""
+    data = base64.b64decode(b64)
+    need(len(data) == (reps + 7) // 8, "hit record length does not match replicates")
+    full, rem = divmod(reps, 8)
+    total = sum(bin(x).count("1") for x in data[:full])
+    if rem:
+        need(data[full] & ((1 << (8 - rem)) - 1) == 0, "hit record has bits past replicates")
+        total += bin(data[full] >> (8 - rem)).count("1")
+    return total
+
+
 def g5(ctx: Ctx) -> str:
-    """Statistical engine: E0 coverage on the frozen grid, recomputed."""
+    """Statistical engine: E0 coverage on the frozen grid, recounted from banked hits."""
     art_rel = "artifacts/e0/summary.json"
     summary = load_json(rel(ctx, art_rel))
     config = check_prereg_link(ctx, art_rel, summary)
     grid = config.get("grid", {})
-    keys = ("estimators", "prevalences", "sample_sizes", "score_distributions")
     need(
-        all(isinstance(grid.get(k), list) and grid[k] for k in keys),
-        "prereg grid needs estimators, prevalences, sample_sizes, score_distributions",
+        all(isinstance(grid.get(k), list) and grid[k] for k, _ in E0_FIELDS),
+        "prereg grid needs estimators, prevalences, budgets_per_10k, sample_sizes, "
+        "score_distributions",
     )
     nominal = float(config.get("nominal", 0.95))
-    expected = set(product(*(map(str, grid[k]) for k in keys)))
+    tol = float(config.get("tolerance", E0_TOLERANCE))
+    need(tol <= E0_TOLERANCE, f"E0 tolerance {tol} is looser than {E0_TOLERANCE}")
+    expected = set(product(*(tuple(_e0_norm(v) for v in grid[k]) for k, _ in E0_FIELDS)))
     seen: set[tuple[str, ...]] = set()
+    passes: dict[str, bool] = {}
     failing: list[str] = []
-    headline_bad: list[str] = []
     for cell in summary.get("cells", []):
-        key = tuple(
-            str(cell.get(k[:-1] if k != "score_distributions" else "score_distribution"))
-            for k in keys
-        )
+        key = tuple(_e0_norm(cell[f]) for _, f in E0_FIELDS)
+        need(key not in seen, f"duplicate E0 cell {cell.get('id')}")
         seen.add(key)
-        reps, hits = int(cell["replicates"]), int(cell["covered"])
-        floor = (
-            E0_MIN_REPLICATES_BOOTSTRAP if cell.get("refits_by_bootstrap") else E0_MIN_REPLICATES
-        )
+        reps = int(cell["replicates"])
+        method = str(cell["estimator"]).split(":", 1)[-1]
+        floor = E0_MIN_REPLICATES_BOOTSTRAP if method in E0_RESAMPLING else E0_MIN_REPLICATES
         need(reps >= floor, f"cell {cell.get('id')} has {reps} replicates < {floor}")
+        hits = count_hits(str(cell["hits_b64"]), reps)
+        need(hits == int(cell["covered"]), f"cell {cell.get('id')} covered count does not recount")
         cov = hits / reps
         mcse = math.sqrt(cov * (1 - cov) / reps)
-        ok = cov >= nominal - E0_TOLERANCE - 2 * mcse
+        ok = cov >= nominal - tol - 2 * mcse
         need(bool(cell.get("passes")) == ok, f"cell {cell.get('id')} pass flag disagrees")
+        passes[str(cell["id"])] = ok
         if not ok:
-            failing.append(str(cell.get("id")))
-            if cell.get("used_by_e2_headline"):
-                headline_bad.append(str(cell.get("id")))
+            failing.append(str(cell["id"]))
     need(not (expected - seen), f"{len(expected - seen)} preregistered cells missing")
-    need(not headline_bad, f"E2 headline cells fail: {', '.join(headline_bad[:5])}")
+    need(not (seen - expected), f"{len(seen - expected)} cells outside the preregistered grid")
+    e2_path = rel(ctx, "artifacts/e2/results.json")
+    need(e2_path.is_file(), "no E2 results: cannot check the cells E2 headline intervals rely on")
+    headline = [e for e in load_json(e2_path).get("estimates", []) if e.get("headline")]
+    need(bool(headline), "E2 results mark no headline estimates")
+    designs = config.get("designs", {})
+    relied: set[str] = set()
+    for e in headline:
+        design = closest_design(designs, int(e["n_neg"]), int(e["n_pos"]), bool(e["clustered"]))
+        for dist in grid["score_distributions"]:
+            relied.add(
+                e0_cell_id(
+                    f"budget_recall:{e['method']}",
+                    dist,
+                    design,
+                    float(e["prevalence"]),
+                    float(e["budget"]),
+                )
+            )
+    unknown = sorted(c for c in relied if c not in passes)
+    need(not unknown, f"E2 headline relies on cells E0 did not run: {', '.join(unknown[:3])}")
+    bad = sorted(c for c in relied if not passes[c])
+    need(not bad, f"E2 headline cells fail: {', '.join(bad[:3])}")
     if failing:
         unsupported = rel(ctx, "src/baserate/estimate/unsupported_cells.json")
-        listed = set(load_json(unsupported)) if unsupported.exists() else set()
+        data = load_json(unsupported) if unsupported.exists() else {}
+        listed = (
+            {str(c.get("id")) for c in data.get("cells", [])} if isinstance(data, dict) else set()
+        )
         need(set(failing) <= listed, "failing cells lack a library warning entry")
         docs = rel(ctx, "docs/UNSUPPORTED.md")
         doc_text = docs.read_text(encoding="utf-8") if docs.exists() else ""
@@ -642,8 +720,8 @@ def g5(ctx: Ctx) -> str:
         "E0 plots missing",
     )
     return (
-        f"{len(seen)} cells recomputed, {len(failing)} below criterion (documented), "
-        f"headline cells pass, {len(plots)} plots"
+        f"{len(seen)} cells recounted from banked hits, {len(failing)} below criterion "
+        f"(documented), {len(relied)} cells behind E2 headlines pass, {len(plots)} plots"
     )
 
 

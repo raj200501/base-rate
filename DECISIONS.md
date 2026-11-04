@@ -165,3 +165,34 @@ cancel-in-progress concurrency group and a 10-minute job timeout. No other
 workflows. `make ci` is to pass locally before every push; the push of
 2026-10-23 that recorded this was made without it at Raj's request to stop
 work immediately (make demo is not built yet, so make ci fails).
+
+## D15 (2026-11-04) Resuming after the pause; agent outputs integrated
+
+Raj paused the session on 2026-10-23 and restarted it on 2026-11-04. The
+container survived, so the stopped subagents' uncommitted work was reviewed
+and integrated by the main session (domains, integrity tools, certify,
+cascade). The E0 run resumed from its pinned worktree at the prereg commit;
+its per-cell seeds make the resumed run identical to an uninterrupted one.
+`goal_turn` continues from where it stopped.
+
+## D16 (2026-11-04) Study design choices fixed before any monitor scores
+
+- Primary analysis set (E2 headlines): the real-agent benign runs (one trace
+  per independent run, no variants) plus natural and inserted violations.
+  Every monitor, including the expensive ladder rungs, scores this whole set,
+  so all comparisons use the same traces and match E0's independent designs.
+  No importance weighting is used for headline results: weighted designs were
+  not validated in E0, and the library warns when weights are passed.
+- Secondary set: the full corpus with procedural variants (clustered by
+  source run, matching E0's clustered design) for the monitors cheap enough to
+  score every trace, and for the transfer study (E3), which needs per-domain
+  benign tails.
+- Armour dataset violations (source (c)) are reported separately, never
+  pooled into headline recall (they are few independent groups, and the rule
+  monitors were built on them).
+- Subject models and monitor ladder come from the same family (Qwen3). That
+  is a limitation (possible self-recognition effects); recall is also
+  reported by subject model.
+- The scaffold prompt includes the standard instruction to carry out each
+  part with the tools and not to describe work not done; it is fixed, and its
+  hash is in every run's provenance.
