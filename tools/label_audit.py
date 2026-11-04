@@ -126,27 +126,66 @@ def _ci(k: int, n: int) -> list[float]:
     return [float(lo), float(hi)]
 
 
-ANSWER_TOOLS = frozenset({"StructuredOutput"})
-"""The only tool an auditor may use: returning its answers."""
+ALLOWED_TOOLS = frozenset({"Read", "StructuredOutput"})
+"""An auditor may read its own batch file and return its answers, nothing else."""
+BATCH_SIZE = 10
+
+
+def batch_path(index: int) -> Path:
+    """The packet batch that auditor ``index`` reads."""
+    return WORK / "batches" / f"batch-{index:03d}.txt"
+
+
+def batches(size: int = BATCH_SIZE) -> None:
+    """Split the packet into batch files, each holding only what a monitor may see."""
+    packet = [json.loads(ln) for ln in (WORK / "packet.jsonl").read_text().splitlines() if ln]
+    out = WORK / "batches"
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob("batch-*.txt"):
+        old.unlink()
+    index = []
+    for n, start in enumerate(range(0, len(packet), size)):
+        items = packet[start : start + size]
+        parts = ["DEFINITIONS", items[0]["definitions"], ""]
+        for item in items:
+            parts += [f"=== {item['audit_id']} ===", item["trajectory"], ""]
+        batch_path(n).write_text("\n".join(parts))
+        index.append(
+            {
+                "batch": n,
+                "path": str(batch_path(n)),
+                "audit_ids": [i["audit_id"] for i in items],
+                "sha256": hashlib.sha256(batch_path(n).read_bytes()).hexdigest(),
+            }
+        )
+    (out / "index.json").write_text(json.dumps(index, indent=1) + "\n")
+    print(f"wrote {len(index)} batches of up to {size} items to {out.relative_to(ROOT)}")
 
 
 def check_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Require that no auditor used any tool except returning its answers.
+    """Require that every auditor only read its own batch and returned answers.
 
-    ``evidence`` lists each auditor agent with the tools its transcript
-    records (tools/audit_evidence.py writes it from the audit workflow's
-    journal). Returns a summary to bank beside the answers.
+    ``evidence`` lists each auditor agent (label ``audit:<n>``) with the tool
+    calls its transcript records and the files it read (tools/audit_evidence.py
+    writes it from the audit workflow's records). Returns a summary to bank
+    beside the answers.
     """
     agents = evidence.get("agents", [])
     if not agents:
         raise SystemExit("audit evidence lists no auditor agents")
-    used = sorted({t for a in agents for t in a.get("tools_used", [])} - ANSWER_TOOLS)
-    if used:
-        raise SystemExit(f"an auditor used tools beyond returning answers: {used}; redo the audit")
+    for agent in agents:
+        used = sorted(set(agent.get("tools_used", [])) - ALLOWED_TOOLS)
+        if used:
+            raise SystemExit(f"{agent['label']} used tools beyond reading its batch: {used}")
+        own = str(batch_path(int(str(agent["label"]).split(":", 1)[1])))
+        other = sorted(set(agent.get("reads", [])) - {own})
+        if other:
+            raise SystemExit(f"{agent['label']} read files other than its batch: {other}")
     return {
         "workflow_run": evidence.get("workflow_run"),
         "agents": len(agents),
         "tools_used": sorted({t for a in agents for t in a.get("tools_used", [])}),
+        "reads": sum(len(a.get("reads", [])) for a in agents),
         "transcripts_sha256": sorted(a["transcript_sha256"] for a in agents),
     }
 
@@ -226,13 +265,15 @@ def score(auditor: str, evidence: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Command-line entry point."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("command", choices=["sample", "score"])
+    ap.add_argument("command", choices=["sample", "batches", "score"])
     ap.add_argument("--corpus", type=Path, default=ROOT / "artifacts" / "corpus" / "manifest.json")
     ap.add_argument("--auditor", default="")
     ap.add_argument("--evidence", type=Path, default=WORK / "evidence.json")
     args = ap.parse_args(argv)
     if args.command == "sample":
         sample(args.corpus)
+    elif args.command == "batches":
+        batches()
     else:
         if not args.auditor:
             raise SystemExit("--auditor is required")

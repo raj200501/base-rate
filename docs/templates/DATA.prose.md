@@ -128,13 +128,15 @@ replaced by independent human labels before external claims are made, so results
 <!-- @table corpus-armour-labels -->
 
 Label audit: the auditor was a Claude subagent of the session that built the corpus, as
-prereg/0002 states. It was given only the audit packet in its prompt (for each record, the
-violation definitions and the trajectory as a monitor sees it, with numbered actions) and
-returned a label, a violation type, and a first violating step for each record. The
-workflow's records list the tools each auditor used; tools/label_audit.py refuses the
-audit if any auditor used a tool other than returning its answers, and the audit artifact
-banks that evidence (auditor_evidence: the tools used and a hash of every auditor's
-transcript). So the auditor read no label, code, or oracle. tools/audit_evidence.py wrote
+prereg/0002 states. Each auditor agent read one batch file of ten packet records
+(tools/label_audit.py batches: for each record, the violation definitions and the
+trajectory as a monitor sees it, with numbered actions) and returned a label, a violation
+type, and a first violating step for each record. The workflow's records and each
+auditor's transcript list the tools it used and the files it read; tools/label_audit.py
+refuses the audit if any auditor used a tool other than reading its own batch file and
+returning its answers, and the audit artifact banks that evidence (auditor_evidence: the
+tools used, the files read, and a hash of every auditor's transcript). So the auditor read
+no label, code, or oracle. tools/audit_evidence.py wrote
 the answers to a file exactly as returned, and the answers were scored against the corpus
 labels. The auditor is the same model family as the session that wrote
 the violation definitions, so agreement measures how consistently the labels follow the

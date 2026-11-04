@@ -37,6 +37,23 @@ def _value(raw: Any) -> Any:
     return raw
 
 
+def transcript_calls(transcript: Path) -> tuple[list[str], list[str]]:
+    """(tool names, files read) from every tool call an agent's transcript records."""
+    tools: list[str] = []
+    reads: list[str] = []
+    for line in transcript.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        content = (entry.get("message") or {}).get("content")
+        for block in content if isinstance(content, list) else []:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                tools.append(str(block.get("name")))
+                if block.get("name") == "Read":
+                    reads.append(str((block.get("input") or {}).get("file_path", "")))
+    return tools, reads
+
+
 def read_journal(journal: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """(evidence entries, answers) for every finished auditor agent in a workflow journal."""
     started: dict[str, dict[str, Any]] = {}
@@ -57,14 +74,17 @@ def read_journal(journal: Path) -> tuple[list[dict[str, Any]], list[dict[str, An
             transcript = journal.parent / f"agent-{agent_id}.jsonl"
             if not transcript.is_file():
                 raise SystemExit(f"no transcript for {label} ({transcript.name})")
-            tools = _value(entry.get("toolsUsed", []))
-            if not isinstance(tools, list):
-                raise SystemExit(f"{label}: unreadable tool list {tools!r}")
+            listed = _value(entry.get("toolsUsed", []))
+            if not isinstance(listed, list):
+                raise SystemExit(f"{label}: unreadable tool list {listed!r}")
+            calls, reads = transcript_calls(transcript)
             evidence.append(
                 {
                     "label": label,
                     "agent_id": agent_id,
-                    "tools_used": sorted(str(t) for t in tools),
+                    # the journal's list and the transcript's own calls, together
+                    "tools_used": sorted({str(t) for t in listed} | set(calls)),
+                    "reads": reads,
                     "transcript_sha256": hashlib.sha256(transcript.read_bytes()).hexdigest(),
                 }
             )

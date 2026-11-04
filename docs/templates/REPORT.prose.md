@@ -234,8 +234,9 @@ runs. Armour's labeled records add a third, separately reported violation
 source, clustered by source file and agent family because they come from a few
 generator scripts (DECISIONS.md D12). A Claude subagent of the session that built the
 corpus, given only the monitor view of a stratified random sample of trajectories, labeled
-them blind to the corpus labels; it made no tool call other than returning its answers,
-which tools/label_audit.py checks from the workflow's records and banks with the audit.
+them blind to the corpus labels; each auditor agent read only its own batch file of that
+view and returned its answers, which tools/label_audit.py checks from the workflow's
+records and transcripts and banks with the audit.
 Agreement is reported in docs/DATA.md and Section 5.
 
 ### 3.6. Monitors

@@ -69,19 +69,47 @@ def evidence(*tools: list[str], packet: str = "") -> dict[str, Any]:
         "workflow_run": "wf_x",
         "packet_sha256": packet,
         "agents": [
-            {"label": f"audit:{i}", "tools_used": t, "transcript_sha256": f"{i:064x}"}
+            {"label": f"audit:{i}", "tools_used": t, "reads": [], "transcript_sha256": f"{i:064x}"}
             for i, t in enumerate(tools)
         ],
     }
 
 
-def test_evidence_refuses_any_tool_beyond_returning_answers() -> None:
+def test_evidence_allows_only_reading_ones_own_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(la, "WORK", Path("/w"))
     ok = la.check_evidence(evidence(["StructuredOutput"], []))
     assert ok["agents"] == 2 and ok["tools_used"] == ["StructuredOutput"]
-    with pytest.raises(SystemExit, match="beyond returning answers"):
-        la.check_evidence(evidence(["StructuredOutput"], ["Read", "StructuredOutput"]))
+    own = evidence(["Read", "StructuredOutput"])
+    own["agents"][0]["reads"] = ["/w/batches/batch-000.txt"]
+    assert la.check_evidence(own)["reads"] == 1
+    with pytest.raises(SystemExit, match="beyond reading its batch"):
+        la.check_evidence(evidence(["Bash", "StructuredOutput"]))
+    for path in ("/w/key.jsonl", "/w/batches/batch-001.txt"):
+        peek = evidence(["Read", "StructuredOutput"])
+        peek["agents"][0]["reads"] = ["/w/batches/batch-000.txt", path]
+        with pytest.raises(SystemExit, match="other than its batch"):
+            la.check_evidence(peek)
     with pytest.raises(SystemExit, match="no auditor agents"):
         la.check_evidence({"agents": []})
+
+
+def test_batches_hold_only_the_monitor_view(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(la, "WORK", tmp_path)
+    monkeypatch.setattr(la, "ROOT", tmp_path.parent)
+    packet = [
+        {"audit_id": f"A{i:03d}", "definitions": "DEFS", "trajectory": f"[0] user.request x{i}"}
+        for i in range(23)
+    ]
+    (tmp_path / "packet.jsonl").write_text("".join(json.dumps(x) + "\n" for x in packet))
+    la.batches()
+    index = json.loads((tmp_path / "batches" / "index.json").read_text())
+    assert [len(b["audit_ids"]) for b in index] == [10, 10, 3]
+    text = la.batch_path(2).read_text()
+    assert "=== A020 ===" in text and "[0] user.request x22" in text and "DEFS" in text
+    for word in ("benign", "violation_type", "stratum", "label"):
+        assert word not in text
 
 
 def _git(root: Path, *args: str) -> None:
@@ -145,7 +173,19 @@ def test_journal_evidence_and_answers_are_read_as_the_agents_returned_them(
     wf.mkdir()
     lines = []
     for i, (agent, answer) in enumerate([("a1", ANSWERS[1]), ("a0", ANSWERS[0])]):
-        (wf / f"agent-{agent}.jsonl").write_text(f'{{"n": {i}}}\n')
+        read = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "Read",
+                        "input": {"file_path": f"/w/batches/batch-{i:03d}.txt"},
+                    }
+                ]
+            },
+        }
+        (wf / f"agent-{agent}.jsonl").write_text(json.dumps(read) + "\n")
         lines.append({"type": "started", "key": f"k{i}", "agentId": agent, "label": f"audit:{i}"})
         lines.append(
             {
@@ -169,7 +209,8 @@ def test_journal_evidence_and_answers_are_read_as_the_agents_returned_them(
     ]
     written = [json.loads(x) for x in (out / "answers.jsonl").read_text().splitlines()]
     assert [a["audit_id"] for a in written] == ["A000", "A001"]  # packet order
-    assert la.check_evidence(ev)["tools_used"] == ["StructuredOutput"]
+    assert ev["agents"][0]["reads"] == ["/w/batches/batch-000.txt"]
+    assert ev["agents"][0]["tools_used"] == ["Read", "StructuredOutput"]
     assert len(ev["packet_sha256"]) == 64
     # an audit id answered by two auditors is refused
     dup = json.loads((wf / "journal.jsonl").read_text().splitlines()[1])
