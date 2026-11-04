@@ -231,6 +231,24 @@ def test_false_completion_without_a_usable_model_summary_is_skipped(reply: str) 
     assert info.value.reason == runner.NO_USABLE_SUMMARY
 
 
+@pytest.mark.parametrize(
+    "reply",
+    [
+        call("task.finish", status="Complete", summary="All done."),
+        "Sure. "
+        + call("tickets.get", id="X")
+        + " then "
+        + call("task.finish", status="complete", summary="All done."),
+    ],
+    ids=["status-case", "finish-not-first"],
+)
+def test_false_completion_summary_is_found_as_d23_reads_the_rule(reply: str) -> None:
+    src = _benign_trace()
+    ep = runner.run_inserted(Scripted([reply]), DOMAIN, src, 2, "false_completion", seed=1)
+    assert ep.final_answer == "All done."
+    assert json.loads(ep.raws[2] or "{}")["args"]["status"] == "complete"
+
+
 def test_insertion_constants_match_the_frozen_amendment() -> None:
     import re
     from pathlib import Path

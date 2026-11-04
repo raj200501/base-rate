@@ -16,12 +16,22 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 from baserate.traces import runner
 from baserate.traces.domains import get_domain
 from baserate.traces.schema import VIOLATION_TYPES, Trace
 
 REPO = Path(__file__).resolve().parents[1]
 DOMAIN = get_domain("customer_support")
+
+
+def _load_tool(name: str) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(f"{name}_under_test", REPO / f"tools/{name}.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load() -> ModuleType:
@@ -128,8 +138,49 @@ def test_plan_is_one_insertion_per_source_with_cycling_types_and_valid_steps(
     assert len(plan) == 11 and len({s.trace_id for s, _, _ in plan}) == 11
     assert [v for _, _, v in plan] == [VIOLATION_TYPES[i % 5] for i in range(11)]
     assert all(1 <= k <= len(s.actions) - 1 for s, k, _ in plan)
-    assert len(ra.insertion_plan(sources, 0, 20261023)) == len(sources)
+    assert ra.insertion_plan(sources, 0, 20261023) == []
 
 
 def test_insertion_seed_comes_from_the_frozen_e1_config() -> None:
     assert ra.e1_config()["insertion"]["seed"] == 20261023
+
+
+def test_repair_cuts_only_a_partial_last_record(tmp_path: Path) -> None:
+    path = tmp_path / "traces.jsonl"
+    path.write_text('{"trace_id": "a"}\n{"trace_id": "b"}\n{"trace_id": "c", "act')
+    assert ra.repair_jsonl(path) == len('{"trace_id": "c", "act')
+    assert ra.done_ids(path) == {"a", "b"}
+    assert ra.repair_jsonl(path) == 0
+    path.write_text('{"trace_id": "a"}\nnot json\n{"trace_id": "b"}\n')
+    with pytest.raises(json.JSONDecodeError):
+        ra.repair_jsonl(path)
+    assert ra.repair_jsonl(tmp_path / "missing.jsonl") == 0
+
+
+def test_server_start_refuses_a_port_that_already_answers(tmp_path: Path) -> None:
+    import http.server
+    import threading
+
+    class Health(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args: Any) -> None:
+            pass
+
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), Health)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(SystemExit, match="already serves"):
+            ra.start_server({"file": "x.gguf"}, httpd.server_port, 1, 1, tmp_path / "s.log")
+    finally:
+        httpd.shutdown()
+
+
+def test_split_rounds_the_second_share_half_up() -> None:
+    cb = _load_tool("count_benign")
+    assert cb.split_attempts(700, 1600, 500) == (533, 167)  # 166.67 -> 167
+    assert cb.split_attempts(700, 1, 1) == (350, 350)
+    assert cb.split_attempts(7, 1, 1) == (3, 4)  # 3.5 rounds up
+    assert cb.split_attempts(700, 0, 0) == (700, 0)

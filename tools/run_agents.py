@@ -75,8 +75,15 @@ def start_server(
         str(slots * 6144),
         "--jinja",
     ]
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2):
+            raise SystemExit(f"port {port} already serves a model; stop that server first")
+    except OSError:
+        pass
     proc = subprocess.Popen(cmd, stdout=log.open("ab"), stderr=subprocess.STDOUT)
     for _ in range(240):
+        if proc.poll() is not None:
+            raise SystemExit(f"llama-server exited with {proc.returncode}; see {log}")
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as r:
                 if r.status == 200:
@@ -133,11 +140,30 @@ def insertion_plan(
     pool = list(sources)
     rng.shuffle(pool)
     plan: list[tuple[Trace, int, ViolationType]] = []
-    for i, src in enumerate(pool[: attempts or len(pool)]):
+    for i, src in enumerate(pool[: max(attempts, 0)]):
         last = len(src.actions) - 1  # agent steps are 1..last
         k = rng.randint(1, max(1, last))
         plan.append((src, k, cast(ViolationType, VIOLATION_TYPES[i % len(VIOLATION_TYPES)])))
     return plan
+
+
+def repair_jsonl(path: Path) -> int:
+    """Cut a partial last record (an interrupted append) from a JSONL file; return bytes cut.
+
+    Only the tail after the last newline can be partial; a complete line that
+    does not parse is an error, never repaired silently.
+    """
+    if not path.exists():
+        return 0
+    data = path.read_bytes()
+    keep = data.rfind(b"\n") + 1
+    if keep < len(data):
+        with path.open("r+b") as fh:
+            fh.truncate(keep)
+    for line in data[:keep].decode("utf-8").splitlines():
+        if line.strip():
+            json.loads(line)
+    return len(data) - keep
 
 
 def done_ids(path: Path) -> set[str]:
@@ -193,6 +219,31 @@ def main(argv: list[str] | None = None) -> int:
             ["git", "rev-parse", "HEAD"], check=False, cwd=ROOT, capture_output=True, text=True
         ).stdout.strip(),
     }
+    # everything that can fail before any model call happens before the server starts
+    plan: list[tuple[Trace, int, ViolationType]] = []
+    if args.insert:
+        if args.max_inserts < 1:
+            raise SystemExit("insert mode needs --max-inserts of at least 1 (this model's share)")
+        sources = insertion_sources(list(args.sources), args.model)
+        seed = int(e1_config()["insertion"]["seed"])
+        plan = insertion_plan(sources, args.max_inserts, seed)
+        if len(plan) < args.max_inserts:
+            raise SystemExit(
+                f"{args.model} has {len(sources)} eligible sources for {args.max_inserts} attempts"
+            )
+        meta["insertion"] = {
+            "prereg": "prereg/0007-e1-amendment-insertion.md",
+            "eligible_sources": len(sources),
+            "requested": args.max_inserts,
+            "attempts": len(plan),
+            "seed": seed,
+        }
+    skip_file = args.out / "skipped.jsonl"
+    for path in (out_file, skip_file):
+        cut = repair_jsonl(path)
+        if cut:
+            print(f"cut a partial last record ({cut} bytes) from {path}", flush=True)
+    seen = done_ids(out_file) | done_ids(skip_file)
     (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     server = (
         None
@@ -201,8 +252,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     client = ModelClient(spec, ROOT, purpose="agent-runs" if not args.insert else "insertions")
     lock = threading.Lock()
-    skip_file = args.out / "skipped.jsonl"
-    seen = done_ids(out_file) | done_ids(skip_file)
     provenance_base = {
         k: meta[k] for k in ("model", "revision", "sha256", "sample_seed", "git_sha")
     }
@@ -269,17 +318,7 @@ def main(argv: list[str] | None = None) -> int:
 
     jobs: list[tuple[Any, ...]] = []
     if args.insert:
-        sources = insertion_sources(list(args.sources), args.model)
-        seed = int(e1_config()["insertion"]["seed"])
-        plan = insertion_plan(sources, args.max_inserts, seed)
         jobs.extend((insert_job, src, k, vtype) for src, k, vtype in plan)
-        meta["insertion"] = {
-            "prereg": "prereg/0007-e1-amendment-insertion.md",
-            "eligible_sources": len(sources),
-            "attempts": len(plan),
-            "seed": seed,
-        }
-        (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     else:
         for task_seed in range(start, end):
             for d in args.domains.split(","):

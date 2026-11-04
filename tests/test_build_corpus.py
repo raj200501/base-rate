@@ -161,7 +161,8 @@ def test_insertion_attempts_and_skips_are_banked(tmp_path: Path) -> None:
     runs = _run_file(tmp_path, range(5))
     inserted = _insert_dir(tmp_path, runs, 3, [SKIP])
     out = tmp_path / "c"
-    assert bc.main(["--runs", str(runs), str(inserted), "--variants", "1", "--out", str(out)]) == 0
+    args = ["--runs", str(runs), str(inserted), "--variants", "1", "--out", str(out)]
+    assert bc.main([*args, "--planned-insertions", "3"]) == 0
     log = json.loads((out / "manifest.json").read_text())["insertion"]
     assert log["attempts"] == 3 and log["inserted"] == 2
     assert log["skipped"] == {runner.NO_VALID_CALL: 0, runner.NO_USABLE_SUMMARY: 1}

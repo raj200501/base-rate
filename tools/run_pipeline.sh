@@ -34,7 +34,15 @@ $RUN tools/run_agents.py --model qwen3-4b-q4_k_m --seeds 250:350 --concurrency 4
   --port 8097 --out runs/agents/corpus-4b
 
 # Stopping rule: extend on the first listed model, 25 seeds per domain per block.
+# A block already started (a restart may have interrupted it) is always finished
+# before the count is checked again, so no block is left partial.
 next=350
+while [ -d "runs/agents/corpus-1.7b-ext${next}" ]; do
+  step "resume extension block seeds ${next}:$((next + 25))"
+  $RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --seeds "${next}:$((next + 25))" \
+    --concurrency 4 --threads 4 --port 8096 --out "runs/agents/corpus-1.7b-ext${next}"
+  next=$((next + 25))
+done
 while [ "$(benign_real)" -lt 2000 ]; do
   step "benign real runs below 2000: extension block seeds ${next}:$((next + 25))"
   $RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --seeds "${next}:$((next + 25))" \
@@ -46,12 +54,16 @@ step "benign real runs: $(benign_real)"
 # Insertions: 700 attempts split by each model's share of benign real runs.
 read -r n17 n4 < <($RUN tools/count_benign.py --split 700)
 step "insertions: ${n17} on 1.7B runs, ${n4} on 4B runs"
-$RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --insert --max-inserts "${n17}" \
-  --from runs/agents/corpus-1.7b*/traces.jsonl --concurrency 4 --threads 4 --port 8096 \
-  --out runs/agents/insert-1.7b
-$RUN tools/run_agents.py --model qwen3-4b-q4_k_m --insert --max-inserts "${n4}" \
-  --from runs/agents/corpus-4b/traces.jsonl --concurrency 4 --threads 4 --port 8097 \
-  --out runs/agents/insert-4b
+if [ "${n17}" -gt 0 ]; then
+  $RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --insert --max-inserts "${n17}" \
+    --from runs/agents/corpus-1.7b*/traces.jsonl --concurrency 4 --threads 4 --port 8096 \
+    --out runs/agents/insert-1.7b
+fi
+if [ "${n4}" -gt 0 ]; then
+  $RUN tools/run_agents.py --model qwen3-4b-q4_k_m --insert --max-inserts "${n4}" \
+    --from runs/agents/corpus-4b/traces.jsonl --concurrency 4 --threads 4 --port 8097 \
+    --out runs/agents/insert-4b
+fi
 
 step "build the corpus"
 $RUN tools/build_corpus.py --runs runs/agents/corpus-*/traces.jsonl runs/agents/insert-*/traces.jsonl \

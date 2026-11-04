@@ -5,8 +5,9 @@
 
 Every run in runs/agents/corpus-*/traces.jsonl is relabeled by exact replay
 (baserate.traces.runner.relabel) before counting. The split gives the 4B model
-its proportional share of attempts (rounded down) and the rest to the first
-listed model, as prereg/0002-e1-corpus.md specifies.
+its proportional share of attempts rounded to the nearest integer (halves up)
+and the rest to the first listed model (prereg/0002-e1-corpus.md, read as in
+DECISIONS.md D23).
 """
 
 from __future__ import annotations
@@ -38,6 +39,13 @@ def counts() -> Counter[str]:
     return out
 
 
+def split_attempts(attempts: int, first: int, second: int) -> tuple[int, int]:
+    """Attempts per model: the second's share rounded half up, the rest to the first (D23)."""
+    total = first + second
+    share = (2 * attempts * second + total) // (2 * total) if total else 0
+    return attempts - share, share
+
+
 def main(argv: list[str] | None = None) -> int:
     """Print the total, or the per-model split of insertion attempts."""
     ap = argparse.ArgumentParser(description=__doc__)
@@ -45,9 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     c = counts()
     if args.split:
-        total = sum(c.values())
-        second = (args.split * c[SECOND]) // total if total else 0
-        print(args.split - second, second)
+        print(*split_attempts(args.split, c[FIRST], c[SECOND]))
     else:
         print(sum(c.values()))
     return 0

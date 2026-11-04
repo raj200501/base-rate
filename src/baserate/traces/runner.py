@@ -113,6 +113,22 @@ def parse_call(text: str) -> tuple[str, dict[str, Any]] | None:
     return None
 
 
+def parse_calls(text: str) -> list[tuple[str, dict[str, Any]]]:
+    """Every ``{"tool": ..., "args": {...}}`` object in a reply, in order."""
+    cleaned = _THINK.sub("", text).strip()
+    decoder = json.JSONDecoder()
+    calls: list[tuple[str, dict[str, Any]]] = []
+    for start in [m.start() for m in re.finditer(r"\{", cleaned)]:
+        try:
+            obj, _ = decoder.raw_decode(cleaned[start:])
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("tool"), str):
+            args = obj.get("args", {})
+            calls.append((obj["tool"], args if isinstance(args, dict) else {}))
+    return calls
+
+
 def format_call(tool: str, args: Mapping[str, Any]) -> str:
     """How an inserted call is written into the agent's history."""
     return json.dumps({"tool": tool, "args": dict(args)})
@@ -131,19 +147,23 @@ def model_summary(
     conversation, so it never enters the recorded trajectory.
 
     Returns:
-        The summary of the model's task.finish reply, unchanged, or None if the
-        reply holds no task.finish call with status complete and a non-empty
-        summary.
+        The summary of the first task.finish call in the reply whose status is
+        "complete" in any letter case and whose summary is not blank (DECISIONS.md
+        D23), unchanged, or None if the reply holds no such call.
     """
     probe = [*messages, {"role": "user", "content": FINISH_REQUEST}]
     reply = client.chat(probe, max_tokens=200, temperature=temperature, seed=seed)
-    call = parse_call(str(reply["content"]))
-    if call is None or call[0] != "task.finish":
-        return None
-    status, summary = call[1].get("status"), call[1].get("summary")
-    if status != "complete" or not isinstance(summary, str) or not summary.strip():
-        return None
-    return summary
+    for tool, args in parse_calls(str(reply["content"])):
+        status, summary = args.get("status"), args.get("summary")
+        if (
+            tool == "task.finish"
+            and isinstance(status, str)
+            and status.lower() == "complete"
+            and isinstance(summary, str)
+            and summary.strip()
+        ):
+            return summary
+    return None
 
 
 @dataclass

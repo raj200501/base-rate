@@ -27,6 +27,7 @@ import gzip
 import hashlib
 import io
 import json
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -83,7 +84,16 @@ SKIP_REASONS = (NO_VALID_CALL, NO_USABLE_SUMMARY)
 """The two skip reasons of prereg/0007."""
 
 
-def insertion_log(paths: list[Path], traces: list[Trace]) -> dict[str, Any]:
+def planned_insertions() -> int:
+    """The preregistered number of insertion attempts (prereg/0002-e1-corpus.md)."""
+    text = (ROOT / "prereg" / "0002-e1-corpus.md").read_text()
+    config = json.loads(re.findall(r"```json prereg-config\n(.*?)```", text, re.S)[0])
+    return int(config["insertion"]["attempts"])
+
+
+def insertion_log(
+    paths: list[Path], traces: list[Trace], planned_total: int | None = None
+) -> dict[str, Any]:
     """Attempts, inserted traces, and skips by type and reason (prereg/0007).
 
     Reads ``meta.json`` and ``skipped.jsonl`` beside each insertion run's trace
@@ -92,8 +102,9 @@ def insertion_log(paths: list[Path], traces: list[Trace]) -> dict[str, Any]:
 
     Raises:
         SystemExit: If an insertion run is incomplete (its planned attempts
-            differ from its inserted plus skipped attempts) or a skip has an
-            unknown reason.
+            differ from its inserted plus skipped attempts), a skip has an
+            unknown reason, or the attempts planned over all insertion runs
+            differ from ``planned_total`` (default: the preregistered number).
     """
     runs = []
     for path in paths:
@@ -136,6 +147,11 @@ def insertion_log(paths: list[Path], traces: list[Trace]) -> dict[str, Any]:
             r = row(str(skip["violation_type"]))
             r[skip["reason"]] += 1
             r["attempts"] += 1
+    expected = planned_insertions() if planned_total is None else planned_total
+    if runs and planned != expected:
+        raise SystemExit(
+            f"insertion runs planned {planned} attempts; the protocol plans {expected}"
+        )
     return {
         "prereg": "prereg/0007-e1-amendment-insertion.md",
         "attempts": planned,
@@ -274,9 +290,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--variants", type=int, default=9)
     ap.add_argument("--armour", type=Path, default=ROOT / "tests" / "fixtures" / "armour")
     ap.add_argument("--out", type=Path, default=ROOT / "artifacts" / "corpus")
+    ap.add_argument(
+        "--planned-insertions",
+        type=int,
+        default=None,
+        help="expected attempts over all insertion runs (default: prereg/0002); for tests",
+    )
     args = ap.parse_args(argv)
     loaded, inputs = load_runs(sorted(args.runs))
-    insertion = insertion_log(sorted(args.runs), loaded)
+    insertion = insertion_log(sorted(args.runs), loaded, args.planned_insertions)
     for path in sorted(args.runs):
         skip_path = path.parent / "skipped.jsonl"
         if skip_path.exists():
