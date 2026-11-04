@@ -7,8 +7,8 @@ Updated 2026-11-04 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.
 
 ## Gates
 
-Passing now (fast check): G2, G14. Everything else waits on data (E0 to E4), the
-report, or the review.
+Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on data
+(E1 to E4), the report, or the review.
 
 | Gate | State | What is left |
 |---|---|---|
@@ -21,17 +21,19 @@ report, or the review.
 | G7 Main study | E2 preregistered (headline method composite, from E0) | scoring runs in the pipeline, then analysis |
 | G8 Transfer and cascades | E3 and E4 preregistered | analysis after scoring |
 | G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples |
-| G10 Claim integrity | claimcheck and freshness tools in place | documents not rendered yet |
+| G10 Claim integrity | claimcheck and freshness cover README, REPORT, and DATA; prose sources pass on synthetic data | render on real results |
 | G11 Preregistration integrity | prereg-verify passes; draft-stage rule (D19) settles 0003 | E2 to E4 artifacts must cite their preregs |
 | G12 Independent review | not started | reviewer subagent, 1 run per day under CAP_SHARE=0.2 |
-| G13 Documentation | report builder in place; REPORT method sections drafted | results, README, citations |
+| G13 Documentation | every table built; make report and make reproduce work; datasheet drafted | results prose, README render |
 | G14 Hygiene | passes | |
 
 ## Now
 
 The unattended pipeline (tools/run_pipeline.sh, log in runs/pipeline/) runs the rest
 of E1 (Qwen3-1.7B batch, Qwen3-4B batch, the stopping rule, insertions, corpus build,
-audit sample) and then all E2 scoring. E0 is banked; E2, E3, and E4 are frozen; the
+audit sample) and then all E2 scoring. The VM was reclaimed at about 04:17 UTC and
+rebooted at 07:10; the pipeline was restarted at 07:12 from 1,064 of 2,000 banked
+1.7B runs, and a two-hour waiter now keeps the session active (D20). E0 is banked; E2, E3, and E4 are frozen; the
 E1 oracle amendment (prereg/0006) is frozen and implemented. The prereg 0003 double
 commit is settled by the draft-stage rule (D19, Raj delegated the choice): 0003 was a
 draft at 8e2836c and froze at 72fc428, and both checks name it.

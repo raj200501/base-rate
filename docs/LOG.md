@@ -22,3 +22,13 @@ Iteration history moved out of STATUS.md. Newest last.
   mutation tests, offline demo (make ci passes), runner provenance fix, variants,
   corpus builder, model monitor, scoring and analysis tools, report builder, label
   audit tool, E1 protocol frozen, E1 generation started, E0 resumed.
+
+## 2026-11-04 Goal turn 3
+
+- Raj delegated the prereg 0003 remedy: implemented the draft-stage freeze rule (D19)
+  in tools/prereg.py and the G11 check with mutation tests; prereg-verify passes.
+- Report builder: every table, numbers.json, docs/DATA.md as a third rendered
+  document, prose claims, make report and make reproduce; corpus canary checked by G6.
+- The VM was reclaimed at about 04:17 UTC and rebooted at 07:10; the pipeline was
+  restarted at 07:12 and is kept alive by a two-hour waiter (D20).
+- Adversarial review workflow over the session's integrity-critical changes started.

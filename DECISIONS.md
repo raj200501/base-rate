@@ -256,3 +256,20 @@ an exemption for one file, so it binds future files the same way, and it is
 disclosed as a deviation in CORRECTIONS.md, docs/REPORT.md, and the README.
 The process rule of D18 stays: drafts are written outside prereg/, and
 preregistrations are committed alone with an explicit path.
+
+## D20 (2026-11-04) Long runs and the container's lifetime
+
+The cloud VM was reclaimed at about 04:17 UTC on 2026-11-04, about four minutes
+after the last background task tracked by the session ended (the turn itself
+had ended near 03:54), and it was rebooted when the session resumed at 07:10.
+The detached corpus pipeline died with it. Nothing banked was lost: every step
+of tools/run_pipeline.sh resumes, the trace file had no partial line, and only
+the episodes in flight were repeated. Rule from now on: while a long local
+model run is in progress, one tracked background waiter (at most two hours)
+is always armed; when it ends, the session checks the run, restarts it if it
+died, commits the usage ledger, and arms the next waiter. That costs about one
+short check-in turn per two hours, fewer than a 15 or 30 minute heartbeat
+would. The remaining compute (corpus batches and insertions, then the model
+monitor scoring that prereg/0003 fixes) is estimated at two to three days of
+CPU on this machine, so the study's timeline depends on the session staying
+active; Raj can also run the pipeline on his own machine.

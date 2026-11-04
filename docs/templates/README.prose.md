@@ -97,7 +97,33 @@ disclose; weaknesses of the evaluated monitors are reported as rates.
 
 ## Related work
 
-<!-- @prose readme-related -->
+- **Control monitoring in deployment.** "Practical challenges of control monitoring in
+  frontier AI deployments" [@practical-challenges-2025] and the control safety-case sketch
+  [@korbak-safety-case-2025] argue that limited review capacity fixes a monitor's
+  false-positive rate and that recall then drives safety, and that these quantities must
+  be estimated and extrapolated conservatively. They give no estimator, interval, or
+  sample size; base-rate supplies that measurement layer.
+- **Control settings and monitor benchmarks.** Async Control [@aisi-async-control-2025],
+  BashArena [@basharena-2025], LinuxArena [@linuxarena-2026], and SHADE-Arena
+  [@shade-arena-2025] score monitors against attackers at a fixed false-positive rate;
+  MonitorBench [@monitorbench-2026] and TRACE [@trace-2026] benchmark what monitors can
+  detect, and TRACE finds that the benign-to-hacked ratio changes measured detection.
+  None estimates recall and precision at a deployment prevalence and review budget.
+- **Cascades.** Hua and colleagues [@hua-cascades-2025] combine monitors of different cost
+  under one budget. base-rate adds a fixed prevalence and review budget, intervals that
+  carry the benign tail's uncertainty, certification sample sizes, and held-out
+  validation split by source run.
+- **Foundations.** Armour [@armour] provides the trace schema, rule monitors, and labeled
+  records. The intervals are standard [@clopper-pearson-1934] [@wilson-1927]
+  [@brown-cai-dasgupta-2001] [@rubin-1981] [@hanley-lippman-hand-1983]; the corpus
+  datasheet follows [@gebru-datasheets-2021]; the model monitors are Qwen3
+  [@qwen3-2025].
+
+docs/REPORT.md section 2 discusses each in more detail.
+
+### References
+
+<!-- @references -->
 
 ## Citation
 

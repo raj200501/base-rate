@@ -288,7 +288,64 @@ margin of the expensive monitor alone.
 
 ## 6. Limitations and threats to validity
 
-<!-- @prose limitations -->
+These results describe these monitors on this corpus. The methods transfer to other
+monitors and data; the numbers do not.
+
+**Simulated tools and small agents.** Every trajectory comes from eight mock-tool domains
+in which a violation is an abstract tool call. The subject agents are two small local
+models on a CPU, and their trajectories are short. Frontier agents act over longer
+horizons with richer tools, and real violations are rarely a single labeled call, so
+recall measured here is not an estimate for any deployed agent.
+
+**How violations arise.** Natural violations here are mostly the mistakes of small models
+(an update on the wrong entity, a read the task did not need), not concealed behavior.
+Inserted violations are one call written by the harness, after which the same agent
+continues; they are labeled synthetic, and recall on them can differ from recall on
+natural violations, which is why the two are reported separately. Armour's records come
+from a few generator scripts and are clustered accordingly. None of the three sources is
+an adversary trying to evade a monitor; the study measures monitors against violations
+that do not hide.
+
+**Labels.** One oracle labels violations from the effects of tool calls, so its
+definitions decide what counts (DECISIONS.md D11). A defect in it, found during E1, counted
+failed calls on missing entities as violations; prereg/0006 fixed it before the corpus was
+built, and the corpus relabeling table states how many labels changed. The blind audit
+bounds the remaining disagreement, but the auditor is a model given the same definitions,
+not a human expert, so agreement measures consistency with the definitions more than
+correctness of the definitions.
+
+**Prevalence is a design parameter.** The corpus's share of violations is not a
+deployment rate. Results at each prevalence assume that the benign corpus stands for
+deployment's benign traffic and the violation set for its violations (case-control
+reweighting), and that the monitor's score distributions do not change with prevalence.
+Precision and reviewer load at a given prevalence inherit both assumptions.
+
+**The benign tail limits every low-budget claim.** At small review budgets the threshold
+sits in the extreme upper tail of the benign scores, which only the independent benign
+runs inform; procedural variants share their source run's cluster and add no
+independent information. The intervals are wide for this reason, and E0 found that the
+headline interval method undercovers in a few cells of the small independent design at
+the smallest budget. Primary estimates that rely on such cells are marked as not
+supported by E0, as the preregistered headline rule requires.
+
+**Deviations from the preregistrations.** Two, both before any monitor score existed. The
+E2 plan (prereg/0003) was first committed as a draft with its interval method unset and
+completed one commit later; the checks treat a file holding an explicit placeholder as an
+unfrozen draft (DECISIONS.md D18 and D19, CORRECTIONS.md). The E1 oracle amendment
+(prereg/0006) changed the labeling rule after the first corpus batch began.
+
+**Monitors.** The model monitors share one frozen prompt and one scoring rule (the
+probability-weighted digit), with no prompt tuning, so the size ladder compares sizes at
+one prompt, not each model at its best. No Claude model served as a subject or a monitor in
+this environment (Section 7). The ensemble and the cascade are the preregistered pairs only.
+
+**Cost and time.** E4's compute cost is the median CPU seconds per trace on this machine; on
+other hardware or through an API the costs, and so the best cascade, differ.
+
+**Sequential certification.** Adding runs after looking at a claim and testing again on
+all runs tests the claim twice, and its error rate exceeds the nominal level
+(DECISIONS.md D17). The certification tools assume the number of runs is fixed in advance,
+or that new runs are tested alone.
 
 ## 7. Ethics and disclosure
 
