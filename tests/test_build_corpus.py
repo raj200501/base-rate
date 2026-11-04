@@ -110,3 +110,75 @@ def test_pilot_seeds_are_refused(tmp_path: Path) -> None:
     runs = _run_file(tmp_path, range(900_000, 900_001))
     with pytest.raises(SystemExit, match="pilot trace"):
         bc.main(["--runs", str(runs), "--out", str(tmp_path / "c")])
+
+
+def _insert_dir(tmp_path: Path, runs: Path, attempts: int, skips: list[dict[str, object]]) -> Path:
+    """An insertion run directory: inserted traces, its meta.json, and its skip log."""
+    domain = get_domain("customer_support")
+    sources = [Trace.from_dict(json.loads(line)) for line in runs.read_text().splitlines()]
+    out = tmp_path / "insert-m"
+    out.mkdir()
+    lines = []
+    for src in sources[:2]:
+        ep = runner.run_inserted(Scripted([]), domain, src, 1, "audit_log_edit", seed=1)
+        trace = runner.to_trace(
+            ep,
+            trace_id=f"ins:{src.trace_id}:1:audit_log_edit",
+            agent_id="m",
+            source="inserted",
+            source_run_id=src.source_run_id,
+            synthetic=True,
+            provenance={"task_seed": src.provenance["task_seed"], "inserted_at": 1},
+            inserted_type="audit_log_edit",
+        )
+        lines.append(json.dumps(trace.to_dict()))
+    (out / "traces.jsonl").write_text("\n".join(lines) + "\n")
+    (out / "meta.json").write_text(
+        json.dumps({"insert": True, "insertion": {"attempts": attempts}})
+    )
+    (out / "skipped.jsonl").write_text("".join(json.dumps(s) + "\n" for s in skips))
+    return out / "traces.jsonl"
+
+
+SKIP = {
+    "trace_id": "ins:x:3:false_completion",
+    "source": "x",
+    "k": 3,
+    "violation_type": "false_completion",
+    "reason": runner.NO_USABLE_SUMMARY,
+}
+
+
+def test_insertion_attempts_and_skips_are_banked(tmp_path: Path) -> None:
+    runs = _run_file(tmp_path, range(5))
+    inserted = _insert_dir(tmp_path, runs, 3, [SKIP])
+    out = tmp_path / "c"
+    assert bc.main(["--runs", str(runs), str(inserted), "--variants", "1", "--out", str(out)]) == 0
+    log = json.loads((out / "manifest.json").read_text())["insertion"]
+    assert log["attempts"] == 3 and log["inserted"] == 2
+    assert log["skipped"] == {runner.NO_VALID_CALL: 0, runner.NO_USABLE_SUMMARY: 1}
+    by_type = {r["type"]: r for r in log["by_type"]}
+    assert by_type["audit_log_edit"]["inserted"] == 2 == by_type["audit_log_edit"]["attempts"]
+    assert by_type["false_completion"][runner.NO_USABLE_SUMMARY] == 1
+    assert by_type["false_completion"]["attempts"] == 1
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert any(i["path"].endswith("skipped.jsonl") for i in manifest["inputs"])
+
+
+@pytest.mark.parametrize(
+    ("attempts", "skips", "needle"),
+    [
+        (4, [SKIP], "insertion run incomplete"),
+        (3, [{**SKIP, "reason": "made up"}], "unknown reason"),
+    ],
+    ids=["incomplete", "unknown-reason"],
+)
+def test_insertion_log_refuses_an_inconsistent_run(
+    tmp_path: Path, attempts: int, skips: list[dict[str, object]], needle: str
+) -> None:
+    runs = _run_file(tmp_path, range(5))
+    inserted = _insert_dir(tmp_path, runs, attempts, skips)
+    with pytest.raises(SystemExit, match=needle):
+        bc.main(
+            ["--runs", str(runs), str(inserted), "--variants", "1", "--out", str(tmp_path / "c")]
+        )

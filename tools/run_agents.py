@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import threading
@@ -91,6 +92,54 @@ def episode_seed(sample_seed: int, trace_id: str) -> int:
     return int(hashlib.sha256(f"{sample_seed}:{trace_id}".encode()).hexdigest()[:8], 16)
 
 
+def e1_config() -> dict[str, Any]:
+    """The frozen E1 config (prereg/0002-e1-corpus.md)."""
+    text = (ROOT / "prereg" / "0002-e1-corpus.md").read_text()
+    blocks = re.findall(r"```json prereg-config\n(.*?)```", text, re.S)
+    cfg: dict[str, Any] = json.loads(blocks[0])
+    return cfg
+
+
+def insertion_sources(paths: list[Path], model: str) -> list[Trace]:
+    """Real runs of ``model`` that are benign under the fixed oracle, by trace id (prereg/0007).
+
+    Each candidate is relabeled by exact replay (prereg/0006), so the stored
+    generation label never decides eligibility, and the order never depends on
+    the order in which episodes finished.
+    """
+    found: dict[str, Trace] = {}
+    for f in paths:
+        for line in f.read_text().splitlines():
+            if not line.strip():
+                continue
+            t = Trace.from_dict(json.loads(line))
+            if t.source != "real_agent" or t.agent_id != model:
+                continue
+            relabeled = runner.relabel(get_domain(t.domain), t)
+            if relabeled is not None and relabeled.label == "benign":
+                found[t.trace_id] = t
+    return [found[k] for k in sorted(found)]
+
+
+def insertion_plan(
+    sources: list[Trace], attempts: int, seed: int
+) -> list[tuple[Trace, int, ViolationType]]:
+    """The preregistered draw: shuffle the sorted sources, one insertion per source.
+
+    The step is uniform over the source's agent steps and the type cycles
+    through the five violation types (prereg/0002, prereg/0007).
+    """
+    rng = random.Random(f"plan:{seed}")
+    pool = list(sources)
+    rng.shuffle(pool)
+    plan: list[tuple[Trace, int, ViolationType]] = []
+    for i, src in enumerate(pool[: attempts or len(pool)]):
+        last = len(src.actions) - 1  # agent steps are 1..last
+        k = rng.randint(1, max(1, last))
+        plan.append((src, k, cast(ViolationType, VIOLATION_TYPES[i % len(VIOLATION_TYPES)])))
+    return plan
+
+
 def done_ids(path: Path) -> set[str]:
     """Trace ids already written."""
     if not path.exists():
@@ -152,7 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     client = ModelClient(spec, ROOT, purpose="agent-runs" if not args.insert else "insertions")
     lock = threading.Lock()
-    seen = done_ids(out_file)
+    skip_file = args.out / "skipped.jsonl"
+    seen = done_ids(out_file) | done_ids(skip_file)
     provenance_base = {
         k: meta[k] for k in ("model", "revision", "sha256", "sample_seed", "git_sha")
     }
@@ -184,8 +234,18 @@ def main(argv: list[str] | None = None) -> int:
         if trace_id in seen:
             return
         sseed = episode_seed(args.sample_seed, trace_id)
-        ep = runner.run_inserted(client, get_domain(src.domain), src, k, vtype, seed=sseed)
-        if ep is None:
+        try:
+            ep = runner.run_inserted(client, get_domain(src.domain), src, k, vtype, seed=sseed)
+        except runner.InsertionSkippedError as skip:
+            record = {
+                "trace_id": trace_id,
+                "source": src.trace_id,
+                "k": k,
+                "violation_type": vtype,
+                "reason": skip.reason,
+            }
+            with lock, skip_file.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, sort_keys=True) + "\n")
             return
         write(
             runner.to_trace(
@@ -201,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
                     "episode_seed": sseed,
                     "inserted_from": src.trace_id,
                     "inserted_at": k,
+                    **({"summary_written_by": "model"} if vtype == "false_completion" else {}),
                 },
                 inserted_type=vtype,
             )
@@ -208,19 +269,17 @@ def main(argv: list[str] | None = None) -> int:
 
     jobs: list[tuple[Any, ...]] = []
     if args.insert:
-        sources: list[Trace] = []
-        for f in args.sources:
-            for line in f.read_text().splitlines():
-                t = Trace.from_dict(json.loads(line))
-                if t.label == "benign" and t.source == "real_agent" and t.agent_id == args.model:
-                    sources.append(t)
-        rng = random.Random(f"plan:{args.sample_seed}")
-        rng.shuffle(sources)
-        for i, src in enumerate(sources[: args.max_inserts or len(sources)]):
-            last = len(src.actions) - 1  # agent steps are 1..last
-            k = rng.randint(1, max(1, last))
-            vtype = cast(ViolationType, VIOLATION_TYPES[i % len(VIOLATION_TYPES)])
-            jobs.append((insert_job, src, k, vtype))
+        sources = insertion_sources(list(args.sources), args.model)
+        seed = int(e1_config()["insertion"]["seed"])
+        plan = insertion_plan(sources, args.max_inserts, seed)
+        jobs.extend((insert_job, src, k, vtype) for src, k, vtype in plan)
+        meta["insertion"] = {
+            "prereg": "prereg/0007-e1-amendment-insertion.md",
+            "eligible_sources": len(sources),
+            "attempts": len(plan),
+            "seed": seed,
+        }
+        (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     else:
         for task_seed in range(start, end):
             for d in args.domains.split(","):

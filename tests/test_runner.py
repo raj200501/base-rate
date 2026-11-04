@@ -185,7 +185,13 @@ def test_insertion_replays_prefix_and_regenerates(vtype: str) -> None:
             for m in client.calls[0]
         )
     else:
-        assert ep.finished and not client.calls
+        # prereg/0007: the same model writes the summary; the request is not recorded
+        assert ep.finished and len(client.calls) == 1
+        assert client.calls[0][-1] == {"role": "user", "content": runner.FINISH_REQUEST}
+        assert ep.final_answer == "Wrapped up." == trace.final_answer
+        assert json.loads(trace.provenance["raw"][k])["args"]["summary"] == "Wrapped up."
+        assert all(runner.FINISH_REQUEST not in json.dumps(a.to_dict()) for a in ep.actions)
+        assert len(ep.actions) == k + 1
 
 
 def test_insertion_detects_replay_mismatch() -> None:
@@ -197,12 +203,44 @@ def test_insertion_detects_replay_mismatch() -> None:
         runner.run_inserted(Scripted([]), DOMAIN, tampered, 3, "audit_log_edit", seed=1)
 
 
-def test_insertion_returns_none_when_no_violating_call_exists(
+def test_insertion_is_skipped_when_no_violating_call_exists(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     src = _benign_trace()
     monkeypatch.setattr(DOMAIN, "insertion", lambda *a, **k: None)
-    assert runner.run_inserted(Scripted([]), DOMAIN, src, 1, "audit_log_edit", seed=1) is None
+    with pytest.raises(runner.InsertionSkippedError) as info:
+        runner.run_inserted(Scripted([]), DOMAIN, src, 1, "audit_log_edit", seed=1)
+    assert info.value.reason == runner.NO_VALID_CALL
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "I have finished.",
+        call("tickets.get", id="X"),
+        call("task.finish", status="failed", summary="Could not do it."),
+        call("task.finish", status="complete", summary="   "),
+        call("task.finish", status="complete"),
+    ],
+    ids=["no-call", "not-finish", "not-complete", "blank-summary", "no-summary"],
+)
+def test_false_completion_without_a_usable_model_summary_is_skipped(reply: str) -> None:
+    src = _benign_trace()
+    with pytest.raises(runner.InsertionSkippedError) as info:
+        runner.run_inserted(Scripted([reply]), DOMAIN, src, 2, "false_completion", seed=1)
+    assert info.value.reason == runner.NO_USABLE_SUMMARY
+
+
+def test_insertion_constants_match_the_frozen_amendment() -> None:
+    import re
+    from pathlib import Path
+
+    text = (
+        Path(__file__).resolve().parents[1] / "prereg/0007-e1-amendment-insertion.md"
+    ).read_text()
+    cfg = json.loads(re.findall(r"```json prereg-config\n(.*?)```", text, re.S)[0])
+    assert cfg["summary_request"] == runner.FINISH_REQUEST
+    assert cfg["skip_reasons"] == [runner.NO_VALID_CALL, runner.NO_USABLE_SUMMARY]
 
 
 def test_inserted_episode_needs_type() -> None:
