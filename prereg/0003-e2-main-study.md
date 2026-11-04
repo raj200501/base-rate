@@ -50,10 +50,15 @@ scoring starts; every monitor scores its sets exactly once.
 ## Analysis
 
 - Estimator: `baserate.estimate.recall_at_budget` at each prevalence and
-  budget, with the headline interval method named in the config (chosen
-  from the methods E0 supports for these designs, before any monitor score
-  exists), alpha 0.05, and the bootstrap seed in the config. Precision and
-  the false-positive rate at the budget map from the recall interval.
+  budget, with the headline interval method named in the config, alpha
+  0.05, and the bootstrap seed in the config. Precision and the
+  false-positive rate at the budget map from the recall interval. The
+  method was chosen from the banked E0 artifact before any monitor score
+  existed: `composite` is the only recall-at-budget method that passes every
+  E0 cell of both large designs, and it passes all but two cells of the
+  small independent design (both at the smallest budget); every other
+  method fails more cells in every design. The cluster-aware exact method
+  used for fixed thresholds passes every E0 cell.
 - Headline rule: every (monitor, prevalence, budget) recall and precision
   estimate on the `primary` set is a headline estimate. Each lists the E0
   cells it relies on under the frozen rule of prereg/0001 (same estimator,
@@ -105,7 +110,7 @@ scoring starts; every monitor scores its sets exactly once.
   "monitor_prompt_sha256": "af7e442ae540572a2a364c2eb525e99d556f49fdeeed17403091034d8bab3808",
   "prevalences": [0.01, 0.001, 0.0001],
   "budgets_per_10k": [5, 20, 100],
-  "headline": {"set": "primary", "method": "TO_BE_SET_FROM_E0", "alpha": 0.05, "resamples": 2000, "seed": 20261104},
+  "headline": {"set": "primary", "method": "composite", "alpha": 0.05, "resamples": 2000, "seed": 20261104},
   "fixed_threshold": {"monitors": ["rule:armour-baseline", "rule:armour-reviewer-calibrated", "rule:armour-strict-agent"], "threshold": 0.2, "method": "cluster_cp"},
   "time_to_detection": {"monitors": ["rule:armour-baseline", "rule:armour-reviewer-calibrated", "rule:armour-strict-agent", "model:qwen3-0.6b-q8_0", "model:qwen3-1.7b-q8_0"], "prevalence": 0.001, "budget_per_10k": 20},
   "size_ladder": {"prevalence": 0.001, "budget_per_10k": 20},
