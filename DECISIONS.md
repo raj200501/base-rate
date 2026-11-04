@@ -221,3 +221,38 @@ the incident is recorded, 0003 is not touched again, and the decision is put
 to Raj. Process change: before every commit, `git status --short` is checked
 and preregistrations are committed alone with an explicit path list
 (`git commit -- prereg/NNNN-x.md`), never through a staged rename.
+
+## D19 (2026-11-04) A preregistration holding a placeholder is a draft (resolves D18)
+
+Raj delegated the choice among the three remedies in STATUS.md ("just do what
+you think is best"). Chosen: option (b). Rule: a file under prereg/ whose
+`json prereg-config` block holds a string value of the form `TO_BE_SET` or
+`TO_BE_SET_<WORDS>` declares itself an unfinished draft. It is frozen by the
+first commit whose config holds no such value. From that commit on the old
+rule applies unchanged: no later commit may touch the file, and HEAD, the
+index, and the working tree must equal the frozen content. Three conditions
+keep the draft stage narrow, and the checks enforce each one: every commit
+before the freezing commit must hold a placeholder; the freezing commit may
+change the config only where a draft held a placeholder (every value a draft
+fixed stays fixed); and every artifact that cites the file, and every
+amendment of it, must come strictly after the freezing commit. A file that
+still holds a placeholder at HEAD fails verification. Prose may change while
+the file is a draft.
+
+Under this rule prereg/0003-e2-main-study.md was a draft at 8e2836c and froze
+at 72fc428, before any monitor score; the only config change was the method
+that the draft left unset. tools/prereg.py and the G11 check in
+tools/ship_check.py implement the rule independently, and both have mutation
+tests for each condition. ship-check names every preregistration that froze
+after a draft in its G11 evidence.
+
+Why not (a), a rewrite and force-push of the branch: it would erase the record
+of the mistake from history, which is the opposite of what a preregistration
+log is for, and the operating rules forbid force-pushes. Why not (c), leaving
+G11 failing: the check would then fail for a reason that is known, disclosed,
+and harmless to the inference, and it would stay red for the life of the
+project, which hides any later real failure. The rule is general rather than
+an exemption for one file, so it binds future files the same way, and it is
+disclosed as a deviation in CORRECTIONS.md, docs/REPORT.md, and the README.
+The process rule of D18 stays: drafts are written outside prereg/, and
+preregistrations are committed alone with an explicit path.
