@@ -30,7 +30,7 @@ import json
 import random
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from baserate.traces.domains.base import Domain, Effect, Task, World, classify
@@ -250,6 +250,81 @@ def run_inserted(
     if finished:
         episode.finished, episode.final_answer = True, final
     return _continue(client, episode, world, messages, seed, max_steps, temperature)
+
+
+def replay(domain: Domain, trace: Trace) -> Episode:
+    """Re-run a recorded trace through a fresh world from its raw replies.
+
+    Worlds are deterministic per task seed, so the replay reproduces every
+    observation (checked) and recomputes every effect with the current oracle.
+
+    Raises:
+        ReplayMismatchError: If a replayed observation differs from the record.
+    """
+    task, world = domain.make_task(int(trace.provenance["task_seed"]))
+    messages = initial_messages(domain, task)
+    episode = Episode(task, [_request_action(task)], [()])
+    raws = trace.provenance["raw"]
+    for j, recorded in enumerate(trace.actions[1:], start=1):
+        raw = str(raws[j])
+        action, effects, finished, final = _step(world, raw, j, messages)
+        if action.observation != recorded.observation:
+            raise ReplayMismatchError(f"{trace.trace_id} step {recorded.step}")
+        episode.actions.append(action)
+        episode.effects.append(effects)
+        episode.raws.append(raw)
+        if finished:
+            episode.finished, episode.final_answer = True, final
+    episode.inserted_at = trace.provenance.get("inserted_at")
+    return episode
+
+
+def relabel(domain: Domain, trace: Trace) -> Trace | None:
+    """The trace labeled by the current oracle, from an exact replay.
+
+    Real-agent runs get their natural label recomputed; the label assigned at
+    generation is kept in ``provenance["generation_label"]``. Inserted traces
+    keep their inserted label if the inserted step still has an effect the
+    oracle classifies as the inserted type; otherwise None (dropped and
+    counted by the caller). Other sources are returned unchanged.
+    """
+    if trace.source not in {"real_agent", "inserted"}:
+        return trace
+    episode = replay(domain, trace)
+    old = {
+        "label": trace.label,
+        "violation_type": trace.violation_type,
+        "first_violating_step": trace.first_violating_step,
+    }
+    if trace.source == "inserted":
+        k = int(trace.first_violating_step or 0)
+        done: list[Effect] = [e for effs in episode.effects[:k] for e in effs]
+        hits = [classify(e, episode.task, [*done, e]) for e in episode.effects[k]]
+        return trace if trace.violation_type in hits else None
+    found = first_violation(episode)
+    prov = {
+        **trace.provenance,
+        "generation_label": old,
+        "oracle_first_violation": None if found is None else list(found),
+    }
+    if found is None:
+        return replace(
+            trace,
+            label="benign",
+            violation_type=None,
+            violation_source=None,
+            first_violating_step=None,
+            provenance=prov,
+        )
+    vtype, fvs = found
+    return replace(
+        trace,
+        label="violation",
+        violation_type=vtype,
+        violation_source="natural",
+        first_violating_step=fvs,
+        provenance=prov,
+    )
 
 
 def to_trace(

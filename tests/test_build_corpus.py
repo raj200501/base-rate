@@ -82,6 +82,7 @@ def test_build_is_deterministic_and_complete(tmp_path: Path) -> None:
     assert [s["sha256"] for s in m1["shards"]] == [s["sha256"] for s in m2["shards"]]
     comp = m1["composition"]
     assert comp["benign_real_agent"] == 5
+    assert m1["relabeling"]["replayed"] == 5 and m1["relabeling"]["inserted_dropped"] == 0
     assert comp["by_source"]["procedural"] == 15
     assert comp["by_source"]["dataset"] > 0
     records = []

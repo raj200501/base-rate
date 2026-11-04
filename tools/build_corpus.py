@@ -33,6 +33,8 @@ from pathlib import Path
 from typing import Any
 
 from baserate.traces.armour import ARMOUR_COMMIT, load_armour_datasets
+from baserate.traces.domains import get_domain
+from baserate.traces.runner import relabel
 from baserate.traces.schema import Trace, independent_runs, synthetic_share
 from baserate.traces.variants import variants
 
@@ -68,6 +70,34 @@ def load_runs(paths: list[Path]) -> tuple[list[Trace], list[dict[str, Any]]]:
                 raise SystemExit(f"pilot trace in corpus input: {t.trace_id}")
             seen.setdefault(t.trace_id, t)
     return list(seen.values()), inputs
+
+
+def relabel_all(traces: list[Trace]) -> tuple[list[Trace], dict[str, Any]]:
+    """Relabel real-agent and inserted traces by exact replay (prereg/0006).
+
+    Returns:
+        The kept traces and a log: how many labels changed (by old and new
+        type) and how many inserted traces were dropped.
+    """
+    out: list[Trace] = []
+    changes: Counter[str] = Counter()
+    dropped = 0
+    for t in traces:
+        r = relabel(get_domain(t.domain), t)
+        if r is None:
+            dropped += 1
+            continue
+        before = (t.label, t.violation_type, t.first_violating_step)
+        after = (r.label, r.violation_type, r.first_violating_step)
+        if before != after:
+            changes[f"{t.violation_type or 'benign'} -> {r.violation_type or 'benign'}"] += 1
+        out.append(r)
+    return out, {
+        "prereg": "prereg/0006-e1-amendment-oracle.md",
+        "replayed": sum(t.source in {"real_agent", "inserted"} for t in traces),
+        "label_changes": dict(sorted(changes.items())),
+        "inserted_dropped": dropped,
+    }
 
 
 def write_shards(traces: list[Trace], out: Path) -> list[dict[str, Any]]:
@@ -141,7 +171,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--armour", type=Path, default=ROOT / "tests" / "fixtures" / "armour")
     ap.add_argument("--out", type=Path, default=ROOT / "artifacts" / "corpus")
     args = ap.parse_args(argv)
-    runs, inputs = load_runs(sorted(args.runs))
+    loaded, inputs = load_runs(sorted(args.runs))
+    runs, relabel_log = relabel_all(loaded)
     real_benign = [t for t in runs if t.source == "real_agent" and t.label == "benign"]
     procedural = [v for t in real_benign for v in variants(t, args.variants)]
     armour = load_armour_datasets(args.armour)
@@ -157,6 +188,7 @@ def main(argv: list[str] | None = None) -> int:
         "shards": entries,
         "composition": composition(traces),
         "variants_per_real_benign_run": args.variants,
+        "relabeling": relabel_log,
         "armour": {
             "commit": ARMOUR_COMMIT,
             "counts": armour.counts(),

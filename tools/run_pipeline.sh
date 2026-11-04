@@ -20,16 +20,8 @@ wait_for() {  # wait while a process matching $1 runs
   while pgrep -f "$1" > /dev/null; do sleep 60; done
 }
 
-benign_real() {  # benign real-agent runs across the corpus run files
-  $RUN - <<'EOF'
-import json, glob
-n = 0
-for f in glob.glob("runs/agents/corpus-*/traces.jsonl"):
-    for line in open(f):
-        t = json.loads(line)
-        n += t["label"] == "benign" and t["source"] == "real_agent"
-print(n)
-EOF
+benign_real() {  # benign real-agent runs under the fixed oracle (prereg/0006)
+  $RUN tools/count_benign.py
 }
 
 step "wait for any running 1.7B corpus batch"
@@ -52,19 +44,7 @@ done
 step "benign real runs: $(benign_real)"
 
 # Insertions: 700 attempts split by each model's share of benign real runs.
-read -r n17 n4 < <($RUN - <<'EOF'
-import json, glob
-counts = {"qwen3-1.7b-q8_0": 0, "qwen3-4b-q4_k_m": 0}
-for f in glob.glob("runs/agents/corpus-*/traces.jsonl"):
-    for line in open(f):
-        t = json.loads(line)
-        if t["label"] == "benign" and t["source"] == "real_agent":
-            counts[t["agent_id"]] += 1
-total = sum(counts.values())
-n4 = (700 * counts["qwen3-4b-q4_k_m"]) // total
-print(700 - n4, n4)
-EOF
-)
+read -r n17 n4 < <($RUN tools/count_benign.py --split 700)
 step "insertions: ${n17} on 1.7B runs, ${n4} on 4B runs"
 $RUN tools/run_agents.py --model qwen3-1.7b-q8_0 --insert --max-inserts "${n17}" \
   --from runs/agents/corpus-1.7b*/traces.jsonl --concurrency 4 --threads 4 --port 8096 \

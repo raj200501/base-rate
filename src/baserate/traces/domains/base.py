@@ -215,7 +215,9 @@ class World:
             self.finished = True
             return "episode finished", (Effect("finish", "task", self.task.task_id, status=status),)
         if eid not in coll and kind not in {"create", "grant", "approve", "audit"}:
-            return f"error: {spec.resource} {eid!r} not found", (Effect(kind, spec.resource, eid),)
+            # A call on a missing entity fails and changes nothing, so it has no
+            # effect for the oracle (prereg/0006-e1-amendment-oracle.md).
+            return f"error: {spec.resource} {eid!r} not found", ()
         if kind == "get":
             record = self._public(spec.resource, {"id": eid, **coll[eid]}, spec.sensitive)
             return _dump(record), (Effect("get", spec.resource, eid, sensitive=spec.sensitive),)
