@@ -93,6 +93,19 @@ class Usage:
     seconds: float = 0.0
 
 
+def _store(path: Path, out: Mapping[str, Any]) -> None:
+    """Write one cache entry atomically.
+
+    Each writer uses its own temporary file (process and thread in the name), so
+    concurrent identical requests never rename a file another writer is using; the
+    last rename wins, and every entry it can leave is a complete reply.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(out))
+    tmp.replace(path)
+
+
 @dataclass
 class ModelClient:
     """Cached, capped, logged chat completions.
@@ -169,10 +182,7 @@ class ModelClient:
             "prompt_tokens": int(data.get("usage", {}).get("prompt_tokens", 0)),
             "completion_tokens": int(data.get("usage", {}).get("completion_tokens", 0)),
         }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(out))
-        tmp.replace(path)
+        _store(path, out)
         with self._lock:
             self.usage.calls += 1
             self.usage.prompt_tokens += out["prompt_tokens"]
@@ -221,10 +231,7 @@ class ModelClient:
             "prompt_tokens": int(data.get("tokens_evaluated", 0)),
             "completion_tokens": int(data.get("tokens_predicted", 0)),
         }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(out))
-        tmp.replace(path)
+        _store(path, out)
         with self._lock:
             self.usage.calls += 1
             self.usage.prompt_tokens += out["prompt_tokens"]
