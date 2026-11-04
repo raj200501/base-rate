@@ -270,9 +270,9 @@ def rel(ctx: Ctx, path: str | Path) -> Path:
 
 
 def tracked(ctx: Ctx, pathspec: str) -> list[str]:
-    """Tracked files in the clone matching a pathspec."""
-    out = git(ctx.clone, "ls-files", "--", pathspec)
-    return [ln for ln in out.splitlines() if ln]
+    """Tracked files in the clone matching a pathspec (NUL-separated, so no path quoting)."""
+    out = git(ctx.clone, "ls-files", "-z", "--", pathspec)
+    return [p for p in out.split("\0") if p]
 
 
 def first_commit(repo: Path, path: str) -> str | None:
@@ -362,7 +362,7 @@ def file_states(repo: Path, path: str) -> dict[str, tuple[str, str] | None]:
         repo,
         "log",
         "--full-history",
-        "-m",
+        "--diff-merges=separate",
         "--no-renames",
         "--raw",
         "--no-abbrev",
@@ -395,18 +395,23 @@ def renamed_from(repo: Path, path: str) -> list[str]:
         repo,
         "log",
         "--full-history",
-        "-m",
+        "--diff-merges=separate",
         "-M",
         "--diff-filter=R",
         "--name-status",
+        "-z",
         "--format=",
         "HEAD",
     )
     sources: dict[str, set[str]] = {}
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) == 3 and parts[0].startswith("R"):
-            sources.setdefault(parts[2], set()).add(parts[1])
+    fields = [f for f in out.split("\0") if f]
+    i = 0
+    while i < len(fields):
+        status = fields[i].strip()
+        width = 3 if status[:1] in {"R", "C"} else 2
+        if status.startswith("R") and i + 2 < len(fields):
+            sources.setdefault(fields[i + 2], set()).add(fields[i + 1])
+        i += width
     names = [path]
     for name in names:
         names.extend(sorted(sources.get(name, set()) - set(names)))
@@ -1159,12 +1164,27 @@ def g10(ctx: Ctx) -> str:
 
 def g11(ctx: Ctx) -> str:
     """Preregistration integrity: frozen files unchanged, artifacts cite earlier preregs."""
-    preregs = [p for p in tracked(ctx, "prereg/*.md") if not p.endswith("README.md")]
-    need(bool(preregs), "no preregistrations under prereg/")
-    deleted = git(
-        ctx.clone, "log", "--format=%H", "--no-renames", "--diff-filter=D", "--", "prereg/"
+    need(
+        git(ctx.clone, "rev-parse", "--is-shallow-repository") != "true",
+        "git history is shallow; run git fetch --unshallow",
     )
-    need(not deleted, "a preregistration file was deleted")
+    meta = {"prereg/README.md", "prereg/.gitkeep"}
+    preregs = [p for p in tracked(ctx, "prereg/*.md") if p not in meta]
+    need(bool(preregs), "no preregistrations under prereg/")
+    ever = git(
+        ctx.clone,
+        "log",
+        "--full-history",
+        "--diff-merges=separate",
+        "--no-renames",
+        "--format=",
+        "--name-only",
+        "-z",
+        "--",
+        "prereg/",
+    )
+    gone = {p.strip("\n") for p in ever.split("\0") if p.strip("\n")} - set(tracked(ctx, "prereg/"))
+    need(not (gone - meta), "a preregistration file was deleted")
     drafted = []
     freezes: dict[str, Freeze] = {}
     for p in preregs:
@@ -1214,9 +1234,9 @@ def g11(ctx: Ctx) -> str:
         original = freezes.get(m.group(1))
         need(original is not None, f"{p} amends {m.group(1)}, which is not a preregistration")
         assert original is not None and original.commit is not None
-        first = freezes[p].first
+        after = descendant_set(ctx.clone, original.commit)
         need(
-            first is not None and is_strict_ancestor(ctx.clone, original.commit, first),
+            bool(freezes[p].introduced) and set(freezes[p].introduced) <= after,
             f"{p} amends {m.group(1)}, which was not frozen before {p} was first committed",
         )
     confirmatory = []

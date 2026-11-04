@@ -501,7 +501,54 @@ def s_control_with_merges(r: Any) -> None:
     r.commit("bank")
 
 
+def s_amendment_versions_unordered(r: Any) -> None:
+    """An amendment drafted on a branch cut before its original existed, frozen on main."""
+    base = r.head()
+    plan(r, CONFIG)
+    r.commit("P1 frozen")
+    r.git("checkout", "-q", "-b", "early", base)
+    plan(r, {"change": "TO_BE_SET"}, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("P2 drafted before P1 existed")
+    r.git("checkout", "-q", "main")
+    plan(r, {"change": "more"}, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("P2 frozen on main")
+    r.git("merge", "-q", "-s", "ours", "early", "-m", "merge the early branch")
+    bank(r, CONFIG)
+    r.commit("bank")
+
+
+def s_prereg_only_in_merges(r: Any) -> None:
+    plan(r, CONFIG)
+    r.commit("freeze")
+    merge_with(r, lambda: plan(r, CONFIG, path=P2, pid="0002"), "add")
+    merge_with(r, lambda: r.git("rm", "-q", P2), "remove")
+    bank(r, CONFIG)
+    r.commit("bank")
+
+
+def s_non_ascii_artifact(r: Any) -> None:
+    plan(r, CONFIG)
+    r.commit("freeze")
+    bank(r, CONFIG, "artifacts/e2/r\u00e9sultats.json")
+    r.commit("bank under a non-ASCII name")
+
+
+def s_non_ascii_rename(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    bank(r, FINAL, "artifacts/e2/t\u00f4t.json")
+    r.commit("bank early under a non-ASCII name")
+    plan(r, FINAL)
+    r.commit("freeze")
+    r.git("mv", "artifacts/e2/t\u00f4t.json", ART)
+    r.commit("rename after the freeze")
+
+
 G11_HISTORY_CASES: list[tuple[str, Callable[[Any], None], str | None]] = [
+    ("amendment-versions-in-either-order", s_amendment_versions_unordered, "0002"),
+    ("prereg-added-and-removed-only-in-merges", s_prereg_only_in_merges, "deleted"),
+    ("non-ascii-artifact-name", s_non_ascii_artifact, None),
+    ("non-ascii-artifact-renamed-from-an-early-file", s_non_ascii_rename, "was not committed"),
     ("freeze-in-a-merge", s_freeze_in_merge, "frozen in a merge commit"),
     ("transient-change-through-merges", s_transient_merges, "changed after it was frozen"),
     ("artifact-inside-a-merge-before-the-freeze", s_artifact_in_merge, "was not committed before"),
@@ -538,6 +585,39 @@ def test_g11_history_cases_and_the_tool_agree(
     else:
         assert_fail(11, repo, tmp_path, needle)
         assert tool.returncode == 1, tool.stdout
+
+
+def test_g11_ignores_a_hostile_diff_merges_setting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = g11_base_repo(tmp_path / "repo")
+    s_artifact_in_merge(repo)
+    config = tmp_path / "gitconfig"
+    config.write_text("[log]\n\tdiffMerges = combined\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    assert_fail(11, repo, tmp_path, "was not committed before")
+    tool = subprocess.run(
+        [PY, "tools/prereg.py", "verify"],
+        cwd=repo.path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert tool.returncode == 1, tool.stdout
+
+
+def test_g11_and_the_tool_refuse_a_shallow_history(tmp_path: Path) -> None:
+    repo = g11_base_repo(tmp_path / "repo")
+    s_control_with_merges(repo)
+    shallow = tmp_path / "shallow"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", f"file://{repo.path}", str(shallow)], check=True
+    )
+    tool = subprocess.run(
+        [PY, "tools/prereg.py", "verify"], cwd=shallow, capture_output=True, text=True, check=False
+    )
+    assert tool.returncode == 1 and "shallow" in tool.stdout, tool.stdout
+    assert_fail(11, h.Repo(shallow), tmp_path, "history is shallow")
 
 
 # ======================================================================= G14

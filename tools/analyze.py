@@ -238,7 +238,9 @@ def _weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
     order = np.argsort(v, kind="stable")
     v, w = v[order], w[order]
     cum = np.cumsum(w)
-    return float(v[int(np.searchsorted(cum, 0.5 * cum[-1]))])
+    # a relative tolerance keeps float rounding at the half-mass point from picking
+    # the upper median (for example 0.3 + 0.7 summing to just under 1)
+    return float(v[int(np.searchsorted(cum, 0.5 * cum[-1] * (1 - 1e-9)))])
 
 
 def ttd(

@@ -1179,12 +1179,38 @@ def write_table(name_: str, rendered: str) -> str:
 CITE_RE = re.compile(r"\[@([A-Za-z0-9][\w\-]*)\]")
 
 
+def display_title(ref: dict[str, Any]) -> str:
+    """The title the citation check saw, without site decorations.
+
+    ``page_title`` is what the check read (arXiv ids, Crossref notes, and site
+    names around it are removed); ``claimed`` is what the brief asserted and may
+    be a short form. The claimed spelling is used only when it equals the
+    verified title apart from letter case and punctuation (Crossref registers
+    some titles in capitals).
+    """
+    seen = str(ref.get("page_title") or "")
+    title = re.sub(r"^\[\d{4}\.\d{4,5}\]\s+", "", seen)
+    title = re.sub(r"\s+\(Crossref title[^)]*\)$", "", title)
+    title = re.sub(r"\s+\\\s+Anthropic$", "", title)
+    title = re.sub(r"\s+-\s+by\s+.+$", "", title)
+    title = re.sub(r"^GitHub - ", "", title).rstrip(" .")
+    claimed = str(ref.get("claimed", {}).get("title") or "")
+
+    def norm(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+    if claimed and norm(claimed) == norm(title):
+        return claimed
+    return title or claimed or str(ref["key"])
+
+
 def references(keys: Sequence[str]) -> str:
     """Reference list (template syntax) for cited keys, from artifacts/citecheck.json.
 
-    Each entry shows the authors, title, and year that the citation check
-    confirmed, and the DOI, arXiv, or publisher link it names (not the API
-    address the check may have read).
+    Each entry shows the title the citation check verified (:func:`display_title`),
+    the year, and the DOI, arXiv, or publisher link the reference names (not the
+    API address the check may have read). Authors are not shown: the check's
+    record holds them only as free text.
     """
     data = load("artifacts/citecheck.json")
     entries = {r["key"]: r for r in data["references"]}
@@ -1194,13 +1220,10 @@ def references(keys: Sequence[str]) -> str:
         if ref is None or not ref.get("verified"):
             raise SystemExit(f"cited reference {key} is missing or unverified in citecheck.json")
         claimed = ref.get("claimed", {})
-        title = claimed.get("title") or ref.get("page_title") or key
-        authors = claimed.get("authors")
         year = claimed.get("year")
         url = claimed.get("url") or ref["final_url"]
-        who = f"{_tag_digits(str(authors).rstrip('.'))}. " if authors else ""
         when = f" {{{{date:{year}}}}}." if year else ""
-        lines.append(f"- [@{key}] {who}{_tag_digits(str(title))}.{when} <{url}>")
+        lines.append(f"- [@{key}] {_tag_digits(display_title(ref))}.{when} <{url}>")
     return "\n".join(lines)
 
 

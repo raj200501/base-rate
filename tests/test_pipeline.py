@@ -648,3 +648,28 @@ def test_report_refuses_an_audit_of_traces_not_in_the_corpus(
     )
     with pytest.raises(SystemExit, match="not in the corpus"):
         rp.corpus_numbers({"shards": []}, {"items": [{"trace_id": "a"}, {"trace_id": "gone"}]})
+
+
+def test_median_delay_does_not_depend_on_the_tie_fraction_without_ties(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    an = _load("analyze", monkeypatch, tmp_path)
+    recs = [{"prefix_scores": [0.9]}, {"prefix_scores": [0.1, 0.1, 0.9]}]
+    medians = {an.ttd(recs, 0.5, t, 10, 1)["median_delay_steps"] for t in (0.1, 0.3, 0.5, 0.7, 0.9)}
+    assert medians == {0.0}
+
+
+def test_references_show_the_verified_title(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    rp = _load("report", monkeypatch, tmp_path)
+    data = json.loads((REPO / "artifacts" / "citecheck.json").read_text())
+    by_key = {r["key"]: r for r in data["references"]}
+    # the brief's short form is replaced by the full verified title
+    assert rp.display_title(by_key["basharena-2025"]).startswith("BashArena: A Control Setting")
+    # a Crossref title registered in capitals keeps the claimed spelling of the same words
+    assert rp.display_title(by_key["clopper-pearson-1934"]).startswith("The use of confidence")
+    for ref in data["references"]:
+        if ref.get("verified"):
+            title = rp.display_title(ref)
+            assert "(Crossref" not in title and not title.startswith("["), title

@@ -92,14 +92,29 @@ def untracked_files(root: Path, *pathspecs: str) -> list[str]:
 
 
 def history_paths(root: Path, prefix: str) -> list[str]:
-    """Every path under ``prefix`` that any commit in HEAD's history touched.
+    """Every path under ``prefix`` that any commit in HEAD's history touched, merges included.
 
-    Renames are reported as a deletion plus an addition, so both names appear.
+    Renames are reported as a deletion plus an addition, so both names appear;
+    a path that only a merge commit added or removed is listed too.
     """
-    out = git(
-        root, "log", "--full-history", "--no-renames", "--format=", "--name-only", "--", prefix
-    )
-    return sorted({ln for ln in out.splitlines() if ln.strip()})
+    out = git_bytes(
+        root,
+        "log",
+        "--full-history",
+        "--diff-merges=separate",
+        "--no-renames",
+        "--format=",
+        "--name-only",
+        "-z",
+        "--",
+        prefix,
+    ).decode("utf-8", errors="replace")
+    return sorted({p.strip("\n") for p in out.split("\0") if p.strip("\n")})
+
+
+def is_shallow(root: Path) -> bool:
+    """Whether the repository's history is cut off (a shallow clone)."""
+    return git(root, "rev-parse", "--is-shallow-repository") == "true"
 
 
 def commits_touching(
@@ -160,7 +175,7 @@ def path_states(
         root,
         "log",
         "--full-history",
-        "-m",
+        "--diff-merges=separate",
         "--no-renames",
         "--raw",
         "--no-abbrev",
@@ -207,22 +222,28 @@ def descendants(root: Path, commit: str) -> frozenset[str]:
 
 def rename_sources(root: Path, path: str) -> list[str]:
     """``path`` and every earlier name it was renamed from (true renames only, not copies)."""
-    out = git(
+    out = git_bytes(
         root,
         "log",
         "--full-history",
-        "-m",
+        "--diff-merges=separate",
         "-M",
         "--diff-filter=R",
         "--name-status",
+        "-z",
         "--format=",
         "HEAD",
-    )
+    ).decode("utf-8", errors="replace")
     renamed: dict[str, set[str]] = {}
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) == 3 and parts[0].startswith("R"):
-            renamed.setdefault(parts[2], set()).add(parts[1])
+    fields = [f for f in out.split("\0") if f]
+    i = 0
+    while i < len(fields):
+        status = fields[i].strip()
+        if status.startswith("R") and i + 2 < len(fields):
+            renamed.setdefault(fields[i + 2], set()).add(fields[i + 1])
+            i += 3
+        else:
+            i += 2 if status[:1] not in {"R", "C"} else 3
     names, todo = [path], [path]
     while todo:
         for old in sorted(renamed.get(todo.pop(), ())):

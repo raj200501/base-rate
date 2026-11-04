@@ -70,6 +70,7 @@ from chainlib import (  # noqa: E402
     history,
     history_paths,
     introducing,
+    is_shallow,
     is_strict_ancestor,
     path_states,
     rename_sources,
@@ -106,6 +107,7 @@ class Prereg:
     freeze_commit: str | None = None
     drafts: list[str] = field(default_factory=list)
     first_commit: str | None = None
+    introduced: list[str] = field(default_factory=list)
 
 
 def parse_front_matter(text: str) -> tuple[dict[str, str], list[str]]:
@@ -294,7 +296,7 @@ class History:
 
 def _check_frozen(
     root: Path, path: str, hist: History, problems: list[str]
-) -> tuple[str | None, list[str], str | None]:
+) -> tuple[str | None, list[str], list[str]]:
     """Check that one tracked preregistration is unchanged since it was frozen.
 
     Every version of the file in HEAD's history counts, merge commits
@@ -305,13 +307,14 @@ def _check_frozen(
     holds exactly the frozen version.
 
     Returns:
-        (freezing commit or None, draft commits oldest first, first commit or None).
+        (freezing commit or None, draft commits oldest first, every commit that
+        introduced a version, oldest first).
     """
     states = path_states(root, path, hist.order, hist.parents)
     intro = introducing(hist.order, hist.parents, states)
     if not intro:
         problems.append(f"{path}: tracked but not added by any commit")
-        return None, [], None
+        return None, [], []
     for commit in intro:
         state = states[commit]
         if state is not None and state[1] not in REGULAR_MODES:
@@ -325,7 +328,7 @@ def _check_frozen(
             f"{path}: still a draft: its config holds a TO_BE_SET placeholder at {held} "
             f"in {_short(intro[-1])}; a preregistration must be frozen"
         )
-        return None, intro, intro[0]
+        return None, intro, intro
     freeze = finals[0]
     pos = {c: i for i, c in enumerate(hist.order)}
     drafts = [c for c in intro if pos[c] < pos[freeze]]
@@ -370,7 +373,7 @@ def _check_frozen(
         problems.append(f"{path}: staged changes to a frozen preregistration")
     if (root / path).is_file() and hash_object(root, root / path) != frozen_blob:
         problems.append(f"{path}: modified in the working tree since it was frozen")
-    return freeze, drafts, intro[0]
+    return freeze, drafts, intro
 
 
 def _collect_preregs(root: Path, hist: History, problems: list[str]) -> dict[str, Prereg]:
@@ -390,8 +393,14 @@ def _collect_preregs(root: Path, hist: History, problems: list[str]) -> dict[str
         if not NAME_RE.match(path):
             problems.append(f"{path}: unexpected file; preregistrations are prereg/NNNN-name.md")
             continue
-        freeze, drafts, first = _check_frozen(root, path, hist, problems)
-        prereg = Prereg(path=path, freeze_commit=freeze, drafts=drafts, first_commit=first)
+        freeze, drafts, intro = _check_frozen(root, path, hist, problems)
+        prereg = Prereg(
+            path=path,
+            freeze_commit=freeze,
+            drafts=drafts,
+            first_commit=intro[0] if intro else None,
+            introduced=intro,
+        )
         text = _read(root, path)
         if text is None:
             problems.append(f"{path}: missing from the working tree or not UTF-8")
@@ -421,7 +430,9 @@ def _check_unique(preregs: dict[str, Prereg], problems: list[str]) -> None:
             problems.append(f"preregistration id {pid!r} is used by {', '.join(paths)}")
 
 
-def _check_amendments(root: Path, preregs: dict[str, Prereg], problems: list[str]) -> None:
+def _check_amendments(
+    root: Path, hist: History, preregs: dict[str, Prereg], problems: list[str]
+) -> None:
     """An amendment must cite a preregistration frozen strictly before the amendment's
     first commit, so not even a draft of the amendment predates the original's freeze."""
     for path, prereg in sorted(preregs.items()):
@@ -432,12 +443,15 @@ def _check_amendments(root: Path, preregs: dict[str, Prereg], problems: list[str
         if target == path or original is None:
             problems.append(f"{path}: amends {target!r}, which is not another preregistration")
             continue
-        if prereg.first_commit is None or original.freeze_commit is None:
+        if not prereg.introduced or original.freeze_commit is None:
             problems.append(f"{path}: cannot order it against {target}: commit unknown")
-        elif not is_strict_ancestor(root, original.freeze_commit, prereg.first_commit):
+            continue
+        after = hist.descendants(root, original.freeze_commit)
+        early = [c for c in prereg.introduced if c not in after]
+        if early:
             problems.append(
                 f"{path}: amends {target}, which was not committed strictly earlier "
-                f"({_short(original.freeze_commit)} vs {_short(prereg.first_commit)})"
+                f"({_short(original.freeze_commit)} vs {', '.join(_short(c) for c in early)})"
             )
 
 
@@ -518,11 +532,17 @@ def verify(root: Path, notes: list[str] | None = None) -> tuple[list[str], int, 
     problems: list[str] = []
     try:
         top = repo_toplevel(root)
+        if is_shallow(top):
+            problems.append(
+                "git history is shallow, so commit order cannot be checked; "
+                "run git fetch --unshallow"
+            )
+            return problems, 0, 0
         hist = History(*history(top))
         preregs = _collect_preregs(top, hist, problems)
         if not preregs:
             problems.append("no preregistrations under prereg/")
-        _check_amendments(top, preregs, problems)
+        _check_amendments(top, hist, preregs, problems)
         linked = _check_artifacts(top, hist, preregs, problems)
     except GitError as exc:
         problems.append(f"git history unavailable: {exc}")
