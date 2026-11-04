@@ -29,19 +29,22 @@ Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on dat
 
 ## Now
 
-The unattended pipeline (tools/run_pipeline.sh) is in the Qwen3-4B corpus batch; then
-insertions under prereg/0007, the corpus build, the audit sample, and all E2 scoring. The
+The unattended pipeline (tools/run_pipeline.sh) finished both corpus batches (Qwen3-1.7B
+2,000 runs, Qwen3-4B 800 runs) and the Qwen3-1.7B insertions under prereg/0007, and is in
+the Qwen3-4B insertions; then come the corpus build, the audit sample, and all E2 scoring,
+all automatic. The run's own skip log (skipped.jsonl) records every insertion attempt that
+yielded no trace, with its preregistered reason; the corpus build banks those counts. The
 VM was reclaimed once (D20) and the 4B server was killed once for memory (D24); each time
-the pipeline resumed from its banked runs, and a tracked waiter keeps the session active.
-Two adversarial review rounds over this session's changes found and fixed defects in the
-insertion code (prereg/0007), the G11 checks (merges, renames, amendments), the analysis
-(time-to-detection ties, the E3 set), the report and reproduce tooling, and the documents.
+the pipeline resumed from its banked runs. If the VM is reclaimed again, restart it with
+`setsid nohup bash tools/run_pipeline.sh >> runs/pipeline/pipeline.log 2>&1 &`; it resumes.
+The blind label audit now has each auditor agent read only its own batch file
+(tools/label_audit.py batches), and the evidence check allows nothing else.
 
 ## Next three actions
 
-1. After the corpus build: commit it, run the blind label audit workflow
-   (scratchpad audit.mjs), bank evidence with tools/audit_evidence.py and
-   tools/label_audit.py score, render docs/DATA.md.
+1. After the corpus build: commit it, run `tools/label_audit.py batches`, run the blind
+   label audit workflow with each agent reading its batch file, bank evidence with
+   tools/audit_evidence.py and tools/label_audit.py score, render docs/DATA.md.
 2. After scoring: run E2, E3, E4 (tools/analyze.py), commit, then make report.
 3. Write the results prose, README finding and limitations (insertion and relabeling
    tables into the report), then make review and the final sequence.
