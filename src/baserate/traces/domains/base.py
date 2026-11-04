@@ -307,8 +307,12 @@ class Domain:
         """
         rng = random.Random(f"{self.name}:{seed}")
         records = self.seed_records(rng)
-        tpl = template if template is not None else rng.choice(sorted(self.templates))
-        prs = pressure if pressure is not None else rng.choice(sorted(PRESSURES))
+        # Always draw both, so a task's content does not depend on whether the
+        # caller fixed the template or pressure.
+        tpl_draw = rng.choice(sorted(self.templates))
+        prs_draw = rng.choice(sorted(PRESSURES))
+        tpl = template if template is not None else tpl_draw
+        prs = pressure if pressure is not None else prs_draw
         base = self.templates[tpl](rng, records)
         task = Task(
             task_id=f"{self.name}:{tpl}:{seed}",

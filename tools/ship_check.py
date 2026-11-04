@@ -79,7 +79,8 @@ DEFAULT_CAPS = {
     "disk_floor_gb": 8,
 }
 CAP_FLOORS = {"disk_floor_gb"}
-REVIEW_DRIFT_ALLOWED = ("artifacts/review/", "STATUS.md", "docs/LOG.md")
+REVIEW_DRIFT_FILES = ("STATUS.md", "docs/LOG.md")
+REVIEW_DRIFT_DIRS = ("artifacts/review/",)
 README_SECTIONS = (
     ("what it is", "what it is and is not"),
     ("key results", "key results"),
@@ -274,9 +275,19 @@ def tracked(ctx: Ctx, pathspec: str) -> list[str]:
 
 def first_commit(repo: Path, path: str) -> str | None:
     """SHA of the first commit that added ``path``, or None if never committed."""
-    out = git(repo, "log", "--format=%H", "--diff-filter=A", "--follow", "--", path)
+    out = git(repo, "log", "--format=%H", "--no-renames", "--diff-filter=A", "--", path)
     shas = out.splitlines()
     return shas[-1] if shas else None
+
+
+def drift_allowed(path: str) -> bool:
+    """Whether a path may change between the reviewed commit and HEAD (brief 10.1 step 8)."""
+    return path in REVIEW_DRIFT_FILES or any(path.startswith(d) for d in REVIEW_DRIFT_DIRS)
+
+
+def id_logged(issue_id: str, text: str) -> bool:
+    """Whether ``issue_id`` appears in ``text`` as a whole token (N1 does not match N12)."""
+    return re.search(rf"(?<![\w-]){re.escape(issue_id)}(?![\w-])", text) is not None
 
 
 def is_strict_ancestor(repo: Path, older: str, newer: str) -> bool:
@@ -653,12 +664,17 @@ def g6(ctx: Ctx) -> str:
     synthetic = 0
     shards = manifest.get("shards", [])
     need(bool(shards), "manifest lists no shards")
+    paths = [str(s["path"]) for s in shards]
+    need(len(paths) == len(set(paths)), "manifest lists a shard more than once")
+    seen_ids: set[str] = set()
     for shard in shards:
         p = rel(ctx, shard["path"])
         need(p.is_file(), f"shard missing: {shard['path']}")
         need(p.stat().st_size < SHARD_LIMIT_BYTES, f"shard over 50 MB: {shard['path']}")
         need(sha256_file(p) == shard["sha256"], f"hash mismatch: {shard['path']}")
         for t in iter_shard(p):
+            need(str(t["trace_id"]) not in seen_ids, f"duplicate trace_id {t['trace_id']}")
+            seen_ids.add(str(t["trace_id"]))
             runs.add(str(t["source_run_id"]))
             procedural = t.get("source") == "procedural"
             need(
@@ -839,10 +855,12 @@ def g11(ctx: Ctx) -> str:
     """Preregistration integrity: frozen files unchanged, artifacts cite earlier preregs."""
     preregs = [p for p in tracked(ctx, "prereg/*.md") if not p.endswith("README.md")]
     need(bool(preregs), "no preregistrations under prereg/")
-    deleted = git(ctx.clone, "log", "--format=%H", "--diff-filter=D", "--", "prereg/")
+    deleted = git(
+        ctx.clone, "log", "--format=%H", "--no-renames", "--diff-filter=D", "--", "prereg/"
+    )
     need(not deleted, "a preregistration file was deleted")
     for p in preregs:
-        commits = git(ctx.clone, "log", "--format=%H", "--", p).splitlines()
+        commits = git(ctx.clone, "log", "--format=%H", "--no-renames", "--", p).splitlines()
         need(len(commits) == 1, f"{p} changed after it was frozen ({len(commits)} commits)")
     confirmatory = []
     for art in tracked(ctx, "artifacts/*.json"):
@@ -876,12 +894,14 @@ def g12(ctx: Ctx) -> str:
         "reviewed commit is not HEAD or an ancestor",
     )
     changed = git(ctx.clone, "diff", "--name-only", reviewed, head).splitlines()
-    drift = [p for p in changed if not any(p == a or p.startswith(a) for a in REVIEW_DRIFT_ALLOWED)]
+    drift = [p for p in changed if not drift_allowed(p)]
     need(not drift, f"code changed since review: {', '.join(drift[:5])}")
     log = rel(ctx, "docs/REVIEW_LOG.md")
     log_text = log.read_text(encoding="utf-8") if log.is_file() else ""
     unlisted = [
-        str(i.get("id")) for i in review.get("non_blocking", []) if str(i.get("id")) not in log_text
+        str(i.get("id"))
+        for i in review.get("non_blocking", [])
+        if not id_logged(str(i.get("id")), log_text)
     ]
     need(
         not unlisted, f"non-blocking issues missing from docs/REVIEW_LOG.md: {', '.join(unlisted)}"

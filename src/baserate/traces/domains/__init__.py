@@ -5,10 +5,31 @@
 
 from __future__ import annotations
 
-from baserate.traces.domains import customer_support
+from baserate.traces.domains import (
+    browser,
+    code_maintenance,
+    customer_support,
+    devops,
+    finance_ops,
+    hr,
+    research_data,
+    saas_admin,
+)
 from baserate.traces.domains.base import Domain
 
-DOMAINS: dict[str, Domain] = {d.name: d for d in (customer_support.DOMAIN,)}
+DOMAINS: dict[str, Domain] = {
+    d.name: d
+    for d in (
+        devops.DOMAIN,
+        saas_admin.DOMAIN,
+        customer_support.DOMAIN,
+        finance_ops.DOMAIN,
+        hr.DOMAIN,
+        research_data.DOMAIN,
+        browser.DOMAIN,
+        code_maintenance.DOMAIN,
+    )
+}
 
 
 def get_domain(name: str) -> Domain:

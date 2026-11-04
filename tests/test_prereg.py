@@ -1,0 +1,492 @@
+"""Tests for tools/prereg.py (``make prereg-verify``): each rule can fail.
+
+Each case builds a small git repository under tmp_path, breaks one property
+of the preregistration contract (docs/PLAN.md), and checks that ``verify``
+fails for that reason; the control cases show it passes when nothing is broken.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import pytest
+
+
+def _helpers() -> ModuleType:
+    if "integrity_helpers" in sys.modules:
+        return sys.modules["integrity_helpers"]
+    path = Path(__file__).parent / "fixtures" / "integrity" / "helpers.py"
+    spec = importlib.util.spec_from_file_location("integrity_helpers", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["integrity_helpers"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+h = _helpers()
+prereg = h.load_tool("prereg")
+chainlib = h.load_tool("chainlib")
+ship_check = h.load_tool("ship_check")
+
+CONFIG: dict[str, Any] = {
+    "prevalences": [0.01, 0.001, 0.0001],
+    "budgets_per_10k": [5, 20, 100],
+    "nominal": 0.95,
+}
+P1 = "prereg/0001-e2-main.md"
+P2 = "prereg/0002-e2-amendment.md"
+ART = "artifacts/e2/results.json"
+
+
+@pytest.fixture(autouse=True)
+def _isolated_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    h.isolate_git(monkeypatch)
+
+
+def linked(path: str = P1, config: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:
+    """An artifact that cites ``path`` with the right config hash."""
+    digest = chainlib.sha256_obj(CONFIG if config is None else config)
+    return {"prereg": path, "prereg_config_sha256": digest, "confirmatory": True, **extra}
+
+
+@pytest.fixture(scope="module")
+def base(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    """Commit 1 freezes one preregistration; commit 2 banks an artifact citing it."""
+    repo = h.Repo.init(tmp_path_factory.mktemp("prereg") / "base")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze the E2 plan")
+    repo.write_json(ART, linked())
+    repo.commit("bank E2 results")
+    return repo
+
+
+@pytest.fixture
+def repo(base: Any, tmp_path: Path) -> Any:
+    return base.copy_to(tmp_path / "repo")
+
+
+def problems(repo: Any) -> str:
+    """All verify problems, one per line."""
+    found, _, _ = prereg.verify(repo.path)
+    return "\n".join(found)
+
+
+def assert_fails(repo: Any, needle: str) -> None:
+    text = problems(repo)
+    assert needle in text, text
+
+
+def fresh(tmp_path: Path, text: str) -> Any:
+    """A repository whose only preregistration has the given content."""
+    repo = h.Repo.init(tmp_path / "fresh")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.write(P1, text)
+    repo.commit("freeze")
+    return repo
+
+
+# ------------------------------------------------------------------ controls
+
+
+def test_control_passes_with_exact_last_line(repo: Any, capsys: pytest.CaptureFixture[str]) -> None:
+    assert prereg.main(["verify", "--root", str(repo.path)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["PREREG-VERIFY: PASS 1 preregistrations, 1 linked artifacts"]
+
+
+def test_cli_runs_stdlib_only_from_the_repo_root(repo: Any) -> None:
+    script = h.TOOLS / "prereg.py"
+    ok = subprocess.run(
+        [sys.executable, "-I", str(script), "verify"],
+        cwd=repo.path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    assert (
+        ok.stdout.splitlines()[-1] == "PREREG-VERIFY: PASS 1 preregistrations, 1 linked artifacts"
+    )
+    repo.write(P1, repo.read(P1) + "\nedited\n")
+    bad = subprocess.run(
+        [sys.executable, "-I", str(script), "--root", str(repo.path), "verify"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert bad.returncode == 1
+    lines = bad.stdout.splitlines()
+    assert lines[-1] == "PREREG-VERIFY: FAIL 1"
+    assert lines[0].startswith("- prereg/0001-e2-main.md: modified in the working tree")
+
+
+def test_readme_in_prereg_may_change(repo: Any) -> None:
+    repo.write("prereg/README.md", "# Preregistrations\n\nMore guidance.\n")
+    repo.commit("expand the README")
+    assert problems(repo) == ""
+
+
+def test_exploratory_artifact_without_prereg_is_not_linked(repo: Any) -> None:
+    repo.write_json("artifacts/pilot/summary.json", {"exploratory": True, "value": 3})
+    repo.commit("bank a pilot")
+    found, n, m = prereg.verify(repo.path)
+    assert (found, n, m) == ([], 1, 1)
+
+
+def test_artifact_updated_after_its_prereg_still_passes(repo: Any) -> None:
+    repo.write_json(ART, linked(note="rerun with more seeds"))
+    repo.commit("update E2 results")
+    assert problems(repo) == ""
+
+
+def test_prereg_merged_from_a_side_branch_passes(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "merge")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.commit("start")
+    repo.git("checkout", "-q", "-b", "plan")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze on a branch")
+    repo.git("checkout", "-q", "main")
+    repo.write("notes.txt", "unrelated\n")
+    repo.commit("unrelated work")
+    repo.git("merge", "-q", "--no-ff", "plan", "-m", "merge the plan")
+    repo.write_json(ART, linked())
+    repo.commit("bank results")
+    assert problems(repo) == ""
+
+
+def test_valid_amendment_passes(repo: Any) -> None:
+    amended = {**CONFIG, "nominal": 0.9}
+    repo.write(P2, h.prereg_text(amended, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("amend the E2 plan")
+    repo.write_json("artifacts/e2/amended.json", linked(P2, amended))
+    repo.commit("bank amended results")
+    found, n, m = prereg.verify(repo.path)
+    assert (found, n, m) == ([], 2, 2)
+
+
+# ------------------------------------------------------- file format rules
+
+
+@pytest.mark.parametrize(
+    ("text", "needle"),
+    [
+        (h.prereg_text(CONFIG, title=""), "front matter lacks 'title'"),
+        (h.prereg_text(CONFIG, experiment=""), "front matter lacks 'experiment'"),
+        (h.prereg_text(CONFIG).replace("id: 0001\n", ""), "front matter lacks 'id'"),
+        (h.prereg_text(CONFIG, date="23 October 2026"), "is not an ISO date"),
+        (h.prereg_text(CONFIG, date="2026-02-30"), "is not an ISO date"),
+        (h.prereg_text(CONFIG, extra="date: 2026-10-24\n"), "key 'date' appears twice"),
+        ("# No front matter\n\n```json prereg-config\n{}\n```\n", "no front matter"),
+        ("---\nid: 0001\n\nnever closed\n", "front matter is not closed"),
+        (h.prereg_text(CONFIG).split("```json")[0], "found 0"),
+        (h.prereg_text(CONFIG) + "\n```json prereg-config\n{}\n```\n", "found 2"),
+        (h.prereg_text(CONFIG).replace('"nominal": 0.95', '"nominal": 0.95,'), "not valid JSON"),
+        (h.prereg_text(CONFIG).replace('"nominal": 0.95', '"nominal": NaN'), "not valid JSON"),
+        (
+            h.prereg_text(CONFIG).replace('"nominal": 0.95', '"nominal": 0.95, "nominal": 0.5'),
+            "duplicate key 'nominal'",
+        ),
+        (h.prereg_text(CONFIG).replace("{", "[{", 1).replace("}\n```", "}]\n```"), "JSON object"),
+    ],
+    ids=[
+        "no-title",
+        "no-experiment",
+        "no-id",
+        "date-not-iso",
+        "date-impossible",
+        "duplicate-key",
+        "no-front-matter",
+        "front-matter-unclosed",
+        "no-config-block",
+        "two-config-blocks",
+        "config-not-json",
+        "config-nan",
+        "config-duplicate-key",
+        "config-not-object",
+    ],
+)
+def test_format_rules(tmp_path: Path, text: str, needle: str) -> None:
+    assert_fails(fresh(tmp_path, text), needle)
+
+
+def test_front_matter_quotes_and_nested_lines() -> None:
+    front, found = prereg.parse_front_matter(
+        "---\nid: '0001'\ntitle: \"E2: main\"\nhypotheses:\n  - H1\n# comment\n---\nbody\n"
+    )
+    assert found == []
+    assert front == {"id": "0001", "title": "E2: main", "hypotheses": ""}
+
+
+def test_no_preregistrations_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "empty")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.commit("start")
+    assert_fails(repo, "no preregistrations under prereg/")
+
+
+def test_not_a_git_repository_fails(tmp_path: Path) -> None:
+    (tmp_path / "prereg").mkdir()
+    assert_fails(h.Repo(tmp_path), "git history unavailable")
+
+
+# ------------------------------------------------------------ frozen rules
+
+
+def _edit_prose(repo: Any) -> None:
+    repo.write(P1, repo.read(P1).replace("Plan prose.", "Plan prose, revised."))
+
+
+FROZEN_CASES: list[tuple[str, Callable[[Any], None], str]] = [
+    (
+        "modified-after-freezing",
+        lambda r: (_edit_prose(r), r.commit("edit plan")),
+        "changed after it was frozen; touched by 2 commits",
+    ),
+    (
+        "deleted",
+        lambda r: (r.git("rm", "-q", P1), r.commit("drop plan")),
+        f"{P1}: deleted or renamed after it was frozen",
+    ),
+    (
+        "renamed-and-edited",
+        lambda r: (
+            r.git("mv", P1, "prereg/0001-e2-renamed.md"),
+            r.write(
+                "prereg/0001-e2-renamed.md",
+                r.read("prereg/0001-e2-renamed.md").replace("0.95", "0.9"),
+            ),
+            r.commit("rename and loosen"),
+        ),
+        f"{P1}: deleted or renamed after it was frozen",
+    ),
+    ("modified-in-working-tree", _edit_prose, "modified in the working tree since it was frozen"),
+    (
+        "staged-edit",
+        lambda r: (_edit_prose(r), r.git("add", P1)),
+        "staged changes to a frozen preregistration",
+    ),
+    (
+        "untracked-new-prereg",
+        lambda r: r.write(P2, h.prereg_text(CONFIG, pid="0002", title="")),
+        f"{P2}: not committed",
+    ),
+    (
+        "untracked-new-prereg-format-also-reported",
+        lambda r: r.write(P2, h.prereg_text(CONFIG, pid="0002", title="")),
+        f"{P2}: front matter lacks 'title'",
+    ),
+    (
+        "unexpected-file",
+        lambda r: (r.write("prereg/notes.txt", "draft\n"), r.commit("notes")),
+        "prereg/notes.txt: unexpected file",
+    ),
+    (
+        "number-reused",
+        lambda r: (
+            r.write("prereg/0001-other.md", h.prereg_text(CONFIG, pid="0009")),
+            r.commit("second 0001"),
+        ),
+        "preregistration number 0001 is used by",
+    ),
+    (
+        "id-reused",
+        lambda r: (r.write(P2, h.prereg_text(CONFIG, pid="0001")), r.commit("same id")),
+        "preregistration id '0001' is used by",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "needle"), [c[1:] for c in FROZEN_CASES], ids=[c[0] for c in FROZEN_CASES]
+)
+def test_frozen_rules(repo: Any, mutate: Callable[[Any], None], needle: str) -> None:
+    mutate(repo)
+    assert_fails(repo, needle)
+
+
+def test_modification_on_a_discarded_side_branch_still_counts(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "side")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze")
+    repo.git("checkout", "-q", "-b", "tweak")
+    _edit_prose(repo)
+    repo.commit("tweak the plan")
+    repo.git("checkout", "-q", "main")
+    repo.git("merge", "-q", "-s", "ours", "tweak", "-m", "merge, keeping main's plan")
+    assert_fails(repo, "touched by 2 commits")
+
+
+def test_edit_hidden_in_a_merge_commit_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "evil")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze")
+    repo.git("checkout", "-q", "-b", "side")
+    repo.write("side.txt", "side\n")
+    repo.commit("side work")
+    repo.git("checkout", "-q", "main")
+    repo.write("main.txt", "main\n")
+    repo.commit("main work")
+    repo.git("merge", "-q", "--no-ff", "--no-commit", "side")
+    _edit_prose(repo)
+    repo.git("add", P1)
+    repo.git("commit", "-q", "-m", "merge side")
+    assert_fails(repo, "content at HEAD differs from its freezing commit")
+
+
+# --------------------------------------------------------------- amendments
+
+
+def test_amendment_citing_a_missing_prereg_fails(repo: Any) -> None:
+    repo.write(P2, h.prereg_text(CONFIG, pid="0002", extra="amends: prereg/0007-nothing.md\n"))
+    repo.commit("amend nothing")
+    assert_fails(repo, "amends 'prereg/0007-nothing.md', which is not another preregistration")
+
+
+def test_amendment_citing_itself_fails(repo: Any) -> None:
+    repo.write(P2, h.prereg_text(CONFIG, pid="0002", extra=f"amends: {P2}\n"))
+    repo.commit("amend itself")
+    assert_fails(repo, "which is not another preregistration")
+
+
+def test_amendment_committed_with_the_original_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "same")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.write(P2, h.prereg_text(CONFIG, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("freeze both at once")
+    assert_fails(repo, f"amends {P1}, which was not committed strictly earlier")
+
+
+# ----------------------------------------------------------- artifact links
+
+
+ARTIFACT_CASES: list[tuple[str, Callable[[Any], None], str]] = [
+    (
+        "config-hash-mismatch",
+        lambda r: (r.write_json(ART, {**linked(), "prereg_config_sha256": "0" * 64}), r.commit()),
+        f"does not match {P1}",
+    ),
+    (
+        "hash-of-a-different-config",
+        lambda r: (r.write_json(ART, linked(config={**CONFIG, "nominal": 0.9})), r.commit()),
+        f"does not match {P1}",
+    ),
+    (
+        "cites-missing-prereg",
+        lambda r: (r.write_json(ART, linked("prereg/0005-missing.md")), r.commit()),
+        "cites 'prereg/0005-missing.md', which is not a tracked prereg",
+    ),
+    (
+        "cites-non-canonical-path",
+        lambda r: (r.write_json(ART, linked("./" + P1)), r.commit()),
+        "which is not a tracked prereg",
+    ),
+    (
+        "prereg-null",
+        lambda r: (r.write_json(ART, {**linked(), "prereg": None}), r.commit()),
+        "cites None",
+    ),
+    (
+        "confirmatory-without-prereg",
+        lambda r: (r.write_json(ART, {"confirmatory": True, "estimates": []}), r.commit()),
+        "confirmatory but cites no preregistration",
+    ),
+    (
+        "invalid-json",
+        lambda r: (r.write(ART, '{"prereg": '), r.commit()),
+        f"{ART}: not valid JSON",
+    ),
+    (
+        "staged-not-committed",
+        lambda r: (
+            r.write_json("artifacts/e2/new.json", linked()),
+            r.git("add", "artifacts/e2/new.json"),
+        ),
+        "artifacts/e2/new.json: not committed",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "needle"), [c[1:] for c in ARTIFACT_CASES], ids=[c[0] for c in ARTIFACT_CASES]
+)
+def test_artifact_rules(repo: Any, mutate: Callable[[Any], None], needle: str) -> None:
+    mutate(repo)
+    assert_fails(repo, needle)
+
+
+def test_artifact_in_the_same_commit_as_its_prereg_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "same")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.write_json(ART, linked())
+    repo.commit("freeze and bank together")
+    assert_fails(repo, f"not strictly after {P1} was frozen")
+
+
+def test_artifact_committed_before_its_prereg_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "early")
+    repo.write_json(ART, linked())
+    repo.commit("bank first")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze afterwards")
+    assert_fails(repo, f"not strictly after {P1} was frozen")
+
+
+def test_artifact_renamed_from_a_file_older_than_the_prereg_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "renamed")
+    rows = [{"monitor": f"m{i}", "estimate": i / 100} for i in range(40)]
+    repo.write_json("artifacts/e2/draft.json", {"estimates": rows})
+    repo.commit("bank a draft before the plan exists")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze")
+    repo.git("mv", "artifacts/e2/draft.json", ART)
+    repo.write_json(ART, {**linked(), "estimates": rows})
+    repo.commit("relabel the draft as confirmatory")
+    assert_fails(repo, f"{ART}: committed in")
+
+
+# ------------------------------------------------------------- hash command
+
+
+def test_hash_command_matches_ship_check_and_the_fixture(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fixture = h.CLAIMS_REPO / P1
+    assert prereg.main(["hash", str(fixture)]) == 0
+    printed = capsys.readouterr().out.strip()
+    recorded = json.loads((h.CLAIMS_REPO / ART).read_text(encoding="utf-8"))
+    assert printed == recorded["prereg_config_sha256"]
+    assert printed == ship_check.canonical_sha256(CONFIG)
+
+
+def test_hash_accepts_root_after_the_subcommand(
+    repo: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert prereg.main(["hash", P1, "--root", str(repo.path)]) == 0
+    assert capsys.readouterr().out.strip() == chainlib.sha256_obj(CONFIG)
+
+
+def test_hash_refuses_an_invalid_file(repo: Any, capsys: pytest.CaptureFixture[str]) -> None:
+    repo.write(P2, h.prereg_text(CONFIG, date="soon"))
+    assert prereg.main(["--root", str(repo.path), "hash", P2]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "is not an ISO date" in captured.err
+    assert prereg.main(["--root", str(repo.path), "hash", "prereg/0099-none.md"]) == 2
+
+
+def test_config_parsing_agrees_with_ship_check(repo: Any, tmp_path: Path) -> None:
+    ctx = ship_check.Ctx(orig=repo.path, clone=repo.path, tmp=tmp_path, fast=True, env={})
+    _, config = ship_check.prereg_config(ctx, P1)
+    assert ship_check.canonical_sha256(config) == prereg.config_sha256(repo.read(P1))

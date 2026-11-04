@@ -41,13 +41,13 @@ demo: ## Offline demo on recorded fixtures; output must match demo/golden_output
 	@echo "NOT IMPLEMENTED: make demo (milestone M1, docs/PLAN.md)"; exit 1
 
 prereg-verify: ## Verify the preregistration chain
-	@echo "NOT IMPLEMENTED: make prereg-verify (milestone M2, docs/PLAN.md)"; exit 1
+	python3 tools/prereg.py verify
 
 claimcheck: ## Every number in README.md and docs/REPORT.md traces to an artifact
-	@echo "NOT IMPLEMENTED: make claimcheck on README.md docs/REPORT.md (milestone M2)"; exit 1
+	python3 tools/claimcheck.py README.md docs/REPORT.md
 
 freshness: ## Re-derive every live number in README.md and docs/REPORT.md
-	@echo "NOT IMPLEMENTED: make freshness on README.md docs/REPORT.md (milestone M2)"; exit 1
+	python3 tools/freshness.py README.md docs/REPORT.md
 
 citecheck: ## Validate artifacts/citecheck.json offline
 	@echo "NOT IMPLEMENTED: make citecheck (milestone M2, docs/PLAN.md)"; exit 1

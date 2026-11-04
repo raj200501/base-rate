@@ -1,0 +1,19 @@
+# Fixture report
+
+## 1. Results
+
+### 1.1. Main study
+
+Recall at budget for the rule monitor was {{claim:e2.rule.recall}}[^1]. Table 1 lists every estimate; Figure 2 shows the front.
+
+<img src="artifacts/report/front.svg" width="640" alt="front">
+
+```text
+baserate eval --prevalence {{param:1e-3}} --budget {{param:20}}
+recall_at_budget = {{claim:e2.rule.recall}}
+```
+
+- Model: {{name:qwen2.5-1.5b}}, scored under milestone M5 and RQ1 (`artifacts/e2/results.json`).
+- Precision at budget: {{claim:e2.rule.precision}}.
+
+[^1]: Interval {{claim:e2.rule.recall.ci}}, clustered by source run.

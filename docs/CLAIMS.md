@@ -1,0 +1,227 @@
+# Claims: how numbers get into README.md and docs/REPORT.md
+
+Non-negotiable 1 of the brief says every result number in a results document
+comes from a committed script and a banked artifact, and gate G10 runs
+`make claimcheck` and `make freshness` on README.md and docs/REPORT.md. This
+page explains the mechanism those two targets check, for anyone who writes
+those documents.
+
+In one paragraph: you never type a result number. You write a **template**
+in which each result is a placeholder naming a **claim**, and each claim is
+registered with the artifact it comes from and a deterministic **extractor**.
+`python3 tools/claims.py render` writes the document from the template and
+the artifacts. Every other number in the template carries an **allowance**
+tag that says why it is not a result (a design parameter, a date, a version,
+a label, a quote from the brief). `tools/claimcheck.py` proves the document
+contains nothing else. `tools/freshness.py` proves every claim still equals
+what its artifact gives today.
+
+## The files
+
+| File | Role |
+|---|---|
+| `docs/claims.json` | The registry: which template renders which document, and every claim |
+| `docs/templates/README.md.tmpl`, `docs/templates/REPORT.md.tmpl` | The sources you edit (any path works; the registry names it) |
+| `README.md`, `docs/REPORT.md` | Rendered output. Never edit these by hand |
+| `artifacts/**.json`, `prereg/NNNN-*.md` | Claim sources: banked artifacts, or a preregistration's config block |
+| `tools/claims.py` | The mechanism, plus `render` and `show` |
+| `tools/claimcheck.py`, `tools/freshness.py` | The two gates |
+
+## Workflow
+
+1. A committed script (for example `make report`) banks results as JSON under
+   `artifacts/`. Commit the artifact. A value is banked only once it is
+   committed.
+2. Register a claim for each number you want to state (see "Registry").
+3. Write the sentence in the template with `{{claim:<id>}}` where the number
+   goes. Tag every other number with an allowance.
+4. `python3 tools/claims.py render` writes README.md and docs/REPORT.md.
+   `python3 tools/claims.py show` prints every claim with its current value.
+5. `make claimcheck` and `make freshness`, then commit the template and the
+   rendered documents together.
+6. When an artifact changes, re-render and commit. Freshness fails until you do.
+
+## Templates
+
+A template is the document's Markdown source with tags of the form
+`{{kind:text}}` (one line, no braces inside). A tag whose kind is not one of
+those below is an error, so a typo cannot slip through as literal text.
+Mermaid's `{{text}}` and other double braces without a lowercase `kind:` are
+left alone.
+
+### Claims
+
+`{{claim:e2.rule.recall}}` renders the claim's current value. Every result
+number (an estimate, an interval, a count of outcomes, a rate, a test
+statistic, a number of runs or traces) must be a claim.
+
+### Allowances
+
+An allowance renders as its text and admits the numbers in it. It is a
+declaration in the source that a reviewer can audit, so label honestly: a
+result written as `{{param:...}}` is a broken rule even though the tool
+cannot tell.
+
+| Tag | For | Rule the checker applies |
+|---|---|---|
+| `{{param:1e-3}}` | Design parameters: prevalences, budgets, sample sizes, grid values, nominal levels, seeds | At most 40 characters, contains a digit |
+| `{{threshold:0.5}}` | Frozen thresholds from a preregistration or the brief | Same as param |
+| `{{cap:300}}` | Usage caps (budget.toml, brief section 8) | Same as param |
+| `{{date:2026-10-23}}` | Dates and years (citations) | `YYYY` (1900 to 2100), `YYYY-MM`, or a valid `YYYY-MM-DD` |
+| `{{version:3.11}}` | Software and document versions | `3.11`, `0.14.1`, `v1.0`, `v2`, with optional suffixes |
+| `{{label:arXiv 2512.22154}}` | Labels with a separate number that the built-in rules do not cover | Same as param |
+| `{{name:qwen2.5-1.5b}}` | Identifiers with digits: model, package, or file names | One token, at most 64 characters, has a letter |
+| `{{brief:1 in 10,000}}` | Text quoted from the brief | Must appear verbatim in docs/BUILD_BRIEF.md (whitespace collapsed), at most 200 characters, and the brief must match docs/BUILD_BRIEF.sha256 |
+
+An allowance that holds no digit is an error (it needs no tag). For a design
+parameter that lives in a preregistration, a claim whose source is that
+preregistration (see "Registry") is better than an allowance: it is checked
+against the frozen config and cannot drift.
+
+### What counts as a number
+
+A number is a run of digits that does not continue a word or a dotted run,
+with optional thousands separators, decimals, exponent, and a leading point:
+`7`, `0.412`, `.5`, `10,000`, `1e-3`. Units glued after it do not hide it:
+`3x`, `1.5B`, `500ms` are numbers. Code blocks, inline code, tables, HTML
+comments, and headings are all checked.
+
+These are identifiers, not numbers, and need no tag:
+
+- Digits glued to letters: `G5`, `RQ1`, `E2`, `H1`, `D5`, `M2`, `v1.0`, `sha256`.
+- URLs (`https://...`, `www....`), Markdown link targets `](...)`, and HTML
+  `href`, `src`, and drawing attributes (`width`, `height`, `x`, `viewBox`, and so on).
+  Link text is still checked.
+- Lowercase hex strings of 7 to 64 characters with a letter and a digit
+  (commit ids, digests).
+- Repository paths whose first component is a tracked top-level directory:
+  `prereg/0001-e0.md`, `artifacts/e2/results.json`.
+- Ordered-list markers at the start of a line (`1.`, `2)`), and heading
+  numbers that end in a dot (`## 3. Method`, `### 3.1. Data`). A heading
+  such as `## 3 of 5 held` is checked.
+- The number right after: section, step, table, figure, fig., appendix,
+  rung, non-negotiable, milestone, or `§` (`section 6`, `Table 2`, `§10.1`).
+- Footnote labels (`[^1]`).
+
+Anything else needs a claim or an allowance. Numbers spelled as words
+("three") are not detected; write results as claims, and the reviewer
+checks prose.
+
+## Registry
+
+`docs/claims.json`:
+
+```json
+{
+  "schema": "baserate-claims/1",
+  "documents": {
+    "README.md": "docs/templates/README.md.tmpl",
+    "docs/REPORT.md": "docs/templates/REPORT.md.tmpl"
+  },
+  "claims": {
+    "e2.rule.recall.p1e-3.b20": {
+      "source": "artifacts/e2/results.json",
+      "select": "estimates[monitor=rule-pack,prevalence=1e-3,budget=20,metric=recall_at_budget]",
+      "format": "{estimate:.3f} [{ci_low:.3f}, {ci_high:.3f}]",
+      "note": "optional free text for humans"
+    }
+  }
+}
+```
+
+A claim has exactly these keys: `source` (required), `select` (default: the
+whole file), `format` (default `{}`), and `note`. Ids use letters, digits,
+`.`, `_`, and `-`. Unknown keys, duplicate keys, and invalid entries are
+errors.
+
+**`source`** is a JSON file under `artifacts/`, or a `prereg/NNNN-name.md`
+file, in which case the claim reads that preregistration's
+`json prereg-config` block.
+
+**`select`** is a small path grammar:
+
+| Form | Meaning |
+|---|---|
+| `a.b` | member `b` of member `a` |
+| `[2]`, `[-1]` | list element (negative counts from the end) |
+| `["0.001"]` | member whose name is not a plain key |
+| `[metric=recall_at_budget,budget=20]` | the one list element whose fields equal these values; numbers compare as numbers (`1e-3` equals `0.001`), `true`, `false`, and `null` match JSON literals |
+| `...\|len` | length of a list, object, or string |
+| `...\|count:outcome=supported` | number of list elements matching the filter |
+| `...\|head:8` | first 8 characters of a string |
+
+A filter that matches zero or several elements is an error, never a guess.
+There is no arithmetic: a derived number (a difference, a ratio, a share) is
+computed by the committed report script and banked in an artifact, then
+selected like any other value.
+
+**`format`** is a Python format string. `{}` is the selected value and
+`{key}` a member of a selected object, each with an optional spec:
+`{:.3f}`, `{:,d}`, `{:.1%}`, `{:g}`. Literal text in a format may not contain
+digits (write "95%" in the template as an allowance), and conversions
+(`!r`), nested fields, and attribute or index access are not allowed. A claim
+renders numbers or strings, never booleans, null, NaN, or infinity, and the
+result must be one non-empty line.
+
+## What the gates check
+
+`python3 tools/claimcheck.py README.md docs/REPORT.md` (`make claimcheck`):
+
+1. The documents, the registry, and each document's template exist, and each
+   document is registered. Missing files fail with their names.
+2. Every number in a template's literal text is an identifier (above) or
+   sits inside an allowance that passes its rule.
+3. Every claim tag names a registered, valid claim whose source is tracked
+   and committed.
+4. The document equals its template with each claim replaced by the claim's
+   rendering from **some committed version** of its source. A hand-edited
+   value, a hand-added sentence, or a template edited without re-rendering
+   fails here, with the line where the document departs from the template.
+
+A value that was banked once stays banked in git history, so claimcheck
+accepts a stale value. That is freshness's job:
+
+`python3 tools/freshness.py README.md docs/REPORT.md` (`make freshness`)
+renders every template with the **current** value of every claim and
+requires each document to equal it. It names each stale claim with the
+written and the current value. A missing source or an extractor that no
+longer resolves is a failure, never a skip.
+
+Last lines: `CLAIMCHECK: PASS <d> documents, <c> claim spans from <s> banked
+sources, <a> allowances` or `CLAIMCHECK: FAIL <n> problems`;
+`FRESHNESS: PASS <c> live claims current in <d> documents` or
+`FRESHNESS: FAIL <n> stale or unresolvable`. Both exit 0 only on PASS and use
+only the standard library.
+
+## Common failures
+
+| Message | Fix |
+|---|---|
+| `number '0.42' is outside any claim or allowance` | Make it a claim; or, if it is not a result, tag it |
+| `'0.415' for claim X is not a rendering of any committed version ... commit it to bank it` | Commit the artifact, then check again |
+| `does not match its template ...: expected ..., found ...` | Edit the template, not the document, then render |
+| `claim X is stale: the document says '0.412', ... now gives '0.415'` | Render and commit |
+| `filter [...] matches 2 elements, needs exactly 1` | Add filter fields until one element matches |
+| `{{brief:...}} is not quoted verbatim` | Copy the text from docs/BUILD_BRIEF.md exactly |
+
+## Preregistrations as sources
+
+A claim may read a preregistration's config, and `make prereg-verify`
+(`python3 tools/prereg.py verify`) guards those files: front matter with
+`id`, `title`, `experiment`, and `date` (ISO `YYYY-MM-DD`), exactly one
+`json prereg-config` block holding a JSON object, one commit that adds the
+file and none that touch it afterwards, and amendments (`amends:
+prereg/....md`) committed strictly after the original. Every tracked artifact
+with a `prereg` field must carry `prereg_config_sha256` equal to
+`python3 tools/prereg.py hash prereg/NNNN-name.md`, and every commit that
+touched it must come strictly after the preregistration's commit. Run
+`hash` on a draft before committing it: a frozen file can never be fixed.
+
+## Provenance
+
+The number pattern, the principled exclusions, and the small path grammar
+are adapted from `tools/claimcheck.py` and `tools/freshness.py` of
+[raise-v1-public](https://github.com/raj200501/raise-v1-public) (commit
+9330c9d396b328cef4736356e0c8962218f0ecd2, Apache License 2.0; see
+third_party/raise-v1/LICENSE and third_party/raise-v1/NOTICE). The template
+and registry design is specific to base-rate.

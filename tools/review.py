@@ -38,7 +38,8 @@ HISTORY = Path("artifacts/review/history")
 LEDGER = Path("artifacts/usage/ledger.jsonl")
 SCHEMA = "baserate-review/1"
 # The reviewed commit may differ from HEAD only in these paths (brief 10.1 step 8).
-ALLOWED_DRIFT = ("artifacts/review/", "STATUS.md", "docs/LOG.md")
+ALLOWED_DRIFT_FILES = ("STATUS.md", "docs/LOG.md")
+ALLOWED_DRIFT_DIRS = ("artifacts/review/",)
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWER_TOOLS = "Read,Grep,Glob"
 
@@ -96,7 +97,11 @@ def drift_outside_allowed(root: Path, reviewed: str) -> list[str] | None:
     except subprocess.CalledProcessError:
         return None
     changed = git(root, "diff", "--name-only", reviewed, "HEAD").splitlines()
-    return [p for p in changed if not any(p == a or p.startswith(a) for a in ALLOWED_DRIFT)]
+    return [
+        p
+        for p in changed
+        if p not in ALLOWED_DRIFT_FILES and not any(p.startswith(d) for d in ALLOWED_DRIFT_DIRS)
+    ]
 
 
 def check_latest(root: Path) -> tuple[str, list[str]]:
@@ -130,7 +135,11 @@ def check_latest(root: Path) -> tuple[str, list[str]]:
         return "REVIEW: STALE", [*details, "changed since review: " + ", ".join(drift[:20])]
     log = root / "docs" / "REVIEW_LOG.md"
     log_text = log.read_text(encoding="utf-8") if log.exists() else ""
-    missing = [i["id"] for i in review["non_blocking"] if i["id"] not in log_text]
+    missing = [
+        i["id"]
+        for i in review["non_blocking"]
+        if re.search(rf"(?<![\w-]){re.escape(str(i['id']))}(?![\w-])", log_text) is None
+    ]
     if missing:
         # The main session logs these (gate G12 checks the log separately).
         details.append("log these non-blocking issues in docs/REVIEW_LOG.md: " + ", ".join(missing))

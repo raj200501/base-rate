@@ -141,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         "command": " ".join(sys.argv),
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_sha": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True
+            ["git", "rev-parse", "HEAD"], check=False, cwd=ROOT, capture_output=True, text=True
         ).stdout.strip(),
     }
     (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
