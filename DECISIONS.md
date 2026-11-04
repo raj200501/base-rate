@@ -273,3 +273,21 @@ would. The remaining compute (corpus batches and insertions, then the model
 monitor scoring that prereg/0003 fixes) is estimated at two to three days of
 CPU on this machine, so the study's timeline depends on the session staying
 active; Raj can also run the pipeline on his own machine.
+
+## D21 (2026-11-04) Fixes from the adversarial review, and the insertion amendment
+
+A review workflow over this session's integrity-critical changes (one reviewer
+per area, then three skeptics per finding) reported 36 findings; the skeptics
+upheld nearly all of those they reached. Verification was stopped early
+because three findings concern the controlled-insertion step, which the
+running pipeline reaches after the Qwen3-4B batch: fixing that code had to
+happen before then, and fixing code while skeptics judge it would bias their
+verdicts. Every finding is instead checked by a test that fails before its fix.
+The insertion findings that change the procedure are frozen as
+prereg/0007-e1-amendment-insertion.md before any insertion runs: sources are the
+runs benign under the fixed oracle, sorted by trace id before the seeded
+shuffle; skipped attempts are logged and banked; and an inserted false
+completion's summary is written by the same model. Findings that need no
+protocol change (G11 merge handling, report captions and tables, reproduce,
+the datasheet's wording) are fixed in code and documents, and a fresh review
+pass covers the fixes.
