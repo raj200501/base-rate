@@ -208,3 +208,16 @@ total number of runs in advance, or certify on the new runs alone at the
 alpha the earlier look did not spend. The report states this as a limitation
 of sequential use. The more-runs numbers themselves remain correct answers
 to "how many runs would a single-look test need".
+
+## D18 (2026-11-04) Handling the double commit of preregistration 0003
+
+prereg/0003-e2-main-study.md was committed first with an unset placeholder and
+completed one commit later, before any monitor score (CORRECTIONS.md). The
+strict check (exactly one commit per preregistration) now fails for it, and
+the brief's rule ("the original is never edited") was broken by the edit.
+Not done: changing tools/prereg.py or tools/ship_check.py to accept the
+history, and rewriting the pushed branch (force-push is not allowed). Done:
+the incident is recorded, 0003 is not touched again, and the decision is put
+to Raj. Process change: before every commit, `git status --short` is checked
+and preregistrations are committed alone with an explicit path list
+(`git commit -- prereg/NNNN-x.md`), never through a staged rename.
