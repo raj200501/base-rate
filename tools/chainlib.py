@@ -126,6 +126,112 @@ def commits_following(root: Path, path: str) -> list[str]:
     return git(root, "log", "--follow", "--format=%H", "--", path).splitlines()
 
 
+REGULAR_MODES = frozenset({"100644", "100755"})
+"""Git modes of regular files (a symlink, 120000, is not one)."""
+_ZERO = "0" * 40
+
+
+def history(root: Path) -> tuple[list[str], dict[str, tuple[str, ...]]]:
+    """Every commit in HEAD's history, parents before children, and each one's parents."""
+    order: list[str] = []
+    parents: dict[str, tuple[str, ...]] = {}
+    for line in git(
+        root, "rev-list", "--topo-order", "--reverse", "--parents", "HEAD"
+    ).splitlines():
+        commit, *ps = line.split()
+        order.append(commit)
+        parents[commit] = tuple(ps)
+    return order, parents
+
+
+def path_states(
+    root: Path, path: str, order: list[str], parents: dict[str, tuple[str, ...]]
+) -> dict[str, tuple[str, str] | None]:
+    """The (blob id, mode) of ``path`` at every commit of ``order``, or None where absent.
+
+    Merge commits count like any other: a merge's state is its own tree's,
+    including a merge whose content differs from every parent. One ``git log``
+    lists every commit whose state differs from a parent's; every other commit
+    keeps its first parent's state.
+    """
+    changed: dict[str, tuple[str, str] | None] = {}
+    current = ""
+    out = git(
+        root,
+        "log",
+        "--full-history",
+        "-m",
+        "--no-renames",
+        "--raw",
+        "--no-abbrev",
+        "--format=%x00%H",
+        "--",
+        path,
+    )
+    for line in out.splitlines():
+        if line.startswith("\0"):
+            current = line[1:]
+        elif line.startswith(":") and current:
+            fields = line.split("\t", 1)[0].split()
+            mode, blob = fields[1], fields[3]
+            changed[current] = None if blob == _ZERO else (blob, mode)
+    states: dict[str, tuple[str, str] | None] = {}
+    for commit in order:
+        if commit in changed:
+            states[commit] = changed[commit]
+        elif parents[commit]:
+            states[commit] = states.get(parents[commit][0])
+        else:
+            states[commit] = None
+    return states
+
+
+def introducing(
+    order: list[str],
+    parents: dict[str, tuple[str, ...]],
+    states: dict[str, tuple[str, str] | None],
+) -> list[str]:
+    """Commits whose state of a path exists and differs from every parent's, oldest first."""
+    return [
+        c
+        for c in order
+        if states[c] is not None and all(states.get(p) != states[c] for p in parents[c])
+    ]
+
+
+def descendants(root: Path, commit: str) -> frozenset[str]:
+    """Commits in HEAD's history that have ``commit`` as a strict ancestor."""
+    out = git(root, "rev-list", "--ancestry-path", f"{commit}..HEAD")
+    return frozenset(out.split())
+
+
+def rename_sources(root: Path, path: str) -> list[str]:
+    """``path`` and every earlier name it was renamed from (true renames only, not copies)."""
+    out = git(
+        root,
+        "log",
+        "--full-history",
+        "-m",
+        "-M",
+        "--diff-filter=R",
+        "--name-status",
+        "--format=",
+        "HEAD",
+    )
+    renamed: dict[str, set[str]] = {}
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith("R"):
+            renamed.setdefault(parts[2], set()).add(parts[1])
+    names, todo = [path], [path]
+    while todo:
+        for old in sorted(renamed.get(todo.pop(), ())):
+            if old not in names:
+                names.append(old)
+                todo.append(old)
+    return names
+
+
 def change_status(root: Path, commit: str, path: str) -> str:
     """Status letter (A, M, D, T) of ``path`` in a non-merge ``commit``, or ''."""
     out = git(root, "show", "--no-renames", "--format=", "--name-status", commit, "--", path)

@@ -358,6 +358,187 @@ def test_g11_draft_mutations_also_fail_the_tool(
     assert ok.stdout.splitlines()[-1].startswith("PREREG-VERIFY: FAIL"), ok.stdout
 
 
+# G11 merges, renames, amendments, and parsing (DECISIONS.md D21): each history is
+# checked by the gate's own code (no-op prereg-verify) and by tools/prereg.py, and
+# the two must agree.
+
+P2 = "prereg/0002-e2-amendment.md"
+
+
+def g11_base_repo(path: Path) -> Any:
+    repo = h.Repo.init(path)
+    repo.write("Makefile", NOOP_VERIFY)
+    copy_tools(repo, "chainlib.py", "prereg.py")
+    repo.write("prereg/README.md", "# Preregistrations\n")
+    repo.commit("tools")
+    return repo
+
+
+def merge_with(repo: Any, edit: Callable[[], None], tag: str) -> None:
+    """A side commit and a main commit, then a merge commit that also runs ``edit``."""
+    repo.git("checkout", "-q", "-b", f"side-{tag}")
+    repo.write(f"side-{tag}.txt", "side\n")
+    repo.commit("side work")
+    repo.git("checkout", "-q", "main")
+    repo.write(f"main-{tag}.txt", "main\n")
+    repo.commit("main work")
+    repo.git("merge", "-q", "--no-ff", "--no-commit", f"side-{tag}")
+    edit()
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", f"merge {tag}")
+
+
+def plan(repo: Any, config: dict[str, Any], body: str = "Plan prose.\n", **kw: Any) -> None:
+    repo.write(kw.pop("path", P1), h.prereg_text(config, body=body, **kw))
+
+
+def bank(repo: Any, config: dict[str, Any], path: str = ART) -> None:
+    repo.write_json(path, confirmatory(config))
+
+
+def s_freeze_in_merge(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    merge_with(r, lambda: plan(r, {**FINAL, "method": "bootstrap"}, body="vm\n"), "fill")
+    plan(r, FINAL, body="v2\n")
+    r.commit("edit after the merge froze it")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+def s_transient_merges(r: Any) -> None:
+    plan(r, CONFIG)
+    r.commit("freeze")
+    frozen = r.read(P1)
+    merge_with(r, lambda: r.write(P1, frozen.replace("100]", "101]")), "loosen")
+    bank(r, CONFIG)
+    r.commit("bank")
+    merge_with(r, lambda: r.write(P1, frozen), "restore")
+
+
+def s_artifact_in_merge(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    merge_with(r, lambda: bank(r, FINAL), "early")
+    plan(r, FINAL)
+    r.commit("freeze")
+    r.git("rm", "-q", ART)
+    r.commit("drop")
+    bank(r, FINAL)
+    r.commit("bank again")
+
+
+def s_artifact_renamed(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    bank(r, FINAL, "artifacts/e2/tmp.json")
+    r.commit("bank under another name")
+    plan(r, FINAL)
+    r.commit("freeze")
+    r.git("mv", "artifacts/e2/tmp.json", ART)
+    r.commit("rename after the freeze")
+
+
+def s_amendment_draft_early(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("P1 draft")
+    plan(r, {"change": "TO_BE_SET"}, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("P2 draft")
+    plan(r, FINAL)
+    r.commit("P1 frozen")
+    plan(r, {"change": "more"}, path=P2, pid="0002", extra=f"amends: {P1}\n")
+    r.commit("P2 frozen")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+def s_exploratory_citation_early(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    r.write_json("artifacts/e2/pilot.json", {**confirmatory(FINAL), "confirmatory": False})
+    r.commit("an exploratory artifact cites the draft")
+    plan(r, FINAL)
+    r.commit("freeze")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+def s_crlf_draft(r: Any) -> None:
+    r.write(P1, h.prereg_text(DRAFT).replace("\n", "\r\n"))
+    r.commit("CRLF draft")
+    bank(r, DRAFT)
+    r.commit("bank")
+
+
+def s_trailing_newline(r: Any) -> None:
+    plan(r, {**CONFIG, "method": "TO_BE_SET\n"})
+    r.commit("plan")
+    plan(r, FINAL)
+    r.commit("edit")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+def s_duplicate_key_draft(r: Any) -> None:
+    text = h.prereg_text({**CONFIG, "method": "TO_BE_SET"})
+    r.write(P1, text.replace('"method": "TO_BE_SET"', '"method": "TO_BE_SET", "method": "x"'))
+    r.commit("draft with a duplicate key")
+    plan(r, FINAL)
+    r.commit("freeze")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+def s_control_with_merges(r: Any) -> None:
+    plan(r, DRAFT)
+    r.commit("draft")
+    merge_with(r, lambda: None, "before")
+    plan(r, FINAL)
+    r.commit("freeze")
+    merge_with(r, lambda: None, "after")
+    bank(r, FINAL)
+    r.commit("bank")
+
+
+G11_HISTORY_CASES: list[tuple[str, Callable[[Any], None], str | None]] = [
+    ("freeze-in-a-merge", s_freeze_in_merge, "frozen in a merge commit"),
+    ("transient-change-through-merges", s_transient_merges, "changed after it was frozen"),
+    ("artifact-inside-a-merge-before-the-freeze", s_artifact_in_merge, "was not committed before"),
+    ("artifact-renamed-from-an-early-file", s_artifact_renamed, "was not committed before"),
+    ("amendment-drafted-before-its-original-froze", s_amendment_draft_early, "amends"),
+    ("exploratory-citation-before-the-freeze", s_exploratory_citation_early, "was not committed"),
+    ("crlf-draft", s_crlf_draft, "still a draft"),
+    ("trailing-newline-is-not-a-placeholder", s_trailing_newline, "changed after it was frozen"),
+    ("duplicate-key-draft-is-not-a-draft", s_duplicate_key_draft, "changed after it was frozen"),
+    ("control-with-merges", s_control_with_merges, None),
+]
+
+
+@pytest.mark.parametrize(
+    ("build", "needle"),
+    [c[1:] for c in G11_HISTORY_CASES],
+    ids=[c[0] for c in G11_HISTORY_CASES],
+)
+def test_g11_history_cases_and_the_tool_agree(
+    tmp_path: Path, build: Callable[[Any], None], needle: str | None
+) -> None:
+    repo = g11_base_repo(tmp_path / "repo")
+    build(repo)
+    tool = subprocess.run(
+        [PY, "tools/prereg.py", "verify"],
+        cwd=repo.path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if needle is None:
+        assert_pass(11, repo, tmp_path)
+        assert tool.returncode == 0, tool.stdout
+    else:
+        assert_fail(11, repo, tmp_path, needle)
+        assert tool.returncode == 1, tool.stdout
+
+
 # ======================================================================= G14
 
 FAKE_KEY = "AKIA" + "Q" * 16

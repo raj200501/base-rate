@@ -282,13 +282,15 @@ def first_commit(repo: Path, path: str) -> str | None:
 
 
 # A prereg-config string value that marks the file as an unfinished draft (DECISIONS.md D19).
-PLACEHOLDER_RE = re.compile(r"^TO_BE_SET(?:_[A-Z0-9]+)*$")
+# Matched with fullmatch, so a trailing newline or other text is not a placeholder.
+PLACEHOLDER_RE = re.compile(r"TO_BE_SET(?:_[A-Z0-9]+)*")
+REGULAR_FILE_MODES = ("100644", "100755")
 
 
 def has_placeholder(value: Any) -> bool:
     """Whether a JSON value holds a draft placeholder at any depth."""
     if isinstance(value, str):
-        return PLACEHOLDER_RE.match(value) is not None
+        return PLACEHOLDER_RE.fullmatch(value) is not None
     if isinstance(value, dict):
         return any(has_placeholder(v) for v in value.values())
     if isinstance(value, list):
@@ -298,7 +300,7 @@ def has_placeholder(value: Any) -> bool:
 
 def keeps_fixed_values(draft: Any, final: Any) -> bool:
     """Whether ``final`` equals ``draft`` everywhere ``draft`` holds no placeholder."""
-    if isinstance(draft, str) and PLACEHOLDER_RE.match(draft):
+    if isinstance(draft, str) and PLACEHOLDER_RE.fullmatch(draft):
         return True
     if isinstance(draft, dict):
         return (
@@ -315,49 +317,144 @@ def keeps_fixed_values(draft: Any, final: Any) -> bool:
     return type(draft) is type(final) and bool(draft == final)
 
 
-def prereg_commits(repo: Path, path: str) -> list[str]:
-    """Non-merge commits in HEAD's history that touched ``path``, oldest first."""
+def strict_json_object(text: str) -> dict[str, Any] | None:
+    """A JSON object with no duplicate keys and no NaN or Infinity, or None."""
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        keys = [k for k, _ in items]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate key")
+        return dict(items)
+
+    def constant(name: str) -> Any:
+        raise ValueError(name)
+
+    try:
+        value = json.loads(text, object_pairs_hook=pairs, parse_constant=constant)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+_HISTORY: dict[str, tuple[list[str], dict[str, tuple[str, ...]]]] = {}
+
+
+def repo_history(repo: Path) -> tuple[list[str], dict[str, tuple[str, ...]]]:
+    """HEAD's commits, parents before children, and each one's parents (cached per HEAD)."""
+    key = f"{repo}@{git(repo, 'rev-parse', 'HEAD')}"
+    if key not in _HISTORY:
+        order: list[str] = []
+        parents: dict[str, tuple[str, ...]] = {}
+        out = git(repo, "rev-list", "--topo-order", "--reverse", "--parents", "HEAD")
+        for line in out.splitlines():
+            commit, *ps = line.split()
+            order.append(commit)
+            parents[commit] = tuple(ps)
+        _HISTORY[key] = (order, parents)
+    return _HISTORY[key]
+
+
+def file_states(repo: Path, path: str) -> dict[str, tuple[str, str] | None]:
+    """(blob, mode) of ``path`` at every commit of HEAD's history, merges included."""
+    order, parents = repo_history(repo)
     out = git(
         repo,
         "log",
-        "--format=%H",
         "--full-history",
-        "--no-merges",
+        "-m",
         "--no-renames",
-        "--topo-order",
-        "--reverse",
+        "--raw",
+        "--no-abbrev",
+        "--format=commit %H",
         "--",
         path,
     )
-    return out.splitlines()
+    changed: dict[str, tuple[str, str] | None] = {}
+    commit = ""
+    for line in out.splitlines():
+        if line.startswith("commit "):
+            commit = line.split()[1]
+        elif line.startswith(":") and commit:
+            fields = line.split("\t")[0].split()
+            changed[commit] = None if set(fields[3]) == {"0"} else (fields[3], fields[1])
+    states: dict[str, tuple[str, str] | None] = {}
+    for c in order:
+        states[c] = changed[c] if c in changed else (states[parents[c][0]] if parents[c] else None)
+    return states
 
 
-def config_at(repo: Path, rev: str, path: str) -> Any:
-    """The parsed prereg-config block of ``path`` at ``rev``, or None."""
-    try:
-        text = git(repo, "show", f"{rev}:{path}")
-    except subprocess.CalledProcessError:
+def descendant_set(repo: Path, commit: str) -> set[str]:
+    """Commits of HEAD's history that have ``commit`` as a strict ancestor."""
+    return set(git(repo, "rev-list", "--ancestry-path", f"{commit}..HEAD").split())
+
+
+def renamed_from(repo: Path, path: str) -> list[str]:
+    """``path`` and every name it was renamed from (renames only; copies are not followed)."""
+    out = git(
+        repo,
+        "log",
+        "--full-history",
+        "-m",
+        "-M",
+        "--diff-filter=R",
+        "--name-status",
+        "--format=",
+        "HEAD",
+    )
+    sources: dict[str, set[str]] = {}
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith("R"):
+            sources.setdefault(parts[2], set()).add(parts[1])
+    names = [path]
+    for name in names:
+        names.extend(sorted(sources.get(name, set()) - set(names)))
+    return names
+
+
+def version_config(repo: Path, state: tuple[str, str] | None) -> dict[str, Any] | None:
+    """The config of one committed version of a preregistration, or None if invalid."""
+    if state is None or state[1] not in REGULAR_FILE_MODES:
         return None
+    text = git(repo, "cat-file", "blob", state[0])
     blocks = re.findall(r"```json prereg-config\n(.*?)```", text, re.S)
-    if len(blocks) != 1:
-        return None
-    try:
-        return json.loads(blocks[0])
-    except ValueError:
-        return None
+    return strict_json_object(blocks[0]) if len(blocks) == 1 else None
+
+
+@dataclass
+class Freeze:
+    """How a preregistration was frozen, from every version in HEAD's history."""
+
+    commit: str | None
+    first: str | None
+    drafts: list[str]
+    introduced: list[str]
+    states: dict[str, tuple[str, str] | None]
+
+
+def freeze_of(repo: Path, path: str) -> Freeze:
+    """Find the freezing commit: the first to introduce a version without a placeholder (D19).
+
+    A commit introduces a version when the file exists there and differs from
+    every parent, so merge commits count like ordinary ones.
+    """
+    order, parents = repo_history(repo)
+    states = file_states(repo, path)
+    intro = [
+        c
+        for c in order
+        if states[c] is not None and all(states[q] != states[c] for q in parents[c])
+    ]
+    for i, c in enumerate(intro):
+        if not has_placeholder(version_config(repo, states[c])):
+            return Freeze(c, intro[0], intro[:i], intro, states)
+    return Freeze(None, intro[0] if intro else None, intro, intro, states)
 
 
 def freeze_commit(repo: Path, path: str) -> tuple[str | None, list[str]]:
-    """(commit that froze a preregistration, the draft commits before it).
-
-    The freezing commit is the first commit whose config holds no
-    ``TO_BE_SET`` placeholder; commits before it are drafts (D19).
-    """
-    commits = prereg_commits(repo, path)
-    for i, commit in enumerate(commits):
-        if not has_placeholder(config_at(repo, commit, path)):
-            return commit, commits[:i]
-    return None, commits
+    """(commit that froze a preregistration, the draft commits before it)."""
+    f = freeze_of(repo, path)
+    return f.commit, f.drafts
 
 
 def drift_allowed(path: str) -> bool:
@@ -445,8 +542,10 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
     """Verify an artifact's preregistration citation; return the frozen config.
 
     The cited file must exist, its config hash must match the artifact's
-    ``prereg_config_sha256``, and the commit that froze it (not a draft of
-    it) must strictly precede the artifact's first commit.
+    ``prereg_config_sha256``, and every commit of HEAD's history at which the
+    artifact exists, under its name or any name it was renamed from, merges
+    included, must strictly descend from the commit that froze the
+    preregistration (not from a draft of it).
     """
     prereg_path = str(artifact.get("prereg", ""))
     _, config = prereg_config(ctx, prereg_path)
@@ -454,12 +553,18 @@ def check_prereg_link(ctx: Ctx, artifact_rel: str, artifact: dict[str, Any]) -> 
         artifact.get("prereg_config_sha256") == canonical_sha256(config),
         f"{artifact_rel}: prereg_config_sha256 does not match {prereg_path}",
     )
-    p_commit = freeze_commit(ctx.clone, prereg_path)[0]
-    a_commit = first_commit(ctx.clone, artifact_rel)
-    need(p_commit is not None and a_commit is not None, f"{artifact_rel} or prereg not committed")
-    assert p_commit is not None and a_commit is not None
+    frozen = freeze_of(ctx.clone, prereg_path).commit
+    need(frozen is not None, f"{prereg_path} is not frozen, so {artifact_rel} cannot cite it")
+    assert frozen is not None
+    present = {
+        c
+        for name in renamed_from(ctx.clone, artifact_rel)
+        for c, state in file_states(ctx.clone, name).items()
+        if state is not None
+    }
+    need(bool(present), f"{artifact_rel} is not committed")
     need(
-        is_strict_ancestor(ctx.clone, p_commit, a_commit),
+        present <= descendant_set(ctx.clone, frozen),
         f"{prereg_path} was not committed before {artifact_rel}",
     )
     return config
@@ -1026,32 +1131,59 @@ def g11(ctx: Ctx) -> str:
     )
     need(not deleted, "a preregistration file was deleted")
     drafted = []
+    freezes: dict[str, Freeze] = {}
     for p in preregs:
-        commits = prereg_commits(ctx.clone, p)
-        frozen, drafts = freeze_commit(ctx.clone, p)
-        need(frozen is not None, f"{p} is still a draft (its config holds a TO_BE_SET placeholder)")
-        assert frozen is not None
+        f = freeze_of(ctx.clone, p)
+        freezes[p] = f
         need(
-            len(commits) == len(drafts) + 1,
-            f"{p} changed after it was frozen ({len(commits)} commits)",
+            all(f.states[c] is None or f.states[c][1] in REGULAR_FILE_MODES for c in f.introduced),
+            f"{p} is not a regular file",
         )
-        final = config_at(ctx.clone, frozen, p)
-        for d in drafts:
+        need(
+            f.commit is not None, f"{p} is still a draft (its config holds a TO_BE_SET placeholder)"
+        )
+        assert f.commit is not None
+        need(
+            len(repo_history(ctx.clone)[1][f.commit]) <= 1,
+            f"{p} was frozen in a merge commit",
+        )
+        need(
+            len(f.introduced) == len(f.drafts) + 1,
+            f"{p} changed after it was frozen ({len(f.introduced)} commits)",
+        )
+        need(
+            all(f.states[c] == f.states[f.commit] for c in descendant_set(ctx.clone, f.commit)),
+            f"{p} changed after it was frozen (a later commit holds other content)",
+        )
+        final = version_config(ctx.clone, f.states[f.commit])
+        for d in f.drafts:
             need(
-                is_strict_ancestor(ctx.clone, d, frozen),
+                is_strict_ancestor(ctx.clone, d, f.commit),
                 f"{p}: draft {d[:12]} does not precede its freezing commit",
             )
             need(
-                keeps_fixed_values(config_at(ctx.clone, d, p), final),
+                keeps_fixed_values(version_config(ctx.clone, f.states[d]), final),
                 f"{p}: its freezing commit changes a value that draft {d[:12]} had fixed",
             )
         need(
-            git(ctx.clone, "rev-parse", f"HEAD:{p}")
-            == git(ctx.clone, "rev-parse", f"{frozen}:{p}"),
+            git(ctx.clone, "rev-parse", f"HEAD:{p}") == f.states[f.commit][0],
             f"{p} at HEAD differs from its freezing commit",
         )
-        if drafts:
+        if f.drafts:
             drafted.append(p.removeprefix("prereg/").split("-", 1)[0])
+    for p in preregs:
+        front = rel(ctx, p).read_text(encoding="utf-8").split("\n---", 1)[0]
+        m = re.search(r"^amends:[ \t]*['\"]?(prereg/[^'\"\s]+)", front, re.M)
+        if m is None:
+            continue
+        original = freezes.get(m.group(1))
+        need(original is not None, f"{p} amends {m.group(1)}, which is not a preregistration")
+        assert original is not None and original.commit is not None
+        first = freezes[p].first
+        need(
+            first is not None and is_strict_ancestor(ctx.clone, original.commit, first),
+            f"{p} amends {m.group(1)}, which was not frozen before {p} was first committed",
+        )
     confirmatory = []
     for art in tracked(ctx, "artifacts/*.json"):
         if art.startswith("artifacts/review/"):
@@ -1060,8 +1192,11 @@ def g11(ctx: Ctx) -> str:
             data = json.loads(rel(ctx, art).read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if isinstance(data, dict) and data.get("confirmatory") is True:
+        if not isinstance(data, dict):
+            continue
+        if data.get("confirmatory") is True or "prereg" in data:
             check_prereg_link(ctx, art, data)
+        if data.get("confirmatory") is True:
             confirmatory.append(art)
     need(bool(confirmatory), "no confirmatory artifacts yet")
     pv = ctx.make("prereg-verify", timeout=600)

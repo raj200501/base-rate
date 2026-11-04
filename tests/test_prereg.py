@@ -700,3 +700,168 @@ def test_fills_only_placeholders_agrees_with_ship_check(
     assert prereg.fills_only_placeholders(draft, final) is expected
     assert ship_check.keeps_fixed_values(draft, final) is expected
     assert bool(prereg.placeholder_paths(draft)) == ship_check.has_placeholder(draft)
+
+
+# ------------------------------------------- merges, renames, CRLF (review D21)
+
+
+def _branch_merge(repo: Any, edit: Callable[[], None], message: str) -> str:
+    """A side commit and a main commit, then a merge whose commit also runs ``edit``."""
+    repo.git("checkout", "-q", "-b", f"side-{message[:8].replace(' ', '-')}")
+    repo.write(f"side-{message[:8]}.txt", "side\n")
+    repo.commit("side work")
+    side = repo.git("rev-parse", "--abbrev-ref", "HEAD")
+    repo.git("checkout", "-q", "main")
+    repo.write(f"main-{message[:8]}.txt", "main\n")
+    repo.commit("main work")
+    repo.git("merge", "-q", "--no-ff", "--no-commit", side)
+    edit()
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", message)
+    return repo.head()
+
+
+def test_freeze_in_a_merge_then_an_edit_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "evil")
+    repo.write(P1, h.prereg_text(DRAFT, body="v0\n"))
+    repo.commit("draft")
+    _branch_merge(
+        repo,
+        lambda: repo.write(P1, h.prereg_text({**FINAL, "method": "bootstrap"}, body="vm\n")),
+        "merge fills the method",
+    )
+    repo.write(P1, h.prereg_text(FINAL, body="v2\n"))
+    repo.commit("edit after the merge froze it")
+    repo.write_json(ART, linked(config=FINAL))
+    repo.commit("bank")
+    text = problems(repo)
+    assert "frozen in merge commit" in text and "changed after it was frozen" in text, text
+
+
+def test_a_transient_change_through_merges_after_the_freeze_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "transient")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("freeze")
+    frozen = repo.read(P1)
+    _branch_merge(
+        repo,
+        lambda: repo.write(P1, frozen.replace('"nominal": 0.95', '"nominal": 0.5')),
+        "merge loosens the plan",
+    )
+    repo.write_json(ART, linked())
+    repo.commit("bank under the loosened plan")
+    _branch_merge(repo, lambda: repo.write(P1, frozen), "merge restores the plan")
+    assert_fails(repo, "changed after it was frozen")
+
+
+def test_artifact_committed_inside_a_merge_before_the_freeze_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "mergeart")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("draft")
+    _branch_merge(repo, lambda: repo.write_json(ART, linked(config=FINAL)), "merge banks early")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("freeze")
+    repo.git("rm", "-q", ART)
+    repo.commit("drop the early artifact")
+    repo.write_json(ART, linked(config=FINAL))
+    repo.commit("bank again after the freeze")
+    assert_fails(repo, f"not strictly after {P1} was frozen")
+
+
+def test_artifact_renamed_after_the_freeze_from_an_early_file_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "renamed")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("draft")
+    repo.write_json("artifacts/e2/tmp.json", linked(config=FINAL))
+    repo.commit("bank under another name")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("freeze")
+    repo.git("mv", "artifacts/e2/tmp.json", ART)
+    repo.commit("rename after the freeze")
+    assert_fails(repo, f"not strictly after {P1} was frozen")
+
+
+def test_a_similar_exploratory_file_is_not_followed_as_a_copy(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "copy")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("draft")
+    rows = [{"monitor": f"m{i}", "estimate": i / 10} for i in range(8)]
+    repo.write_json("artifacts/e2/pilot.json", {"exploratory": True, "rows": rows})
+    repo.commit("exploratory pilot, no prereg field")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("freeze")
+    repo.write_json(ART, linked(config=FINAL, rows=rows))
+    repo.commit("bank")
+    assert problems(repo) == ""
+
+
+def test_crlf_draft_at_head_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "crlf")
+    repo.write(P1, h.prereg_text(DRAFT).replace("\n", "\r\n"))
+    repo.commit("draft with CRLF line endings")
+    repo.write_json(ART, linked(config=DRAFT))
+    repo.commit("bank")
+    assert_fails(repo, "still a draft")
+
+
+def test_placeholder_with_a_trailing_newline_is_not_a_draft(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "newline")
+    repo.write(P1, h.prereg_text({**CONFIG, "method": "TO_BE_SET\n"}))
+    repo.commit("plan")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("edit")
+    assert_fails(repo, "changed after it was frozen; touched by 2 commits")
+
+
+def test_amendment_drafted_before_its_original_froze_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "amenddraft")
+    repo.write(P1, h.prereg_text(DRAFT))
+    repo.commit("P1 draft")
+    amend = {"change": "TO_BE_SET", "x": 1}
+    repo.write(P2, h.prereg_text(amend, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("P2 draft")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("P1 frozen")
+    repo.write(P2, h.prereg_text({**amend, "change": "more"}, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("P2 frozen")
+    assert_fails(repo, f"{P2}: amends {P1}, which was not committed strictly earlier")
+
+
+def test_amendment_drafted_before_its_original_existed_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "amendfirst")
+    amend = {"change": "TO_BE_SET", "x": 1}
+    repo.write(P2, h.prereg_text(amend, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("P2 draft first")
+    repo.write(P1, h.prereg_text(CONFIG))
+    repo.commit("P1 frozen")
+    repo.write(P2, h.prereg_text({**amend, "change": "more"}, pid="0002", extra=f"amends: {P1}\n"))
+    repo.commit("P2 frozen")
+    assert_fails(repo, f"{P2}: amends {P1}, which was not committed strictly earlier")
+
+
+def test_draft_on_a_side_branch_that_the_freeze_does_not_descend_from_fails(
+    tmp_path: Path,
+) -> None:
+    repo = h.Repo.init(tmp_path / "sidedraft")
+    repo.write("README.md", "x\n")
+    repo.commit("start")
+    repo.git("checkout", "-q", "-b", "side")
+    repo.write(P1, h.prereg_text(DRAFT, body="side draft\n"))
+    repo.commit("draft on a side branch")
+    repo.git("checkout", "-q", "main")
+    repo.write(P1, h.prereg_text(FINAL))
+    repo.commit("freeze on main without the draft")
+    repo.git("merge", "-q", "-s", "ours", "side", "-m", "merge, keeping main's plan")
+    # topological order decides whether the side draft counts as an earlier draft
+    # that the freeze does not descend from, or as a version after the freeze
+    text = problems(repo)
+    assert "does not precede the freezing commit" in text or "changed after it was frozen" in text
+
+
+def test_symlinked_preregistration_fails(tmp_path: Path) -> None:
+    repo = h.Repo.init(tmp_path / "symlink")
+    repo.write("docs/plan.md", h.prereg_text(CONFIG))
+    (repo.path / "prereg").mkdir()
+    (repo.path / P1).symlink_to("../docs/plan.md")
+    repo.commit("plan behind a symlink")
+    assert_fails(repo, "not a regular file")

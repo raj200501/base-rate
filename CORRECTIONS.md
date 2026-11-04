@@ -41,3 +41,24 @@ tests show each of its conditions can fail. `make prereg-verify` prints a note
 naming both commits, and the G11 line of ship-check names 0003 as frozen after
 a declared draft. The history was not rewritten, so the original commit
 remains in the log for anyone to inspect.
+
+## 2026-11-04 Two inexact statements about the draft-stage rule
+
+1. The first 0003 entry says that, apart from the placeholder and the added
+   paragraph, no other line changed. In fact the freezing commit 72fc428 also
+   rewrote the four existing lines of the Estimator bullet and removed its
+   parenthetical "(chosen from the methods E0 supports for these designs,
+   before any monitor score exists)". In the config, only `/headline/method`
+   changed (`TO_BE_SET_FROM_E0` to `composite`).
+2. The resolution entry says the new rule "keeps every other condition of the
+   old check". The first implementation (767570f) did not: it listed only
+   ordinary commits, so a merge commit that filled the placeholder was skipped,
+   and a later ordinary edit was taken as the freeze. An adversarial review
+   found this, together with older gaps that the old check shared (an artifact
+   first committed inside a merge before the freeze, and a transient change made
+   and undone by merges after it). Both checks now read every version of the
+   file in HEAD's history, merges included: the freeze must be an ordinary
+   commit, no later commit may introduce another version, every descendant of
+   the freeze must hold the frozen content, and an artifact must not exist,
+   under any name it was renamed from, at any commit that does not descend from
+   the freeze (DECISIONS.md D21). Regression tests cover each history.
