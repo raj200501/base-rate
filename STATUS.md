@@ -35,8 +35,9 @@ audit sample (runs/audit), and the rule monitor scoring (artifacts/scores, commi
 is now scoring the model monitors, smallest first (Qwen3 0.6B, 1.7B, 4B, 8B), all
 automatic. The insertion log in the corpus manifest accounts for every planned attempt;
 the skips all fall in false_completion, which the report must state. The VM was reclaimed
-once (D20) and the 4B server was killed once for memory (D24); each time the pipeline
-resumed from its banked runs. If the VM is reclaimed again, restart it with
+once (D20), the 4B server was killed once for memory (D24), and the 0.6B dataset step
+crashed once on a response cache race (two identical requests shared a temporary file;
+fixed with a test); each time the pipeline resumed from its banked runs. If the VM is reclaimed again, restart it with
 `setsid nohup bash tools/run_pipeline.sh >> runs/pipeline/pipeline.log 2>&1 &`; it resumes.
 The blind label audit has each auditor agent read only its own batch file
 (tools/label_audit.py batches), and the evidence check allows nothing else.
