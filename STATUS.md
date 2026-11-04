@@ -30,15 +30,21 @@ Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on dat
 ## Now
 
 The unattended pipeline (tools/run_pipeline.sh) has finished both corpus batches, both
-insertion runs under prereg/0007, the corpus build (artifacts/corpus, committed), the blind
-audit sample (runs/audit), and the rule monitor scoring (artifacts/scores, committed). It
-is now scoring the model monitors, smallest first (Qwen3 0.6B, 1.7B, 4B, 8B), all
-automatic. The insertion log in the corpus manifest accounts for every planned attempt;
-the skips all fall in false_completion, which the report must state. The VM was reclaimed
-once (D20), the 4B server was killed once for memory (D24), and the 0.6B dataset step
-crashed once on a response cache race (two identical requests shared a temporary file;
-fixed with a test); each time the pipeline resumed from its banked runs. If the VM is reclaimed again, restart it with
-`setsid nohup bash tools/run_pipeline.sh >> runs/pipeline/pipeline.log 2>&1 &`; it resumes.
+insertion runs under prereg/0007, the corpus build (artifacts/corpus, committed), the
+blind audit sample (runs/audit), and the rule monitor scoring (artifacts/scores,
+committed). It is now scoring the model monitors, smallest first: Qwen3 0.6B and 1.7B are
+banked and committed, 4B is running, then 8B and the 0.6B run on the full set, all
+automatic; each finished monitor is committed as it lands. The insertion log in the
+corpus manifest accounts for every planned attempt; the skips all fall in
+false_completion, which the report must state.
+
+Interruptions so far: the VM was reclaimed once (D20) and the container restarted once
+(2026-11-04 22:21 UTC); the 4B server was killed once for memory (D24); the 0.6B dataset
+step crashed once on a response cache race (two identical requests shared a temporary
+file; fixed with a test). Each time the pipeline resumed from its banked runs, and the
+corpus build now keeps a current banked corpus. If the VM is reclaimed again, restart it
+with `setsid nohup bash tools/run_pipeline.sh >> runs/pipeline/pipeline.log 2>&1 &`.
+
 The blind label audit has each auditor agent read only its own batch file
 (tools/label_audit.py batches), and the evidence check allows nothing else.
 
