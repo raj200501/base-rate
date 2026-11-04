@@ -291,3 +291,15 @@ completion's summary is written by the same model. Findings that need no
 protocol change (G11 merge handling, report captions and tables, reproduce,
 the datasheet's wording) are fixed in code and documents, and a fresh review
 pass covers the fixes.
+
+## D22 (2026-11-04) E3's analysis set, read from its preregistration
+
+prereg/0004-e3-transfer.md analyzes "the full set of the E1 corpus" and sets
+each domain's threshold on "A's traces (benign and natural plus inserted
+violations of A)". Armour's records carry the same eight domain names, so they
+belong to the domains' traffic. Read literally, E3's negatives are every benign
+trace of the full set, Armour's benign records included, and its positives are
+the natural and inserted violations; Armour's violations are left out. The
+analysis code had dropped every Armour record, which the preregistration does
+not say. It is fixed to follow the text before any monitor score exists, and
+the E3 table states the set exactly.
