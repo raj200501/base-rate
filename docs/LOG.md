@@ -48,3 +48,7 @@ Iteration history moved out of STATUS.md. Newest last.
   intact shards), and the pipeline was restarted.
 - The blind label audit now has each auditor read only its own batch file, and the
   evidence check allows nothing else.
+- Model scoring now writes one usage entry per 15 minutes and one at the end of a run,
+  instead of one per ten calls, so the tracked ledger is not changing every minute of a
+  long run; local calls have no count cap, so cap checks are unchanged. The container
+  restarted once (2026-11-04 22:21 UTC); the pipeline resumed from its banked runs.

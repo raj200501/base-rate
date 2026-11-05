@@ -697,6 +697,26 @@ def test_scoring_safeguards(root: Path, monkeypatch: pytest.MonkeyPatch) -> None
         sm.main([*base, "--limit", "3"])
 
 
+def test_ledger_flushes_at_most_once_per_interval(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Long scoring runs write one usage entry per interval, not one per few calls."""
+    sm = _load("score_monitors", monkeypatch, tmp_path)
+    clock = [0.0]
+    flushed: list[float] = []
+
+    class Client:
+        def flush(self) -> None:
+            flushed.append(clock[0])
+
+    flusher = sm.LedgerFlusher(Client(), seconds=900.0, clock=lambda: clock[0])
+    for t in (10.0, 899.0, 900.0, 901.0, 1799.0, 1800.0, 1801.0):
+        clock[0] = t
+        flusher.maybe_flush()
+    assert flushed == [900.0, 1800.0]
+    assert sm.LEDGER_FLUSH_SECONDS >= 600  # the tracked ledger changes rarely during a run
+
+
 def test_e4_cost_leaves_out_cached_records(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     an = _load("analyze", monkeypatch, tmp_path)
     recs = {

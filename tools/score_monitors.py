@@ -54,6 +54,34 @@ E2_PREREG = "prereg/0003-e2-main-study.md"
 
 SETS = ("primary", "full", "dataset")
 
+# One usage entry per this many seconds of model scoring, and one when the run ends
+# (normally or on an exception). An entry every few calls made the tracked ledger
+# change every minute of a long run; local calls have no count cap (budget.toml),
+# so only the entries' granularity changes.
+LEDGER_FLUSH_SECONDS = 900.0
+
+
+class LedgerFlusher:
+    """Flushes a client's usage to the ledger at most once per ``seconds``."""
+
+    def __init__(
+        self,
+        client: Any,
+        seconds: float = LEDGER_FLUSH_SECONDS,
+        clock: Any = time.monotonic,
+    ) -> None:
+        self.client, self.seconds, self.clock = client, seconds, clock
+        self.last = clock()
+
+    def maybe_flush(self) -> bool:
+        """Flush if the interval has passed since the last flush; report whether it did."""
+        now = self.clock()
+        if now - self.last < self.seconds:
+            return False
+        self.client.flush()
+        self.last = now
+        return True
+
 
 def prereg_link(path: str) -> dict[str, str]:
     """A citation of a preregistration: its path and its config's canonical SHA-256."""
@@ -254,12 +282,13 @@ def main(argv: list[str] | None = None) -> int:
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
         done[trace.trace_id] = rec
 
+    flusher = LedgerFlusher(client) if server is not None else None
     try:
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             for i, fut in enumerate([pool.submit(job, t) for t in todo], start=1):
                 fut.result()
-                if i % 10 == 0 and server is not None:
-                    client.flush()
+                if flusher is not None:
+                    flusher.maybe_flush()
                 if i % 100 == 0:
                     print(f"  {i}/{len(todo)}", flush=True)
     finally:
