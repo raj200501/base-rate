@@ -52,3 +52,7 @@ Iteration history moved out of STATUS.md. Newest last.
   instead of one per ten calls, so the tracked ledger is not changing every minute of a
   long run; local calls have no count cap, so cap checks are unchanged. The container
   restarted once (2026-11-04 22:21 UTC); the pipeline resumed from its banked runs.
+- The 8B scoring step stopped once before it began: the server start waited a fixed 240
+  polls, and a cold read of the 8B weights after the restart took longer. Servers now
+  get a 30-minute deadline (a server that exits still fails at once); the pipeline was
+  restarted.

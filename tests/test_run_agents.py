@@ -178,6 +178,76 @@ def test_server_start_refuses_a_port_that_already_answers(tmp_path: Path) -> Non
         httpd.shutdown()
 
 
+class _FakeProc:
+    returncode = None
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.args = ["llama-server"]
+        self.terminated = False
+
+    def poll(self) -> int | None:
+        return None
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+
+class _Healthy:
+    status = 200
+
+    def __enter__(self) -> _Healthy:
+        return self
+
+    def __exit__(self, *args: Any) -> bool:
+        return False
+
+
+def _fake_start(
+    monkeypatch: pytest.MonkeyPatch, healthy_after: float
+) -> tuple[list[float], list[_FakeProc]]:
+    """A fake clock, process, and health endpoint that answers after ``healthy_after`` s."""
+    clock = [0.0]
+    procs: list[_FakeProc] = []
+    polls = [0]
+
+    def popen(*args: Any, **kwargs: Any) -> _FakeProc:
+        procs.append(_FakeProc())
+        return procs[-1]
+
+    def urlopen(url: str, timeout: float) -> _Healthy:
+        polls[0] += 1
+        if polls[0] == 1 or clock[0] < healthy_after:  # the first call is the port check
+            raise OSError("connection refused")
+        return _Healthy()
+
+    def sleep(seconds: float) -> None:
+        clock[0] += seconds
+
+    monkeypatch.setattr(ra.subprocess, "Popen", popen)
+    monkeypatch.setattr(ra.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(ra.time, "sleep", sleep)
+    monkeypatch.setattr(ra.time, "monotonic", lambda: clock[0])
+    return clock, procs
+
+
+def test_server_start_waits_for_a_slow_cold_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 8B model took longer than the old 240 polls to load from a cold disk."""
+    clock, procs = _fake_start(monkeypatch, healthy_after=600.0)
+    proc = ra.start_server({"file": "x.gguf"}, 8095, 1, 1, tmp_path / "s.log")
+    assert proc is procs[0] and not procs[0].terminated and clock[0] >= 600.0
+
+
+def test_server_start_gives_up_after_its_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clock, procs = _fake_start(monkeypatch, healthy_after=float("inf"))
+    with pytest.raises(SystemExit, match="did not become healthy"):
+        ra.start_server({"file": "x.gguf"}, 8095, 1, 1, tmp_path / "s.log")
+    assert procs[0].terminated and clock[0] >= ra.SERVER_START_SECONDS
+
+
 def test_split_rounds_the_second_share_half_up() -> None:
     cb = _load_tool("count_benign")
     assert cb.split_attempts(700, 1600, 500) == (533, 167)  # 166.67 -> 167

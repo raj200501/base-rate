@@ -60,6 +60,12 @@ the KV cache exceeded the VM's memory and the kernel killed the server (DECISION
 the cap affects speed only."""
 
 
+# How long a server may take to load its model. A cold read of the 8B weights from this
+# VM's disk after a restart outlasted the old fixed wait of 240 polls; a server that
+# exits still fails at once.
+SERVER_START_SECONDS = 1800.0
+
+
 def start_server(
     entry: dict[str, Any], port: int, slots: int, threads: int, log: Path
 ) -> subprocess.Popen[bytes]:
@@ -89,7 +95,8 @@ def start_server(
     except OSError:
         pass
     proc = subprocess.Popen(cmd, stdout=log.open("ab"), stderr=subprocess.STDOUT)
-    for _ in range(240):
+    deadline = time.monotonic() + SERVER_START_SECONDS
+    while time.monotonic() < deadline:
         if proc.poll() is not None:
             raise SystemExit(f"llama-server exited with {proc.returncode}; see {log}")
         try:
@@ -97,9 +104,12 @@ def start_server(
                 if r.status == 200:
                     return proc
         except OSError:
-            time.sleep(1)
+            pass  # not listening yet, or 503 while the model loads
+        time.sleep(2)
     proc.terminate()
-    raise SystemExit("llama-server did not become healthy")
+    raise SystemExit(
+        f"llama-server did not become healthy within {SERVER_START_SECONDS:.0f} s; see {log}"
+    )
 
 
 def stop_server(server: subprocess.Popen[bytes]) -> None:
