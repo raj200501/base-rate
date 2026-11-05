@@ -56,3 +56,6 @@ Iteration history moved out of STATUS.md. Newest last.
   polls, and a cold read of the 8B weights after the restart took longer. Servers now
   get a 30-minute deadline (a server that exits still fails at once); the pipeline was
   restarted.
+- 2026-11-05 11:17 UTC: the pipeline finished. Every score file prereg/0003 lists is
+  banked and committed, each citing prereg/0003 and the corpus manifest hash, and the
+  set of files matches the preregistered plan (monitors, sets, and prefix scores).

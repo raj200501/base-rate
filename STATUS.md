@@ -3,7 +3,7 @@ STATE: ACTIVE
 
 # Status
 
-Updated 2026-11-04 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
+Updated 2026-11-05 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
 
 ## Gates
 
@@ -18,8 +18,8 @@ Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on dat
 | G4 Offline demo | make demo matches golden output | |
 | G5 Statistical engine | E0 banked (all 2,376 cells; failures documented, library warns) | E2 headline cross-check once E2 exists |
 | G6 Corpus | corpus built and banked (artifacts/corpus: composition, relabeling and insertion logs, seed ranges, canary in every record) | blind audit (sample drawn, workflow ready), datasheet render |
-| G7 Main study | E2 preregistered; rule monitors scored and banked (artifacts/scores, metadata cites prereg/0003) | model monitors scoring in the pipeline, then analysis |
-| G8 Transfer and cascades | E3 and E4 preregistered; E3 set fixed to its prereg (D22); E4 cost timing fixed | analysis after scoring |
+| G7 Main study | every score file prereg/0003 lists is banked (three rule monitors, the Qwen3 ladder; each cites prereg/0003 and the corpus hash) | E2 analysis (tools/analyze.py), then the report |
+| G8 Transfer and cascades | E3 and E4 preregistered; E3 set fixed to its prereg (D22); E4 cost timing fixed; member scores banked | E3 and E4 analysis |
 | G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples (render) |
 | G10 Claim integrity | claimcheck and freshness cover README, REPORT, DATA; numbers.json source hashes and make reproduce checked | render on real results |
 | G11 Preregistration integrity | prereg-verify passes (7 preregistrations); merges, renames, amendments, shallow clones handled in both checks | confirmatory artifacts after the pipeline |
@@ -29,33 +29,32 @@ Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on dat
 
 ## Now
 
-The unattended pipeline (tools/run_pipeline.sh) has finished both corpus batches, both
-insertion runs under prereg/0007, the corpus build (artifacts/corpus, committed), the
-blind audit sample (runs/audit), and the rule monitor scoring (artifacts/scores,
-committed). It is now scoring the model monitors, smallest first: Qwen3 0.6B and 1.7B are
-banked and committed, 4B is running, then 8B and the 0.6B run on the full set, all
-automatic; each finished monitor is committed as it lands. The insertion log in the
-corpus manifest accounts for every planned attempt; the skips all fall in
-false_completion, which the report must state.
+The unattended pipeline (tools/run_pipeline.sh) finished on 2026-11-05 at 11:17 UTC, and
+everything it banked is committed: both corpus batches, both insertion runs under
+prereg/0007, the corpus build (artifacts/corpus), the blind audit sample (runs/audit), and
+every score file prereg/0003 lists (artifacts/scores: three rule monitors and the Qwen3
+0.6B, 1.7B, 4B, and 8B monitors on their preregistered sets, with prefix scores where the
+plan asks for them; each file cites prereg/0003 and the corpus manifest hash). The
+insertion log in the corpus manifest accounts for every planned attempt; the skips all
+fall in false_completion, which the report must state.
 
-Interruptions so far: the VM was reclaimed once (D20) and the container restarted once
-(2026-11-04 22:21 UTC); the 4B server was killed once for memory (D24); the 0.6B dataset
-step crashed once on a response cache race (two identical requests shared a temporary
-file; fixed with a test). Each time the pipeline resumed from its banked runs, and the
-corpus build now keeps a current banked corpus. If the VM is reclaimed again, restart it
-with `setsid nohup bash tools/run_pipeline.sh >> runs/pipeline/pipeline.log 2>&1 &`.
+Interruptions during the run: the VM was reclaimed once (D20) and the container restarted
+once (2026-11-04 22:21 UTC); the 4B server was killed once for memory (D24); the 0.6B
+dataset step crashed once on a response cache race (fixed with a test); the 8B server
+start outlasted a fixed wait after the restart (now a deadline, fixed with a test). Each
+time the pipeline resumed from its banked runs, and the corpus build keeps a current
+banked corpus.
 
 The blind label audit has each auditor agent read only its own batch file
 (tools/label_audit.py batches), and the evidence check allows nothing else.
 
 ## Next three actions
 
-1. Run `tools/label_audit.py batches`, run the blind label audit workflow with each agent
-   reading its batch file, bank evidence with tools/audit_evidence.py and
-   tools/label_audit.py score, render docs/DATA.md.
-2. As each model monitor finishes, commit its scores; after scoring, run E2, E3, E4
-   (tools/analyze.py), commit, then make report.
-3. Write the results prose, README finding and limitations (insertion and relabeling
+1. Blind label audit: `tools/label_audit.py batches`, the audit workflow with each agent
+   reading its batch file, `tools/audit_evidence.py`, `tools/label_audit.py score`; then
+   render docs/DATA.md.
+2. Run E2, E3, and E4 (tools/analyze.py) on the banked scores, commit, then make report.
+3. Write the results prose, README finding, and limitations (insertion and relabeling
    tables into the report, with the false_completion skips), then make review and the
    final sequence.
 
