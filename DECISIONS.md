@@ -344,6 +344,14 @@ reports a violation for that day, and G14 fails on it. The overrun is not hidden
 caps are lowered only, and how the project treats a past overrun is Raj's decision
 (STATUS.md, "Needs Raj"). No further review runs happen on 2026-11-11.
 
+Two facts belong with this record. The second run was the same reviewer subagent resumed
+with a follow-up message at 05:20:58 UTC, not a fresh agent. And the decision behind it,
+to restart brief 10.6's final sequence in the same session rather than "in a later turn"
+after the first BLOCK, was written down only in docs/LOG.md at 05:23 UTC, after that run
+had started; it is recorded here. The after-the-fact ledger entries carry the reviews'
+completion times (their reviewed_at) and no token or wall-time counts, which subagent runs
+do not report.
+
 ## D26 (2026-11-11) Waiver: the 2026-11-11 claude_review_run overrun (D25)
 
 Approved by Raj on 2026-11-11, in his message of that day: he accepts the overrun D25
@@ -358,6 +366,16 @@ also requires each applied waiver to be tracked and to cite a DECISIONS.md entry
 records Raj's approval for that day and kind (tests/test_gate_mutations.py). The overrun
 stays disclosed in README.md, CORRECTIONS.md, and STATUS.md.
 
+The approval, field by field (`make budget` and G14 require budget_waivers.toml to match
+this line exactly):
+
+Waiver record: decision=D26; day=2026-11-11; kind=claude_review_run; max_entries=2; approved_by=Raj Kashikar; approved_on=2026-11-11
+
+This is a deviation from the literal text of brief G14 ("every cap respected"), approved
+by Raj, and the one exception to D5's rule that a later change to a gate may only
+strengthen it: G14 now passes with this one overrun on record. It is no wider than
+Raj's approval: one day, one kind, at most two entries, and nothing else.
+
 ## D27 (2026-11-11) Which Claude runs the usage ledger records
 
 The caps in brief section 8 bind three kinds of Claude use, each named by its comment
@@ -371,3 +389,41 @@ subagents (parallel builders under D10, the review-and-skeptic workflows of D21,
 citation checker, verification agents) are the session's work rather than one of those
 kinds, as they have been throughout, and are not logged per call. No Claude model has run
 as a subject or a monitor (D2).
+
+## D28 (2026-11-11) Three points D27 left unstated, against brief section 8
+
+1. The turn cap. `claude_agent_max_turns` ("per headless run (or per subtask message in
+   resumed sessions)") binds headless Claude children. budget.py checks it for the capped
+   subject runs (claude_agent_run), and the headless `make review` path now passes the
+   effective cap to the child as `--max-turns` (tools/review.py; not exercised here, where the
+   billing guard blocks headless runs). The reviewer and the label auditors ran as Claude Code subagents of
+   this session, which section 8 allows "for a handful of pipeline calls", not as headless
+   children, so no turn cap bound them. The first review made 95 tool calls and the resumed
+   second 23, more than the effective cap of 8 turns at CAP_SHARE=0.2 would allow a headless
+   run. Recorded so a reader can judge it.
+2. The single-call procedure. The twenty label-audit auditors ran as workflow subagents,
+   each reading one batch file of ten records and returning structured answers, not as
+   headless single calls with `--tools ""` batching 20 to 50 items. They are counted
+   conservatively as twenty single calls (the cap is 60 a day at CAP_SHARE=0.2). This is a
+   deviation from section 8's single-call procedure; the blindness evidence of the audit
+   (tools/label_audit.py, artifacts/corpus/label_audit.json) is unaffected.
+3. The development workflows D27 does not log per call, under D10 and brief 10.4 ("Use
+   subagents for literature verification, wide code review, and data audits"): on
+   2026-11-04, three review-and-skeptic workflows over the session's own changes, of 32, 61,
+   and 26 agents (11 reviewers and 108 skeptics in all); on 2026-11-11, a pre-review QA
+   workflow of 4 agents and the fork subagents that wrote fixes; and the citation checker in
+   earlier sessions. Counted as judging calls, 2026-11-04 would exceed the single-call cap.
+   This classification is the project's reading of the brief, written on 2026-11-11 after
+   those runs; Raj may overrule it.
+
+
+## D29 (2026-11-11) The cap share is recorded in budget.toml
+
+D9 relied on `CAP_SHARE=0.2` being exported in every command, but this session's later
+containers did not set it, so `make budget` and the review-cap check would have used the
+full share. Raj's standing instruction of 2026-11-11 is to keep CAP_SHARE at 0.2. budget.toml
+now records `cap_share = 0.2`, validated like a cap (a number in (0, 1], lowered only), and
+the share in force is the smaller of that and `CAP_SHARE` when the environment sets it
+(src/baserate/budget.py share_in_force; tools/review.py). An unset or larger `CAP_SHARE` can
+no longer raise the caps; a smaller one still lowers them. Claude ledger entries must record
+their share (they fail closed without it), and a day's cap uses the smallest share in force.

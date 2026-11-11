@@ -19,6 +19,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import re
 import sys
 import tomllib
 from collections import Counter
@@ -61,6 +63,7 @@ class Budget:
 
     cash_usd: float
     caps: Mapping[str, float]
+    cap_share: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -109,7 +112,7 @@ def parse_budget(data: Mapping[str, Any]) -> Budget:
     """
     if data.get("cash_usd") != 0:
         raise BudgetError("cash_usd must be exactly 0")
-    unknown = sorted(set(data) - set(DEFAULT_CAPS) - {"cash_usd"})
+    unknown = sorted(set(data) - set(DEFAULT_CAPS) - {"cash_usd", "cap_share"})
     if unknown:
         raise BudgetError(f"unknown keys in budget.toml: {', '.join(unknown)}")
     caps: dict[str, float] = {}
@@ -125,7 +128,23 @@ def parse_budget(data: Mapping[str, Any]) -> Budget:
         elif value > default:
             raise BudgetError(f"cap {key} raised above default {default}")
         caps[key] = float(value)
-    return Budget(cash_usd=0.0, caps=caps)
+    raw_share = data.get("cap_share", 1.0)
+    if isinstance(raw_share, bool) or not isinstance(raw_share, int | float):
+        raise BudgetError(f"budget.toml cap_share must be a number, not {raw_share!r}")
+    share = parse_cap_share(raw_share, "budget.toml cap_share")
+    return Budget(cash_usd=0.0, caps=caps, cap_share=share)
+
+
+def share_in_force(budget: Budget, env: str | None) -> float:
+    """The cap share in force: the smaller of budget.toml's ``cap_share`` and ``CAP_SHARE``.
+
+    budget.toml records the project's share durably (it may only be lowered, like a cap),
+    so an environment without ``CAP_SHARE`` cannot raise the caps; ``CAP_SHARE`` can only
+    lower them further.
+    """
+    if env is None:
+        return budget.cap_share
+    return min(budget.cap_share, parse_cap_share(env, "CAP_SHARE"))
 
 
 def load_budget(path: Path) -> Budget:
@@ -189,6 +208,14 @@ def parse_entry(record: Mapping[str, Any]) -> LedgerEntry:
         raise BudgetError(f"unknown ledger kind {kind!r}")
     turns = record.get("turns")
     params_b = record.get("params_b")
+    if "cap_share" in record:
+        share = parse_cap_share(record["cap_share"], f"{kind} entry at {ts.isoformat()}")
+    elif kind.startswith("claude_"):
+        # A capped Claude entry must say which share was in force; a silent default of 1.0
+        # would let it count against the full cap (fail closed).
+        raise BudgetError(f"{kind} entry at {ts.isoformat()} records no cap_share")
+    else:
+        share = 1.0
     return LedgerEntry(
         ts=ts,
         kind=kind,
@@ -196,8 +223,25 @@ def parse_entry(record: Mapping[str, Any]) -> LedgerEntry:
         plan_equivalent_usd=float(record.get("plan_equivalent_usd", 0.0)),
         turns=None if turns is None else int(turns),
         params_b=None if params_b is None else float(params_b),
-        cap_share=float(record.get("cap_share", 1.0)),
+        cap_share=share,
     )
+
+
+def parse_cap_share(value: Any, what: str) -> float:
+    """A ``cap_share``: a finite number in (0, 1].
+
+    Raises:
+        BudgetError: For a boolean, a non-number, NaN, infinity, or a value outside (0, 1].
+    """
+    if isinstance(value, bool):
+        raise BudgetError(f"{what}: cap_share must be a number, not {value!r}")
+    try:
+        share = float(value)
+    except (TypeError, ValueError) as exc:
+        raise BudgetError(f"{what}: cap_share must be a number, not {value!r}") from exc
+    if not math.isfinite(share) or not 0.0 < share <= 1.0:
+        raise BudgetError(f"{what}: cap_share must be in (0, 1], not {value!r}")
+    return share
 
 
 def read_ledger(path: Path) -> list[LedgerEntry]:
@@ -214,8 +258,12 @@ def read_ledger(path: Path) -> list[LedgerEntry]:
     """
     if not path.exists():
         return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise BudgetError(f"cannot read {path}: {exc}") from exc
     entries = []
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
         try:
@@ -235,7 +283,10 @@ def utc_day(ts: datetime) -> str:
     to a neighbouring day's cap.
     """
     aware = ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
-    return aware.astimezone(UTC).date().isoformat()
+    try:
+        return aware.astimezone(UTC).date().isoformat()
+    except (OverflowError, ValueError) as exc:
+        raise BudgetError(f"ledger timestamp {ts.isoformat()} has no UTC day: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -263,6 +314,11 @@ WAIVER_KEYS: frozenset[str] = frozenset(
     {"decision", "day", "kind", "max_entries", "approved_by", "approved_on"}
 )
 
+APPROVER = "Raj Kashikar"
+"""The only person who may approve a waiver (the project's owner)."""
+
+DECISION_ID = re.compile(r"D[0-9]+")
+
 
 def _iso_day(value: Any, what: str) -> date:
     try:
@@ -287,6 +343,7 @@ def parse_waivers(data: Mapping[str, Any]) -> list[Waiver]:
         raise BudgetError("waivers must be [[waiver]] tables")
     out: list[Waiver] = []
     seen: set[tuple[str, str]] = set()
+    seen_ids: set[str] = set()
     for item in raw:
         if not isinstance(item, Mapping):
             raise BudgetError("each waiver must be a table")
@@ -297,6 +354,11 @@ def parse_waivers(data: Mapping[str, Any]) -> list[Waiver]:
         if missing:
             raise BudgetError(f"waiver missing keys: {missing}")
         decision = str(item["decision"])
+        if not DECISION_ID.fullmatch(decision):
+            raise BudgetError(f"waiver decision id {decision!r} must look like D26")
+        if decision in seen_ids:
+            raise BudgetError(f"repeated decision {decision}: one waiver per decision")
+        seen_ids.add(decision)
         day = _iso_day(item["day"], f"waiver {decision} day")
         approved_on = _iso_day(item["approved_on"], f"waiver {decision} approved_on")
         if approved_on < day:
@@ -327,13 +389,69 @@ def load_waivers(path: Path) -> list[Waiver]:
         return []
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise BudgetError(f"cannot read {path}: {exc}") from exc
     return parse_waivers(data)
 
 
+def waiver_record_line(w: Waiver) -> str:
+    """The exact line that records a waiver's approval in its DECISIONS.md entry."""
+    return (
+        f"Waiver record: decision={w.decision}; day={w.day}; kind={w.kind}; "
+        f"max_entries={w.max_entries}; approved_by={w.approved_by}; approved_on={w.approved_on}"
+    )
+
+
+def _decision_sections(text: str, decision: str) -> list[str]:
+    """Every DECISIONS.md section headed ``## <decision> (``, each up to the next heading."""
+    lines = text.splitlines()
+    sections: list[str] = []
+    for i, line in enumerate(lines):
+        if line.startswith(f"## {decision} ("):
+            end = next((j for j in range(i + 1, len(lines)) if lines[j].startswith("## ")), None)
+            sections.append("\n".join(lines[i : end if end is not None else len(lines)]))
+    return sections
+
+
+def waiver_record_problems(waivers: Sequence[Waiver], decisions_text: str) -> list[str]:
+    """Problems with each waiver's approval record in DECISIONS.md.
+
+    A waiver counts only if :data:`APPROVER` approved it and the one DECISIONS.md
+    section headed ``## <decision> (`` holds, as a line of its own, exactly
+    :func:`waiver_record_line` of the waiver, which pins its day, kind,
+    ``max_entries``, approver, and approval date. A quoted line, a line in another
+    section, or a line with any other field value does not count.
+    """
+    problems: list[str] = []
+    for w in waivers:
+        if w.approved_by != APPROVER:
+            problems.append(f"waiver {w.decision} is approved by {w.approved_by}, not {APPROVER}")
+            continue
+        sections = _decision_sections(decisions_text, w.decision)
+        if len(sections) != 1:
+            problems.append(
+                f"waiver {w.decision} needs exactly one DECISIONS.md section "
+                f"'## {w.decision} (', found {len(sections)}"
+            )
+            continue
+        if re.search(r"\bnot\s+approved\b", sections[0], re.IGNORECASE):
+            problems.append(
+                f"waiver {w.decision}: its DECISIONS.md section says it is not approved"
+            )
+            continue
+        record = waiver_record_line(w)
+        if record not in (line.strip() for line in sections[0].splitlines()):
+            problems.append(
+                f"waiver {w.decision}: its DECISIONS.md section lacks the exact line '{record}'"
+            )
+    return problems
+
+
 def check_ledger(
-    budget: Budget, entries: Iterable[LedgerEntry], waivers: Sequence[Waiver] = ()
+    budget: Budget,
+    entries: Iterable[LedgerEntry],
+    waivers: Sequence[Waiver] = (),
+    cap_share: float | None = None,
 ) -> BudgetReport:
     """Check logged usage against the caps.
 
@@ -347,6 +465,8 @@ def check_ledger(
         budget: The validated budget.
         entries: Ledger entries.
         waivers: Accepted past overruns (``budget_waivers.toml``).
+        cap_share: The ``CAP_SHARE`` in force now, if known; a day's share is then
+            never above it, whatever its entries record.
 
     Returns:
         Totals, per-day counts, every violation found, and every waived overrun.
@@ -359,15 +479,16 @@ def check_ledger(
     )
     counts: Counter[tuple[str, str]] = Counter()
     min_share: dict[str, float] = {}
+    ceiling = 1.0 if cap_share is None else cap_share
     for e in items:
         day = utc_day(e.ts)
-        min_share[day] = min(min_share.get(day, 1.0), e.cap_share)
+        min_share[day] = min(min_share.get(day, ceiling), e.cap_share)
         if e.kind in DAILY_CAP_FOR_KIND:
             counts[(day, e.kind)] += 1
         if e.cash_usd != 0:
             report.violations.append(f"{e.ts.isoformat()}: cash_usd {e.cash_usd} recorded")
         if e.kind == "claude_agent_run":
-            cap = effective_cap(budget, "claude_agent_max_turns", e.cap_share)
+            cap = effective_cap(budget, "claude_agent_max_turns", min(e.cap_share, ceiling))
             if e.turns is None:
                 report.violations.append(f"{e.ts.isoformat()}: agent run without turn count")
             elif e.turns > cap:
@@ -476,11 +597,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="accepted past overruns (default: budget_waivers.toml beside --budget)",
     )
+    parser.add_argument(
+        "--decisions",
+        type=Path,
+        default=None,
+        help="approval records for the waivers (default: DECISIONS.md beside --budget)",
+    )
     args = parser.parse_args(argv)
     waivers_path = args.waivers or args.budget.parent / "budget_waivers.toml"
+    decisions_path = args.decisions or args.budget.parent / "DECISIONS.md"
     try:
         budget = load_budget(args.budget)
-        report = check_ledger(budget, read_ledger(args.ledger), load_waivers(waivers_path))
+        share = share_in_force(budget, os.environ.get("CAP_SHARE"))
+        waivers = load_waivers(waivers_path)
+        problems: list[str] = []
+        decisions = ""
+        if waivers:
+            try:
+                decisions = decisions_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                raise BudgetError(f"waivers need their approval records: {exc}") from exc
+            problems = waiver_record_problems(waivers, decisions)
+        valid = (
+            [w for w in waivers if not waiver_record_problems([w], decisions)] if waivers else []
+        )
+        report = check_ledger(budget, read_ledger(args.ledger), valid, cap_share=share)
+        report.violations[:0] = problems
     except BudgetError as exc:
         print(f"budget error: {exc}")
         print("caps: VIOLATED")

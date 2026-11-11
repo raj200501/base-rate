@@ -757,16 +757,22 @@ max_entries = 2
 approved_by = "Raj Kashikar"
 approved_on = "2026-11-11"
 """
+RECORD = (
+    "Waiver record: decision=D26; day=2026-11-11; kind=claude_review_run; max_entries=2; "
+    "approved_by=Raj Kashikar; approved_on=2026-11-11"
+)
 APPROVAL = (
     "# Decisions\n\n## D26 (2026-11-11) Waiver: the 2026-11-11 claude_review_run overrun\n\n"
-    "Approved by Raj on 2026-11-11, for that one day and that one overrun.\n"
+    f"Approved by Raj on 2026-11-11, for that one day and that one overrun.\n\n{RECORD}\n"
 )
 
 
-def _overrun(r: Any, waiver: bool, approval: str | None) -> None:
-    r.write("artifacts/usage/ledger.jsonl", OVERRUN)
+def _overrun(
+    r: Any, waiver: bool, approval: str | None, rows: str = WAIVER, ledger: str = OVERRUN
+) -> None:
+    r.write("artifacts/usage/ledger.jsonl", ledger)
     if waiver:
-        r.write("budget_waivers.toml", WAIVER)
+        r.write("budget_waivers.toml", rows)
     if approval is not None:
         r.write("DECISIONS.md", approval)
     r.commit("usage")
@@ -776,6 +782,7 @@ def test_g14_honors_a_waiver_raj_approved(g14: Any, tmp_path: Path) -> None:
     _overrun(g14, waiver=True, approval=APPROVAL)
     evidence = assert_pass(14, g14, tmp_path)
     assert "caps respected except waived overruns (D26" in evidence
+    assert "approved by Raj Kashikar" in evidence
 
 
 G14_CASES += [
@@ -787,12 +794,100 @@ G14_CASES += [
     (
         "waiver-without-approval",
         lambda r: _overrun(r, waiver=True, approval="# Decisions\n"),
-        "waiver D26 has no DECISIONS.md entry approved by Raj",
+        "make budget: caps: VIOLATED",
     ),
     (
         "waiver-approval-not-by-raj",
-        lambda r: _overrun(r, waiver=True, approval=APPROVAL.replace("Approved by Raj", "Noted")),
-        "waiver D26 has no DECISIONS.md entry approved by Raj",
+        lambda r: _overrun(
+            r,
+            waiver=True,
+            approval=APPROVAL.replace(
+                "Approved by Raj on", "This waiver is NOT approved by Raj on"
+            ),
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-repeated-id",
+        lambda r: _overrun(
+            r,
+            waiver=True,
+            approval=APPROVAL,
+            # a forged row first: the old check kept only the last row per decision id
+            rows=WAIVER.replace("claude_review_run", "claude_single_call").replace(
+                "max_entries = 2", "max_entries = 100"
+            )
+            + "\n"
+            + WAIVER,
+            ledger=OVERRUN
+            + "".join(
+                json.dumps(
+                    {
+                        "ts": f"2026-11-11T{5 + i // 60:02d}:{i % 60:02d}:00+00:00",
+                        "kind": "claude_single_call",
+                        "cap_share": 0.2,
+                    }
+                )
+                + "\n"
+                for i in range(61)
+            ),
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-alias-id",
+        lambda r: _overrun(
+            r, waiver=True, approval=APPROVAL, rows=WAIVER.replace('"D26"', '"D26, D26"')
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-max-entries-raised",
+        lambda r: _overrun(
+            r,
+            waiver=True,
+            approval=APPROVAL,
+            rows=WAIVER.replace("max_entries = 2", "max_entries = 6"),
+            ledger=OVERRUN * 3,
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-record-says-not-approved",
+        lambda r: _overrun(
+            r, waiver=True, approval=APPROVAL.replace(RECORD, "This waiver is NOT approved by Raj.")
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-approved-by-someone-else",
+        lambda r: _overrun(
+            r,
+            waiver=True,
+            approval=APPROVAL.replace("approved_by=Raj Kashikar", "approved_by=Someone Else"),
+            rows=WAIVER.replace("Raj Kashikar", "Someone Else"),
+        ),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "decisions-ignored-and-untracked",
+        lambda r: (
+            r.write(".gitignore", "private/\nDECISIONS.md\n"),
+            _overrun(r, waiver=True, approval=None),
+            r.write("DECISIONS.md", APPROVAL),
+        ),
+        "make budget applied waivers but DECISIONS.md is not tracked",
+    ),
+    (
+        "review-run-without-cap-share",
+        lambda r: _overrun(
+            r,
+            waiver=False,
+            approval=None,
+            ledger=json.dumps({"ts": "2026-11-12T01:00:00+00:00", "kind": "claude_review_run"})
+            + "\n",
+        ),
+        "make budget: caps: VIOLATED",
     ),
     (
         "waiver-untracked",

@@ -103,8 +103,14 @@ def test_ledger_round_trip_and_clean_report(tmp_path: Path) -> None:
                 "ts": "2026-10-23T01:00:00+00:00",
                 "kind": "claude_single_call",
                 "plan_equivalent_usd": 0.25,
+                "cap_share": 1.0,
             },
-            {"ts": "2026-10-23T02:00:00+00:00", "kind": "claude_agent_run", "turns": 12},
+            {
+                "ts": "2026-10-23T02:00:00+00:00",
+                "kind": "claude_agent_run",
+                "turns": 12,
+                "cap_share": 1.0,
+            },
             {"ts": "2026-10-23T03:00:00+00:00", "kind": "local_call", "params_b": 1.5},
         ],
     )
@@ -242,6 +248,16 @@ approved_on = "2026-11-11"
 """
 
 
+D26_RECORD = (
+    "Waiver record: decision=D26; day=2026-11-11; kind=claude_review_run; max_entries=2; "
+    "approved_by=Raj Kashikar; approved_on=2026-11-11"
+)
+D26_APPROVAL = (
+    "# Decisions\n\n## D26 (2026-11-11) Waiver: the 2026-11-11 claude_review_run overrun\n\n"
+    f"Approved by Raj on 2026-11-11.\n\n{D26_RECORD}\n\n## D27 (2026-11-11) Other\n\nText.\n"
+)
+
+
 def _runs(kind: str, day: str, n: int, share: float = 0.2) -> list[budget.LedgerEntry]:
     return [
         budget.LedgerEntry(
@@ -313,7 +329,8 @@ def test_a_waiver_that_excuses_nothing_fails() -> None:
         (D26 + 'note = "x"\n', "unknown"),
         (D26.replace('decision = "D26"\n', ""), "missing"),
         (D26.replace('day = "2026-11-11"', 'day = "2026-13-11"'), "date"),
-        (D26 + "\n" + D26, "duplicate"),
+        (D26 + "\n" + D26, "repeated decision|duplicate"),
+        (D26 + "\n" + D26.replace('"D26"', '"D27"'), "duplicate waiver for 2026-11-11"),
         ("extra = 1\n" + D26, "unknown"),
     ],
     ids=[
@@ -325,6 +342,7 @@ def test_a_waiver_that_excuses_nothing_fails() -> None:
         "missing-key",
         "bad-date",
         "duplicate",
+        "same-day-and-kind",
         "extra-table",
     ],
 )
@@ -344,6 +362,8 @@ def test_repository_waivers_match_the_repository_ledger() -> None:
         caps, budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl"), waivers
     )
     assert report.ok and len(report.waived) == 1 and report.waived[0].startswith("2026-11-11:")
+    decisions = (root / "DECISIONS.md").read_text(encoding="utf-8")
+    assert budget.waiver_record_problems(waivers, decisions) == []
 
 
 def test_cli_reports_the_waiver(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -357,6 +377,7 @@ def test_cli_reports_the_waiver(tmp_path: Path, capsys: pytest.CaptureFixture[st
     )
     w = tmp_path / "budget_waivers.toml"
     w.write_text(D26)
+    (tmp_path / "DECISIONS.md").write_text(D26_APPROVAL)
     assert budget.main(["--budget", str(b), "--ledger", str(led), "--waivers", str(w)]) == 0
     out = capsys.readouterr().out.splitlines()
     assert out[-1] == "caps: respected except waived overruns (D26)"
@@ -384,3 +405,168 @@ def test_days_are_utc_days_whatever_the_offset() -> None:
     assert report.daily_counts == {("2026-11-13", "claude_review_run"): 2}
     assert any("2026-11-13: 2 claude_review_run entries > cap 1" in v for v in report.violations)
     assert budget.calls_remaining(caps, entries, "claude_review_run", "2026-11-13", 0.2) == 0
+
+
+# ------------------------------------------------- exact approval records (QA)
+
+
+def test_decision_ids_must_be_unique_and_plain() -> None:
+    second = D26.replace("2026-11-11", "2026-11-09").replace(
+        "claude_review_run", "claude_single_call"
+    )
+    with pytest.raises(budget.BudgetError, match="repeated decision"):
+        _waivers(D26 + "\n" + second)
+    with pytest.raises(budget.BudgetError, match="decision id"):
+        _waivers(D26.replace('decision = "D26"', 'decision = "D26, D26"'))
+
+
+def test_the_approval_record_pins_every_field() -> None:
+    waivers = _waivers()
+    assert budget.waiver_record_line(waivers[0]) == D26_RECORD
+    assert budget.waiver_record_problems(waivers, D26_APPROVAL) == []
+    raised = _waivers(D26.replace("max_entries = 2", "max_entries = 6"))
+    assert budget.waiver_record_problems(raised, D26_APPROVAL)  # the record says 2
+
+
+@pytest.mark.parametrize(
+    "decisions",
+    [
+        D26_APPROVAL.replace(D26_RECORD, "This waiver is NOT approved by Raj on 2026-11-11."),
+        D26_APPROVAL.replace(D26_RECORD, "> " + D26_RECORD),
+        D26_APPROVAL.replace(D26_RECORD, "").replace("Text.", D26_RECORD),
+        D26_APPROVAL.replace(D26_RECORD, D26_RECORD.replace("max_entries=2", "max_entries=3")),
+        D26_APPROVAL + "\n## D26 (2026-11-12) A second D26\n\nText.\n",
+        D26_APPROVAL.replace("Approved by Raj on", "This waiver is not approved by Raj on"),
+        "# Decisions\n",
+    ],
+    ids=[
+        "not-approved",
+        "quoted",
+        "other-section",
+        "other-count",
+        "two-sections",
+        "record-kept-but-not-approved",
+        "absent",
+    ],
+)
+def test_a_waiver_without_its_exact_record_fails(decisions: str) -> None:
+    assert budget.waiver_record_problems(_waivers(), decisions)
+
+
+def test_only_raj_approves_waivers() -> None:
+    other = _waivers(D26.replace("Raj Kashikar", "Someone Else"))
+    record = D26_APPROVAL.replace("approved_by=Raj Kashikar", "approved_by=Someone Else")
+    assert budget.waiver_record_problems(other, record)
+
+
+def test_cli_refuses_a_stretched_waiver(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    runs = [
+        {"ts": f"2026-11-11T0{i}:00:00+00:00", "kind": "claude_review_run", "cap_share": 0.2}
+        for i in range(6)
+    ]
+    b, led = _write(tmp_path, DEFAULT_TOML, runs)
+    (tmp_path / "budget_waivers.toml").write_text(D26.replace("max_entries = 2", "max_entries = 6"))
+    (tmp_path / "DECISIONS.md").write_text(D26_APPROVAL)
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1
+    assert capsys.readouterr().out.splitlines()[-1] == "caps: VIOLATED"
+
+
+def test_cli_refuses_a_waiver_without_decisions(tmp_path: Path) -> None:
+    runs = [
+        {"ts": f"2026-11-11T0{i}:00:00+00:00", "kind": "claude_review_run", "cap_share": 0.2}
+        for i in range(2)
+    ]
+    b, led = _write(tmp_path, DEFAULT_TOML, runs)
+    (tmp_path / "budget_waivers.toml").write_text(D26)
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1
+
+
+# ------------------------------------------------------------- cap_share (QA)
+
+
+@pytest.mark.parametrize("kind", ["claude_review_run", "claude_single_call", "claude_agent_run"])
+def test_claude_entries_must_record_their_cap_share(kind: str) -> None:
+    with pytest.raises(budget.BudgetError, match="cap_share"):
+        budget.parse_entry({"ts": "2026-11-12T01:00:00+00:00", "kind": kind, "turns": 1})
+
+
+def test_local_calls_may_omit_cap_share() -> None:
+    entry = budget.parse_entry({"ts": "2026-10-23T02:00:00", "kind": "local_call"})
+    assert entry.cap_share == 1.0
+
+
+@pytest.mark.parametrize("share", ["nan", 0, -0.2, 1.5, True, "x"])
+def test_invalid_cap_shares_are_errors(share: Any) -> None:
+    value = float("nan") if share == "nan" else share
+    with pytest.raises(budget.BudgetError, match="cap_share"):
+        budget.parse_entry({"ts": "2026-10-23T02:00:00", "kind": "local_call", "cap_share": value})
+
+
+def test_cap_share_in_the_environment_lowers_a_day_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runs = [
+        {"ts": f"2026-11-13T0{i}:00:00+00:00", "kind": "claude_review_run", "cap_share": 1.0}
+        for i in range(2)
+    ]
+    b, led = _write(tmp_path, DEFAULT_TOML, runs)
+    monkeypatch.delenv("CAP_SHARE", raising=False)
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 0  # cap 6 at share 1
+    monkeypatch.setenv("CAP_SHARE", "0.2")
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1  # cap 1 at share 0.2
+    assert "2026-11-13: 2 claude_review_run entries > cap 1" in capsys.readouterr().out
+    monkeypatch.setenv("CAP_SHARE", "2")
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1  # an invalid share
+
+
+def test_bad_inputs_give_a_clean_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    b, led = _write(tmp_path, DEFAULT_TOML, [])
+    bad = tmp_path / "budget_waivers.toml"
+    bad.write_bytes(b"# caf\xe9\n")
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("budget error:") and out[-1] == "caps: VIOLATED"
+    bad.unlink()
+    _, led2 = _write(
+        tmp_path, DEFAULT_TOML, [{"ts": "0001-01-01T00:30:00+01:00", "kind": "local_call"}]
+    )
+    assert budget.main(["--budget", str(b), "--ledger", str(led2)]) == 1
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("budget error:") and out[-1] == "caps: VIOLATED"
+
+
+# ---------------------------------------------------------------- cap share in budget.toml (D29)
+
+
+def test_budget_records_the_cap_share_and_it_lowers_caps_without_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CAP_SHARE", raising=False)
+    caps = budget.parse_budget(_defaults(cap_share=0.2))
+    assert caps.cap_share == 0.2
+    share = budget.share_in_force(caps, None)
+    assert share == 0.2
+    entries = _runs("claude_review_run", "2026-11-20", 2, share=1.0)  # entries claim full share
+    report = budget.check_ledger(caps, entries, (), share)
+    assert any("2026-11-20: 2 claude_review_run entries > cap 1" in v for v in report.violations)
+    assert budget.calls_remaining(caps, entries[:1], "claude_review_run", "2026-11-20", share) == 0
+
+
+def test_the_environment_can_only_lower_the_recorded_share() -> None:
+    caps = budget.parse_budget(_defaults(cap_share=0.2))
+    assert budget.share_in_force(caps, "0.5") == 0.2
+    assert budget.share_in_force(caps, "0.1") == 0.1
+    assert budget.share_in_force(budget.parse_budget(_defaults()), None) == 1.0
+    with pytest.raises(budget.BudgetError, match="cap_share"):
+        budget.share_in_force(caps, "2")
+
+
+@pytest.mark.parametrize("bad", [0, 1.5, -0.2, True, "0.2", float("nan")])
+def test_invalid_recorded_shares_are_refused(bad: Any) -> None:
+    with pytest.raises(budget.BudgetError, match="cap_share"):
+        budget.parse_budget(_defaults(cap_share=bad))
+
+
+def test_repository_budget_records_the_project_share() -> None:
+    root = Path(__file__).resolve().parents[1]
+    assert budget.load_budget(root / "budget.toml").cap_share == 0.2
