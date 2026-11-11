@@ -801,16 +801,19 @@ def table_e4(reg: Registry, e4: dict[str, Any]) -> str:
         set_tags(reg, src, f"pairs[index={first}].test_composition"),
     )
     header = [
-        "Pair",
-        "Stage 1",
-        "Stage 2",
-        "Escalation rate",
-        "Cascade recall (test)",
-        "Stage 2 alone (test)",
-        "Cost, s per trace (test)",
-        "Cost cap",
-        "H4.1",
-        "H4.2",
+        _tag_digits(h)
+        for h in (
+            "Pair",
+            "Stage 1",
+            "Stage 2",
+            "Escalation rate",
+            "Cascade recall (test)",
+            "Stage 2 alone (test)",
+            "Cost, s per trace (test)",
+            "Cost cap",
+            "H4.1",
+            "H4.2",
+        )
     ]
     return framed(
         f"E4 cascades on held-out data, estimate [{p('95%')} interval]", cap, md_table(header, rows)

@@ -134,25 +134,45 @@ MONITORS = [
         "prefixes": True,
     },
     {
-        "id": "model:m1",
+        "id": "model:qwen3-0.6b-q8_0",
         "family": "model",
         "params_b": 0.6,
         "sets": ["primary", "full"],
         "prefixes": True,
     },
-    {"id": "model:m2", "family": "model", "params_b": 4.0, "sets": ["primary"], "prefixes": False},
     {
-        "id": "ensemble:rank-mean(rule:armour-reviewer-calibrated,model:m2)",
+        "id": "model:qwen3-1.7b-q8_0",
+        "family": "model",
+        "params_b": 1.7,
+        "sets": ["primary", "dataset"],
+        "prefixes": False,
+    },
+    {
+        "id": "model:qwen3-4b-q4_k_m",
+        "family": "model",
+        "params_b": 4.0,
+        "sets": ["primary", "dataset"],
+        "prefixes": False,
+    },
+    {
+        "id": "model:qwen3-8b-q4_k_m",
+        "family": "model",
+        "params_b": 8.0,
+        "sets": ["primary", "dataset"],
+        "prefixes": False,
+    },
+    {
+        "id": "ensemble:rank-mean(rule:armour-reviewer-calibrated,model:qwen3-8b-q4_k_m)",
         "family": "ensemble",
-        "members": ["rule:armour-reviewer-calibrated", "model:m2"],
+        "members": ["rule:armour-reviewer-calibrated", "model:qwen3-8b-q4_k_m"],
         "how": "mean",
         "sets": ["primary"],
     },
     {
-        "id": "cascade:model:m1>model:m2@0.05",
+        "id": "cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05",
         "family": "cascade",
-        "stage1": "model:m1",
-        "stage2": "model:m2",
+        "stage1": "model:qwen3-0.6b-q8_0",
+        "stage2": "model:qwen3-8b-q4_k_m",
         "escalation_rate": 0.05,
         "sets": ["primary"],
     },
@@ -241,7 +261,13 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                 rec: dict[str, Any] = {
                     "trace_id": t.trace_id,
                     "score": s,
-                    "seconds": 0.5 if mon["id"] == "model:m1" else 3.0,
+                    "seconds": (
+                        0.5
+                        if mon["id"] == "model:qwen3-0.6b-q8_0"
+                        else 0.001
+                        if mon["family"] == "rule"
+                        else 3.0
+                    ),
                 }
                 if bad and mon.get("prefixes"):
                     start = max(int(t.first_violating_step or 1), 1)
@@ -315,7 +341,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             "method": "cluster_cp",
         },
         "time_to_detection": {
-            "monitors": ["rule:armour-baseline", "model:m1"],
+            "monitors": ["rule:armour-baseline", "model:qwen3-0.6b-q8_0"],
             "prevalence": 0.001,
             "budget_per_10k": 20,
         },
@@ -325,7 +351,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     e3cfg = {
         "experiment": "E3",
         "set": "full",
-        "monitors": ["rule:armour-reviewer-calibrated", "model:m1"],
+        "monitors": ["rule:armour-reviewer-calibrated", "model:qwen3-0.6b-q8_0"],
         "prevalence": 0.001,
         "budget_per_10k": 100,
         "source_prevalence": 0.01,
@@ -343,7 +369,14 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "experiment": "E4",
         "scores_from": "prereg/0003-e2.md",
         "set": "primary",
-        "pairs": [{"index": "p1", "stage1": "model:m1", "stage2": "model:m2"}],
+        "pairs": [
+            {"index": "p1", "stage1": "model:qwen3-0.6b-q8_0", "stage2": "model:qwen3-8b-q4_k_m"},
+            {
+                "index": "p2",
+                "stage1": "rule:armour-reviewer-calibrated",
+                "stage2": "model:qwen3-8b-q4_k_m",
+            },
+        ],
         "prevalence": 0.001,
         "budget_per_10k": 20,
         "compute_budget_fraction_of_stage2": 0.5,
@@ -375,7 +408,10 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
         if e["set"] == "primary"
     }
     assert len(grid) == len(MONITORS) * 9 * 3
-    assert {r["monitor"] for r in e2["time_to_detection"]} == {"rule:armour-baseline", "model:m1"}
+    assert {r["monitor"] for r in e2["time_to_detection"]} == {
+        "rule:armour-baseline",
+        "model:qwen3-0.6b-q8_0",
+    }
     assert all(0 <= r["share_caught"] <= 1 for r in e2["time_to_detection"])
     assert e2["size_ladder"]["best_rule_monitor"].startswith("rule:")
     assert {b["by"] for b in e2["breakdowns"]} == {
@@ -395,7 +431,7 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     )
     e4 = an.run_e4(root / "prereg" / "0005-e4.md")
     an.write("e4", e4)
-    assert [h["id"] for h in e4["hypotheses"]] == ["H4.1-p1", "H4.2-p1"]
+    assert [h["id"] for h in e4["hypotheses"]] == ["H4.1-p1", "H4.2-p1", "H4.1-p2", "H4.2-p2"]
     pr = e4["pairs"][0]
     assert pr["test_recall_ci"][0] <= pr["test_recall"] <= pr["test_recall_ci"][1]
     # the held-out half's own composition, not the whole primary set's
@@ -453,7 +489,10 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     assert corpus["relabeling"]["changed"] == 4
     assert corpus["audit"]["traces"] == 12
     # ensembles and cascades are spelled out by member (their ids exceed name allowances)
-    assert "rank mean of `rule:armour-reviewer-calibrated` and `model:m2`" in docs["README.md"]
+    assert (
+        "rank mean of `rule:armour-reviewer-calibrated` and `model:qwen3-8b-q4_k_m`"
+        in docs["README.md"]
+    )
     _check_reproduce(root, monkeypatch)
 
 
