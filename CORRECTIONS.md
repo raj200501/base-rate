@@ -3,7 +3,30 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
-No corrections yet (no claims have been published).
+## 2026-11-11 Results claims corrected after the first `make review`
+
+The first rendering of README.md and docs/REPORT.md (commits 238b99d to e403a4e, not yet
+public) made claims that the independent review (artifacts/review/, review of e403a4e)
+showed wrong or incomplete. Each was corrected before release:
+
+- What was claimed: only the ensemble and the cascade clear chance, with no breakdown by
+  violation source for either. What changed: the preregistered breakdown (prereg/0003) was
+  missing for both because the analysis skipped derived monitors; it is now computed for
+  every primary monitor. Most of their gain is on synthetic inserted violations, and on
+  natural violations the cascade's interval contains the random-review rate. The README
+  finding now says so on its first screen (review B1).
+- What was claimed: time to detection describes the violations a monitor catches within
+  the budget. What changed: the analysis counted violations that only a prefix flagged;
+  as preregistered it now counts only violations the budget catches by their full trace,
+  and the rows changed accordingly (B2).
+- What was claimed: the E3 recall-transfer result held only because recall is near zero in
+  every domain. What changed: that premise is false for the rule monitor, whose own-domain
+  recall varies across domains; the supported outcome is now reported plainly (B3).
+- Smaller corrections: the E4 heading said a cheap filter beat the expensive monitor alone,
+  which one pair contradicts (N6); the insertion skips logged as no valid call were
+  attributed to the subject model, but the runner skips those before the model is asked
+  (N5); E0's coverage of interval methods was overstated (N4); the size-ladder crossing
+  rule did name a rung (N7).
 
 ## 2026-11-04 Preregistration 0003 was committed twice
 

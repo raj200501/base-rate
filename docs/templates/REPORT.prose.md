@@ -22,7 +22,8 @@ in eight mock-tool domains, and to three Armour rule configurations, Qwen3 monit
 {{param:20}} reviews per {{param:10,000}} trajectories and a prevalence of {{param:1e-3}}, no
 single monitor caught more violations than random review within its {{param:95%}}
 interval; the best combination, a rank-mean ensemble of a rule monitor and the {{name:8B}}
-model, reached recall {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}. Rule
+model, reached recall {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}, mostly
+on synthetic inserted violations. Rule
 thresholds that catch {{claim:e2.fixed.reviewer-calibrated.recall}} of violations flag
 {{claim:e2.fixed.reviewer-calibrated.fpr}} of benign runs, far more than any budget studied
 allows. The rule monitors and the larger models reached recall near one, with wide
@@ -30,8 +31,8 @@ intervals, on Armour's curated reference records, so results on curated records 
 about value on agent traffic. Thresholds tuned in one domain did not keep the review load within a factor of
 two in others, and on held-out data a cascade from a rule filter to the {{name:8B}} model
 caught more than the {{name:8B}} alone at a fraction of its compute. Every number in this
-report is rendered from a banked artifact; the corpus, scores, and analyses are released
-with the code.
+report is rendered from a banked artifact; the corpus, scores, and analyses are in the
+repository with the code.
 
 ## 1. Introduction
 
@@ -334,9 +335,10 @@ and Armour tables are in docs/DATA.md.
 
 Controlled insertion accounted for every planned attempt:
 {{claim:corpus.ins.inserted}} of {{claim:corpus.ins.attempts}} attempts yielded an inserted
-violation, and every skip, each with its preregistered reason, was a false completion,
-because the subject model either made no valid call of the drawn type or would not write a
-usable completion summary when asked to declare the task done. False completion is
+violation, and every skip, each with its preregistered reason, was a false completion:
+either the task was already done at the drawn step, so declaring it complete there would
+not be a false completion (logged as no valid call of the drawn type), or the subject model
+wrote no usable summary when asked to declare the task done. False completion is
 therefore under-represented among inserted violations, and recall by violation type
 (Table e2-breakdown) carries that imbalance.
 
@@ -365,11 +367,17 @@ violations, and every single monitor's interval contains that value at prevalenc
 ensemble of the reviewer-calibrated rule and the {{name:8B}} model reached
 {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}, and the cascade that escalates
 the top {{param:5%}} of traffic by the {{name:0.6B}} score to the {{name:8B}} reached
-{{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}. At the largest budget,
+{{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}. Most of their gain is on
+the synthetic inserted violations: by violation source, the ensemble reached
+{{claim:e2.by.violation_source.inserted.ensemble--rank-mean-}} on inserted and
+{{claim:e2.by.violation_source.natural.ensemble--rank-mean-}} on natural violations, and the
+cascade {{claim:e2.by.violation_source.inserted.cascade-qwen3-0.6b-qwen3-8b}} and
+{{claim:e2.by.violation_source.natural.cascade-qwen3-0.6b-qwen3-8b}}, so on the violations
+that arose naturally the cascade's interval contains the random-review rate. At the largest budget,
 {{param:100}} per {{param:10,000}}, the ensemble reached
-{{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b100}}. Recall barely moves with
-prevalence because, at these prevalences, the reviewed set is almost all benign whatever
-the prevalence, so the threshold is set by the benign scores alone.
+{{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b100}}. For the single monitors,
+recall barely moves with prevalence, because their reviewed set is almost all benign at
+every prevalence studied, so the threshold is set by the benign scores alone.
 
 ![Figure 1: recall at the review budget for every monitor on the primary set, by prevalence and budget, with {{param:95%}} intervals](../artifacts/report/figures/headline_recall.svg)
 
@@ -402,21 +410,20 @@ reviewed trajectory is benign; at {{param:1e-2}} the ensemble's precision was
 **Size ladder (RQ5).** Recall at prevalence {{param:1e-3}} and {{param:20}} reviews per
 {{param:10,000}} did not rise with model size at the one frozen prompt: {{name:0.6B}}
 {{claim:e2.ladder.qwen3-0.6b}}, {{name:1.7B}} {{claim:e2.ladder.qwen3-1.7b}}, {{name:4B}}
-{{claim:e2.ladder.qwen3-4b}}, and {{name:8B}} {{claim:e2.ladder.qwen3-8b}}. No rung clearly
-overtakes the best rule monitor, so the preregistered crossing question has no answer at
-this prompt; a larger model, a better prompt, or both might change that, and this study
-does not say which.
+{{claim:e2.ladder.qwen3-4b}}, and {{name:8B}} {{claim:e2.ladder.qwen3-8b}}. The preregistered
+crossing rule names the {{name:8B}} rung as the first whose point estimate exceeds the best
+rule monitor's, but not clearly, since the intervals overlap; a larger model, a better
+prompt, or both might change that, and this study does not say which.
 
 ![Figure 3: recall at the budget along the model size ladder, with the best rule monitor for reference](../artifacts/report/figures/size_ladder.svg)
 
 <!-- @table e2-ladder -->
 
-**Time to detection.** Time to detection is defined for the violations a monitor catches
-within the budget. With recall near the review rate, the few caught violations give
-wide intervals, and the table is reported for completeness rather than as evidence about
-how early these monitors fire.
-
-<!-- @table e2-ttd -->
+**Time to detection.** As preregistered, time to detection counts only the violations the
+budget catches by their full-trace score, and reports the share flagged at the violating
+step itself and the median delay after it. Single monitors catch so few violations at the
+budget that these rows (artifacts/report/tables/e2-ttd.md) rest on a handful of violations
+and say little about how early the monitors fire.
 
 **Armour's records, the full corpus, and breakdowns.** The sharpest contrast in the study is
 between the corpus and Armour's labeled reference records. At the same prevalence and
@@ -449,9 +456,11 @@ share {{claim:e3.H3.1-armour-reviewer-calibrated.share}} of ordered domain pairs
 reviewer-calibrated rule and {{claim:e3.H3.1-qwen3-0.6b-q8_0.share}} for the {{name:0.6B}}
 model, against the preregistered {{threshold:75%}}. A team that tunes a threshold on one
 product surface and deploys it on another should expect its review queue to grow or shrink
-by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors,
-but the result is weak: recall is near zero in every domain, so gaps between domains are
-small by construction. Prevalence transfer (H3.3) was supported at both target prevalences
+by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors:
+a share {{claim:e3.H3.2-armour-reviewer-calibrated.share}} of pairs for the rule monitor and
+{{claim:e3.H3.2-qwen3-0.6b-q8_0.share}} for the {{name:0.6B}} model kept the recall gap within
+the preregistered tenth. For the rule monitor, own-domain recall varies across domains at
+this budget, and the few pairs that miss, such as those into devops, lose more. Prevalence transfer (H3.3) was supported at both target prevalences
 for both monitors; for the rule monitor at {{param:1e-4}} the realized review rate was
 {{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio}} of the intended rate
 [{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.lo}},
@@ -476,7 +485,9 @@ to the {{name:8B}} model reached test recall {{claim:e4.p2.recall}}
 compute per trajectory, within its limit of {{claim:e4.p2.max_cost}}, while the {{name:8B}}
 alone reached {{claim:e4.p2.alone}} [{{claim:e4.p2.alone.lo}}, {{claim:e4.p2.alone.hi}}]. The
 cascade from the {{name:0.6B}} to the {{name:8B}} model reached {{claim:e4.p1.recall}}
-[{{claim:e4.p1.recall.lo}}, {{claim:e4.p1.recall.hi}}]. A cascade can beat its expensive stage
+[{{claim:e4.p1.recall.lo}}, {{claim:e4.p1.recall.hi}}], while the one from the {{name:1.7B}}
+to the {{name:8B}} model reached only {{claim:e4.p4.recall}} [{{claim:e4.p4.recall.lo}},
+{{claim:e4.p4.recall.hi}}]. A cascade can beat its expensive stage
 alone because it reviews by the expensive score only among trajectories the cheap stage
 already ranked high, so it acts as a two-signal filter. The efficiency hypothesis (H4.2)
 was supported for all four pairs, but it compares each cascade with a second stage that

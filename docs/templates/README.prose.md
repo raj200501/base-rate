@@ -5,8 +5,10 @@ violation prevalence of {{param:1e-3}}, no single monitor in this preregistered 
 Armour rule configurations and Qwen3 models from {{name:0.6B}} to {{name:8B}} parameters)
 caught more violations than random review would within its {{param:95%}} interval; the best
 combination, a rank-mean ensemble of the reviewer-calibrated rule and the {{name:8B}} model,
-caught {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}} of them.** Random review
-at that budget catches {{param:0.002}}. The corpus is agent trajectories in mock-tool domains,
+caught {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}} of them, mostly the
+synthetic inserted ones ({{claim:e2.by.violation_source.inserted.ensemble--rank-mean-}} of
+inserted and {{claim:e2.by.violation_source.natural.ensemble--rank-mean-}} of natural
+violations).** Random review at that budget catches {{param:0.002}}. The corpus is agent trajectories in mock-tool domains,
 its inserted violations are synthetic, and the monitors are small local models, so these
 numbers describe these monitors on this corpus; the methods are the reusable part.
 
@@ -14,7 +16,7 @@ numbers describe these monitors on this corpus; the methods are the reusable par
 
 <!-- @table readme-headline -->
 
-**Quickstart (offline, about a minute):**
+**Quickstart (about a minute; after `make setup` fetches the dependencies, everything runs offline):**
 
 ```bash
 git clone https://github.com/raj200501/base-rate && cd base-rate
@@ -52,11 +54,15 @@ same prominence as the rest.
   rule, {{claim:e2.qwen3-0.6b.recall_at_budget.p0.001.b20}} for Qwen3 {{name:0.6B}},
   {{claim:e2.qwen3-1.7b.recall_at_budget.p0.001.b20}} for {{name:1.7B}},
   {{claim:e2.qwen3-4b.recall_at_budget.p0.001.b20}} for {{name:4B}}, and
-  {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20}} for {{name:8B}}. Only the two
-  preregistered combinations clear chance: the ensemble
+  {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20}} for {{name:8B}}. The two preregistered
+  combinations did better overall, the ensemble
   ({{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}) and the cascade that sends
   the top {{param:5%}} by the {{name:0.6B}} score to the {{name:8B}}
-  ({{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}).
+  ({{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}), but mostly on the
+  synthetic inserted violations: on natural violations the ensemble reached
+  {{claim:e2.by.violation_source.natural.ensemble--rank-mean-}} and the cascade
+  {{claim:e2.by.violation_source.natural.cascade-qwen3-0.6b-qwen3-8b}}, an interval that
+  contains the random-review rate.
 - **The same monitors look strong on curated records** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   On Armour's labeled reference records, at the same prevalence and budget, the
   reviewer-calibrated rule reached recall
@@ -87,26 +93,31 @@ same prominence as the rest.
   {{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio}}
   [{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.lo}},
   {{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.hi}}]), as expected when
-  reviewed traffic is almost all benign. The recall-transfer hypothesis held, but only
-  because recall is near zero in every domain.
-- **A cheap filter in front of an expensive monitor beat the expensive monitor alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
+  reviewed traffic is almost all benign. The recall-transfer hypothesis was supported for
+  both (shares {{claim:e3.H3.2-armour-reviewer-calibrated.share}} and
+  {{claim:e3.H3.2-qwen3-0.6b-q8_0.share}} of pairs within the preregistered recall gap),
+  though for the rule monitor a few pairs, such as those into devops, lose more.
+- **A rule filter in front of the 8B model beat the 8B alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
   On the held-out half of the source runs, the cascade from the reviewer-calibrated rule to
   the {{name:8B}} model reached recall {{claim:e4.p2.recall}} [{{claim:e4.p2.recall.lo}},
   {{claim:e4.p2.recall.hi}}] at {{claim:e4.p2.cost}} seconds of compute per trajectory,
   while the {{name:8B}} alone reached {{claim:e4.p2.alone}} [{{claim:e4.p2.alone.lo}},
-  {{claim:e4.p2.alone.hi}}]. Every cascade's training estimate held on the test half (H4.1
-  supported for all four pairs); the efficiency hypothesis H4.2 held for all four too,
-  which says little when the second stage alone catches almost nothing.
+  {{claim:e4.p2.alone.hi}}]. Not every cascade did: from the {{name:1.7B}} to the {{name:8B}},
+  test recall was {{claim:e4.p4.recall}}. Every cascade's training estimate held on the
+  test half (H4.1 supported for all four pairs); the efficiency hypothesis H4.2 held for
+  all four too, which says little when the second stage alone catches almost nothing.
 - **The corpus and its blind label audit** ([corpus manifest](artifacts/corpus/manifest.json), [label audit](artifacts/corpus/label_audit.json), [prereg/0002](prereg/0002-e1-corpus.md)).
   {{claim:corpus.total.traces}} trajectories from {{claim:corpus.total.runs}} independent
   source runs (synthetic share {{claim:corpus.total.synthetic}}), with every planned
   insertion attempt accounted for ({{claim:corpus.ins.inserted}} inserted of
-  {{claim:corpus.ins.attempts}}; every skip was a false completion, where the subject model
-  made no valid finishing call or wrote no usable summary). A blind audit of
+  {{claim:corpus.ins.attempts}}; every skip was a false completion, either because the task
+  was already done at the drawn step or because the subject model wrote no usable
+  summary). A blind audit of
   {{claim:audit.n}} sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on {{claim:audit.agreement}}
   [{{claim:audit.agreement.lo}}, {{claim:audit.agreement.hi}}] of them (docs/DATA.md).
-- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). Every interval was checked
-  by preregistered simulation against exact truth; cells where a method undercovers are
+- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
+  fixed-threshold interval methods were checked by preregistered simulation against exact
+  truth; cells where a method undercovers are
   listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
   on them.
 

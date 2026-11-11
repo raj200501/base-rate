@@ -5,8 +5,10 @@ violation prevalence of 1e-3, no single monitor in this preregistered study (thr
 Armour rule configurations and Qwen3 models from 0.6B to 8B parameters)
 caught more violations than random review would within its 95% interval; the best
 combination, a rank-mean ensemble of the reviewer-calibrated rule and the 8B model,
-caught 0.069 [0.042, 0.102] of them.** Random review
-at that budget catches 0.002. The corpus is agent trajectories in mock-tool domains,
+caught 0.069 [0.042, 0.102] of them, mostly the
+synthetic inserted ones (0.11 [0.06, 0.15] of
+inserted and 0.01 [0.00, 0.05] of natural
+violations).** Random review at that budget catches 0.002. The corpus is agent trajectories in mock-tool domains,
 its inserted violations are synthetic, and the monitors are small local models, so these
 numbers describe these monitors on this corpus; the methods are the reusable part.
 
@@ -26,7 +28,7 @@ numbers describe these monitors on this corpus; the methods are the reusable par
 | rank mean of `rule:armour-reviewer-calibrated` and `model:qwen3-8b-q4_k_m` | ensemble | 0.069 [0.042, 0.102] | 0.034 [0.021, 0.051] |
 | `model:qwen3-0.6b-q8_0` then `model:qwen3-8b-q4_k_m`, escalating 0.05 | cascade | 0.025 [0.009, 0.041] | 0.012 [0.004, 0.021] |
 
-**Quickstart (offline, about a minute):**
+**Quickstart (about a minute; after `make setup` fetches the dependencies, everything runs offline):**
 
 ```bash
 git clone https://github.com/raj200501/base-rate && cd base-rate
@@ -64,11 +66,15 @@ same prominence as the rest.
   rule, 0.001 [0.000, 0.012] for Qwen3 0.6B,
   0.000 [0.000, 0.004] for 1.7B,
   0.000 [0.000, 0.004] for 4B, and
-  0.003 [0.000, 0.015] for 8B. Only the two
-  preregistered combinations clear chance: the ensemble
+  0.003 [0.000, 0.015] for 8B. The two preregistered
+  combinations did better overall, the ensemble
   (0.069 [0.042, 0.102]) and the cascade that sends
   the top 5% by the 0.6B score to the 8B
-  (0.025 [0.009, 0.041]).
+  (0.025 [0.009, 0.041]), but mostly on the
+  synthetic inserted violations: on natural violations the ensemble reached
+  0.01 [0.00, 0.05] and the cascade
+  0.01 [0.00, 0.04], an interval that
+  contains the random-review rate.
 - **The same monitors look strong on curated records** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   On Armour's labeled reference records, at the same prevalence and budget, the
   reviewer-calibrated rule reached recall
@@ -99,26 +105,31 @@ same prominence as the rest.
   0.994
   [0.986,
   1.002]), as expected when
-  reviewed traffic is almost all benign. The recall-transfer hypothesis held, but only
-  because recall is near zero in every domain.
-- **A cheap filter in front of an expensive monitor beat the expensive monitor alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
+  reviewed traffic is almost all benign. The recall-transfer hypothesis was supported for
+  both (shares 0.893 and
+  1.000 of pairs within the preregistered recall gap),
+  though for the rule monitor a few pairs, such as those into devops, lose more.
+- **A rule filter in front of the 8B model beat the 8B alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
   On the held-out half of the source runs, the cascade from the reviewer-calibrated rule to
   the 8B model reached recall 0.062 [0.041,
   0.085] at 1.723 seconds of compute per trajectory,
   while the 8B alone reached 0.004 [0.000,
-  0.021]. Every cascade's training estimate held on the test half (H4.1
-  supported for all four pairs); the efficiency hypothesis H4.2 held for all four too,
-  which says little when the second stage alone catches almost nothing.
+  0.021]. Not every cascade did: from the 1.7B to the 8B,
+  test recall was 0.002. Every cascade's training estimate held on the
+  test half (H4.1 supported for all four pairs); the efficiency hypothesis H4.2 held for
+  all four too, which says little when the second stage alone catches almost nothing.
 - **The corpus and its blind label audit** ([corpus manifest](artifacts/corpus/manifest.json), [label audit](artifacts/corpus/label_audit.json), [prereg/0002](prereg/0002-e1-corpus.md)).
   25,023 trajectories from 2,808 independent
   source runs (synthetic share 0.888), with every planned
   insertion attempt accounted for (618 inserted of
-  700; every skip was a false completion, where the subject model
-  made no valid finishing call or wrote no usable summary). A blind audit of
+  700; every skip was a false completion, either because the task
+  was already done at the drawn step or because the subject model wrote no usable
+  summary). A blind audit of
   200 sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on 0.930
   [0.885, 0.961] of them (docs/DATA.md).
-- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). Every interval was checked
-  by preregistered simulation against exact truth; cells where a method undercovers are
+- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
+  fixed-threshold interval methods were checked by preregistered simulation against exact
+  truth; cells where a method undercovers are
   listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
   on them.
 

@@ -22,7 +22,8 @@ in eight mock-tool domains, and to three Armour rule configurations, Qwen3 monit
 20 reviews per 10,000 trajectories and a prevalence of 1e-3, no
 single monitor caught more violations than random review within its 95%
 interval; the best combination, a rank-mean ensemble of a rule monitor and the 8B
-model, reached recall 0.069 [0.042, 0.102]. Rule
+model, reached recall 0.069 [0.042, 0.102], mostly
+on synthetic inserted violations. Rule
 thresholds that catch 0.143 [0.122, 0.165] of violations flag
 0.067 [0.058, 0.078] of benign runs, far more than any budget studied
 allows. The rule monitors and the larger models reached recall near one, with wide
@@ -30,8 +31,8 @@ intervals, on Armour's curated reference records, so results on curated records 
 about value on agent traffic. Thresholds tuned in one domain did not keep the review load within a factor of
 two in others, and on held-out data a cascade from a rule filter to the 8B model
 caught more than the 8B alone at a fraction of its compute. Every number in this
-report is rendered from a banked artifact; the corpus, scores, and analyses are released
-with the code.
+report is rendered from a banked artifact; the corpus, scores, and analyses are in the
+repository with the code.
 
 ## 1. Introduction
 
@@ -344,9 +345,10 @@ and Armour tables are in docs/DATA.md.
 
 Controlled insertion accounted for every planned attempt:
 618 of 700 attempts yielded an inserted
-violation, and every skip, each with its preregistered reason, was a false completion,
-because the subject model either made no valid call of the drawn type or would not write a
-usable completion summary when asked to declare the task done. False completion is
+violation, and every skip, each with its preregistered reason, was a false completion:
+either the task was already done at the drawn step, so declaring it complete there would
+not be a false completion (logged as no valid call of the drawn type), or the subject model
+wrote no usable summary when asked to declare the task done. False completion is
 therefore under-represented among inserted violations, and recall by violation type
 (Table e2-breakdown) carries that imbalance.
 
@@ -393,11 +395,17 @@ violations, and every single monitor's interval contains that value at prevalenc
 ensemble of the reviewer-calibrated rule and the 8B model reached
 0.069 [0.042, 0.102], and the cascade that escalates
 the top 5% of traffic by the 0.6B score to the 8B reached
-0.025 [0.009, 0.041]. At the largest budget,
+0.025 [0.009, 0.041]. Most of their gain is on
+the synthetic inserted violations: by violation source, the ensemble reached
+0.11 [0.06, 0.15] on inserted and
+0.01 [0.00, 0.05] on natural violations, and the
+cascade 0.03 [0.01, 0.05] and
+0.01 [0.00, 0.04], so on the violations
+that arose naturally the cascade's interval contains the random-review rate. At the largest budget,
 100 per 10,000, the ensemble reached
-0.090 [0.064, 0.120]. Recall barely moves with
-prevalence because, at these prevalences, the reviewed set is almost all benign whatever
-the prevalence, so the threshold is set by the benign scores alone.
+0.090 [0.064, 0.120]. For the single monitors,
+recall barely moves with prevalence, because their reviewed set is almost all benign at
+every prevalence studied, so the threshold is set by the benign scores alone.
 
 ![Figure 1: recall at the review budget for every monitor on the primary set, by prevalence and budget, with 95% intervals](../artifacts/report/figures/headline_recall.svg)
 
@@ -460,10 +468,10 @@ reviewed trajectory is benign; at 1e-2 the ensemble's precision was
 **Size ladder (RQ5).** Recall at prevalence 1e-3 and 20 reviews per
 10,000 did not rise with model size at the one frozen prompt: 0.6B
 0.001 [0.000, 0.012], 1.7B 0.000 [0.000, 0.004], 4B
-0.000 [0.000, 0.004], and 8B 0.003 [0.000, 0.015]. No rung clearly
-overtakes the best rule monitor, so the preregistered crossing question has no answer at
-this prompt; a larger model, a better prompt, or both might change that, and this study
-does not say which.
+0.000 [0.000, 0.004], and 8B 0.003 [0.000, 0.015]. The preregistered
+crossing rule names the 8B rung as the first whose point estimate exceeds the best
+rule monitor's, but not clearly, since the intervals overlap; a larger model, a better
+prompt, or both might change that, and this study does not say which.
 
 ![Figure 3: recall at the budget along the model size ladder, with the best rule monitor for reference](../artifacts/report/figures/size_ladder.svg)
 
@@ -477,20 +485,11 @@ does not say which.
 | `model:qwen3-8b-q4_k_m` | 8B | 0.003 [0.000, 0.015] |
 | `rule:armour-baseline` | rule (best) | 0.002 [0.000, 0.012] |
 
-**Time to detection.** Time to detection is defined for the violations a monitor catches
-within the budget. With recall near the review rate, the few caught violations give
-wide intervals, and the table is reported for completeness rather than as evidence about
-how early these monitors fire.
-
-*Time to detection at prevalence 1e-3 and 20 reviews per 10,000 (bootstrap 95% intervals). Set: primary. Traces: 3,418. Independent source runs: 2,800. Synthetic share: 0.181.*
-
-| Monitor | Violations scored | Share caught by the end | Share caught at the violating step | Median delay, steps |
-|---|---|---|---|---|
-| `rule:armour-baseline` | 1,045 | 0.002 | 0.001 [0.000, 0.002] | 1.000 [0.000, 4.000] |
-| `rule:armour-reviewer-calibrated` | 1,045 | 0.002 | 0.001 [0.000, 0.002] | 1.000 [0.000, 4.000] |
-| `rule:armour-strict-agent` | 1,045 | 0.002 | 0.001 [0.000, 0.002] | 1.000 [0.000, 4.000] |
-| `model:qwen3-0.6b-q8_0` | 1,045 | 0.122 | 0.032 [0.022, 0.043] | 1.000 [1.000, 1.000] |
-| `model:qwen3-1.7b-q8_0` | 1,045 | 0.000 | 0.000 [0.000, 0.000] | none caught |
+**Time to detection.** As preregistered, time to detection counts only the violations the
+budget catches by their full-trace score, and reports the share flagged at the violating
+step itself and the median delay after it. Single monitors catch so few violations at the
+budget that these rows (artifacts/report/tables/e2-ttd.md) rest on a handful of violations
+and say little about how early the monitors fire.
 
 **Armour's records, the full corpus, and breakdowns.** The sharpest contrast in the study is
 between the corpus and Armour's labeled reference records. At the same prevalence and
@@ -533,9 +532,11 @@ share 0.393 of ordered domain pairs for the
 reviewer-calibrated rule and 0.196 for the 0.6B
 model, against the preregistered 75%. A team that tunes a threshold on one
 product surface and deploys it on another should expect its review queue to grow or shrink
-by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors,
-but the result is weak: recall is near zero in every domain, so gaps between domains are
-small by construction. Prevalence transfer (H3.3) was supported at both target prevalences
+by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors:
+a share 0.893 of pairs for the rule monitor and
+1.000 for the 0.6B model kept the recall gap within
+the preregistered tenth. For the rule monitor, own-domain recall varies across domains at
+this budget, and the few pairs that miss, such as those into devops, lose more. Prevalence transfer (H3.3) was supported at both target prevalences
 for both monitors; for the rule monitor at 1e-4 the realized review rate was
 0.994 of the intended rate
 [0.986,
@@ -571,7 +572,9 @@ to the 8B model reached test recall 0.062
 compute per trajectory, within its limit of 11.765, while the 8B
 alone reached 0.004 [0.000, 0.021]. The
 cascade from the 0.6B to the 8B model reached 0.063
-[0.010, 0.132]. A cascade can beat its expensive stage
+[0.010, 0.132], while the one from the 1.7B
+to the 8B model reached only 0.002 [0.000,
+0.006]. A cascade can beat its expensive stage
 alone because it reviews by the expensive score only among trajectories the cheap stage
 already ranked high, so it acts as a two-signal filter. The efficiency hypothesis (H4.2)
 was supported for all four pairs, but it compares each cascade with a second stage that

@@ -963,6 +963,16 @@
    "select": "breakdowns[monitor=rule:armour-baseline,by=subject_model,value=qwen3-1.7b-q8_0]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
+  "e2.by.subject_model.qwen3-1.7b-q8_0.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=subject_model,value=qwen3-1.7b-q8_0]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.subject_model.qwen3-1.7b-q8_0.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=subject_model,value=qwen3-1.7b-q8_0]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
   "e2.by.subject_model.qwen3-1.7b-q8_0.n": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=subject_model,value=qwen3-1.7b-q8_0].n_pos",
@@ -1001,6 +1011,16 @@
   "e2.by.subject_model.qwen3-4b-q4_k_m.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=subject_model,value=qwen3-4b-q4_k_m]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.subject_model.qwen3-4b-q4_k_m.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=subject_model,value=qwen3-4b-q4_k_m]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.subject_model.qwen3-4b-q4_k_m.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=subject_model,value=qwen3-4b-q4_k_m]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.n": {
@@ -1043,6 +1063,16 @@
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_source,value=inserted]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
+  "e2.by.violation_source.inserted.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_source,value=inserted]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_source.inserted.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_source,value=inserted]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
   "e2.by.violation_source.inserted.n": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_source,value=inserted].n_pos",
@@ -1081,6 +1111,16 @@
   "e2.by.violation_source.natural.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_source,value=natural]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_source.natural.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_source,value=natural]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_source.natural.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_source,value=natural]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
   "e2.by.violation_source.natural.n": {
@@ -1123,6 +1163,16 @@
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=audit_log_edit]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
+  "e2.by.violation_type.audit_log_edit.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=audit_log_edit]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.audit_log_edit.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_type,value=audit_log_edit]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
   "e2.by.violation_type.audit_log_edit.n": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=audit_log_edit].n_pos",
@@ -1161,6 +1211,16 @@
   "e2.by.violation_type.false_completion.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=false_completion]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.false_completion.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=false_completion]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.false_completion.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_type,value=false_completion]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
   "e2.by.violation_type.false_completion.n": {
@@ -1203,6 +1263,16 @@
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=scope_overreach]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
+  "e2.by.violation_type.scope_overreach.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=scope_overreach]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.scope_overreach.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_type,value=scope_overreach]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
   "e2.by.violation_type.scope_overreach.n": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=scope_overreach].n_pos",
@@ -1243,6 +1313,16 @@
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=unapproved_escalation]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
+  "e2.by.violation_type.unapproved_escalation.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=unapproved_escalation]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.unapproved_escalation.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_type,value=unapproved_escalation]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
   "e2.by.violation_type.unapproved_escalation.n": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=unapproved_escalation].n_pos",
@@ -1281,6 +1361,16 @@
   "e2.by.violation_type.unauthorized_data_access.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=unauthorized_data_access]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.unauthorized_data_access.cascade-qwen3-0.6b-qwen3-8b": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=unauthorized_data_access]",
+   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+  },
+  "e2.by.violation_type.unauthorized_data_access.ensemble--rank-mean-": {
+   "source": "artifacts/e2/results.json",
+   "select": "breakdowns[family=ensemble,by=violation_type,value=unauthorized_data_access]",
    "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.n": {
