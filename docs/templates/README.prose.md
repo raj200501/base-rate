@@ -159,10 +159,11 @@ same prominence as the rest.
   returned SHIP with no blocking issues (artifacts/review/latest.json). The first review had
   blocked the release on five issues, all fixed and recorded in CORRECTIONS.md. That pass
   is qualified: the usage ledger then omitted the session's two `make review` runs, and once
-  logged they exceed the project's share of one review run a day, so the usage gate (G14)
-  now fails on that day's record until Raj decides how to treat the overrun (STATUS.md,
-  "Needs Raj"). This page was also revised after that commit, so the review gate (G12)
-  needs a fresh `make review`, which waits for the next day's review allowance.
+  logged they exceed the project's share of one review run a day. Raj accepted that one
+  overrun with a dated waiver scoped to that day (DECISIONS.md D25 and D26,
+  budget_waivers.toml); `make budget` reports it as waived, caps are unchanged, and any
+  other overrun still fails. This page was also revised after that commit, so the review
+  gate (G12) needs a fresh `make review`, which waits for the next day's review allowance.
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify and that the three Armour rule configurations score this corpus identically; no

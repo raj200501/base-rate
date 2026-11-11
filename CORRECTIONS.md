@@ -14,6 +14,10 @@ makes `make budget`, and so G14, report the overrun. What changed: the Status se
 says so, DECISIONS.md D25 records the overrun, and STATUS.md asks Raj how to treat it. Caps
 are never raised, so the gate stays failing on that day's record until he decides.
 
+Update (2026-11-11): Raj accepted that one overrun. DECISIONS.md D26 records a dated waiver
+scoped to that day and kind (budget_waivers.toml); `make budget` and G14 honor exactly that
+waiver, every other overrun still fails, and the README Status section says so.
+
 ## 2026-11-11 Results claims corrected after the first `make review`
 
 The first rendering of README.md and docs/REPORT.md (commits 238b99d to e403a4e, not yet
