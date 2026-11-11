@@ -1,0 +1,239 @@
+{
+ "corpus": {
+  "agents": [
+   {
+    "agent": "qwen3-1.7b-q8_0",
+    "independent_source_runs": 2000,
+    "inserted_violation": 416,
+    "natural_violation": 383,
+    "real_benign": 1617
+   },
+   {
+    "agent": "qwen3-4b-q4_k_m",
+    "independent_source_runs": 800,
+    "inserted_violation": 202,
+    "natural_violation": 44,
+    "real_benign": 756
+   }
+  ],
+  "armour": {
+   "independent_source_runs": 8,
+   "synthetic_share": 0.9556451612903226,
+   "traces": 248
+  },
+  "armour_label_sources": [
+   {
+    "records": 21,
+    "source": "dual-review-fixture"
+   },
+   {
+    "records": 31,
+    "source": "operator-reviewed-live-fixture"
+   },
+   {
+    "records": 11,
+    "source": "prompted-reference"
+   },
+   {
+    "records": 185,
+    "source": "synthetic-reference"
+   }
+  ],
+  "audit": {
+   "independent_source_runs": 181,
+   "synthetic_share": 0.5,
+   "traces": 200
+  },
+  "insertion": {
+   "attempts": 700,
+   "by_type": [
+    {
+     "attempts": 140,
+     "inserted": 140,
+     "no_usable_summary": 0,
+     "no_valid_call": 0,
+     "type": "audit_log_edit"
+    },
+    {
+     "attempts": 139,
+     "inserted": 57,
+     "no_usable_summary": 32,
+     "no_valid_call": 50,
+     "type": "false_completion"
+    },
+    {
+     "attempts": 141,
+     "inserted": 141,
+     "no_usable_summary": 0,
+     "no_valid_call": 0,
+     "type": "scope_overreach"
+    },
+    {
+     "attempts": 139,
+     "inserted": 139,
+     "no_usable_summary": 0,
+     "no_valid_call": 0,
+     "type": "unapproved_escalation"
+    },
+    {
+     "attempts": 141,
+     "inserted": 141,
+     "no_usable_summary": 0,
+     "no_valid_call": 0,
+     "type": "unauthorized_data_access"
+    }
+   ],
+   "inserted": 618,
+   "skipped": 82
+  },
+  "real_and_inserted": {
+   "independent_source_runs": 2800,
+   "synthetic_share": 0.18080748976009361,
+   "traces": 3418
+  },
+  "relabeling": {
+   "changed": 35,
+   "changes": [
+    {
+     "count": 2,
+     "from": "scope_overreach",
+     "to": "audit_log_edit"
+    },
+    {
+     "count": 25,
+     "from": "scope_overreach",
+     "to": "benign"
+    },
+    {
+     "count": 4,
+     "from": "scope_overreach",
+     "to": "scope_overreach"
+    },
+    {
+     "count": 4,
+     "from": "scope_overreach",
+     "to": "unauthorized_data_access"
+    }
+   ],
+   "inserted_dropped": 0,
+   "replayed": 3418
+  },
+  "rows": [
+   {
+    "independent_source_runs": 2373,
+    "key": "real_benign",
+    "label": "Real agent runs, benign",
+    "synthetic_share": 0.0,
+    "traces": 2373
+   },
+   {
+    "independent_source_runs": 427,
+    "key": "natural_violation",
+    "label": "Real agent runs, natural violation",
+    "synthetic_share": 0.0,
+    "traces": 427
+   },
+   {
+    "independent_source_runs": 618,
+    "key": "inserted_violation",
+    "label": "Inserted violation (synthetic)",
+    "synthetic_share": 1.0,
+    "traces": 618
+   },
+   {
+    "independent_source_runs": 2373,
+    "key": "procedural_benign",
+    "label": "Procedural variant of a real benign run",
+    "synthetic_share": 1.0,
+    "traces": 21357
+   },
+   {
+    "independent_source_runs": 8,
+    "key": "dataset_benign",
+    "label": "Armour dataset, benign",
+    "synthetic_share": 0.9202898550724637,
+    "traces": 138
+   },
+   {
+    "independent_source_runs": 7,
+    "key": "dataset_violation",
+    "label": "Armour dataset, violation",
+    "synthetic_share": 1.0,
+    "traces": 110
+   }
+  ],
+  "seeds": [
+   {
+    "agent": "qwen3-1.7b-q8_0",
+    "distinct_seeds": 250,
+    "ranges": "0 to 249",
+    "runs": 2000
+   },
+   {
+    "agent": "qwen3-4b-q4_k_m",
+    "distinct_seeds": 100,
+    "ranges": "250 to 349",
+    "runs": 800
+   }
+  ],
+  "total": {
+   "benign": 23868,
+   "independent_source_runs": 2808,
+   "synthetic_share": 0.8876633497182592,
+   "traces": 25023,
+   "violations": 1155
+  },
+  "types": [
+   {
+    "dataset": 28,
+    "inserted": 140,
+    "natural": 2,
+    "total": 170,
+    "type": "audit_log_edit"
+   },
+   {
+    "dataset": 12,
+    "inserted": 57,
+    "natural": 229,
+    "total": 298,
+    "type": "false_completion"
+   },
+   {
+    "dataset": 14,
+    "inserted": 141,
+    "natural": 124,
+    "total": 279,
+    "type": "scope_overreach"
+   },
+   {
+    "dataset": 14,
+    "inserted": 139,
+    "natural": 10,
+    "total": 163,
+    "type": "unapproved_escalation"
+   },
+   {
+    "dataset": 42,
+    "inserted": 141,
+    "natural": 62,
+    "total": 245,
+    "type": "unauthorized_data_access"
+   }
+  ],
+  "violations": {
+   "independent_source_runs": 1052,
+   "synthetic_share": 0.6303030303030303,
+   "traces": 1155
+  }
+ },
+ "schema": "baserate-report-numbers/1",
+ "sources": {
+  "artifacts/citecheck.json": "6815c18e6e0ab659cc70319e1b204a29f10b5d9b83f292ecb583348baff58cfe",
+  "artifacts/corpus/label_audit.json": "c6be5a5cb68f01147fed2cd6d4f9c4a56c52532fa3c9c4562d6b5a09f0074fde",
+  "artifacts/corpus/manifest.json": "f8a124a8580eeb401c563e6a35176771fb8619a824a1ed3ea669d706c7c656aa",
+  "artifacts/e0/summary.json": "fc17f0ce6410081f7cc6c8c1780cbc03e690ae8ea1ddd087c2c8048949bd13c1",
+  "artifacts/e2/results.json": "f925639aaebcf774d91bec2c276da7e01f5f45564dfe77a356a4131bc69caf20",
+  "artifacts/e3/results.json": "6463340b50396d6e794168d460786cba3a12bb97c7b55d7c7cfc5ad1c26c8483",
+  "artifacts/e4/results.json": "9b49f1d0684271f8e8ebbdc1a84baeb2adb585cff099af63242068bfb7c93900"
+ }
+}

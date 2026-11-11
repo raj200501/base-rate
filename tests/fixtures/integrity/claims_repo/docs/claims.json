@@ -1,0 +1,43 @@
+{
+  "schema": "baserate-claims/1",
+  "documents": {
+    "README.md": "docs/templates/README.md.tmpl",
+    "docs/REPORT.md": "docs/templates/REPORT.md.tmpl"
+  },
+  "claims": {
+    "e2.rule.recall": {
+      "source": "artifacts/e2/results.json",
+      "select": "estimates[monitor=rule-pack,prevalence=1e-3,budget=20,metric=recall_at_budget].estimate",
+      "format": "{:.3f}",
+      "note": "E2 recall at budget, rule monitor, prevalence 1e-3, budget 20 per 10k"
+    },
+    "e2.rule.recall.ci": {
+      "source": "artifacts/e2/results.json",
+      "select": "estimates[monitor=rule-pack,prevalence=0.001,budget=20,metric=recall_at_budget]",
+      "format": "[{ci_low:.3f}, {ci_high:.3f}]"
+    },
+    "e2.rule.runs": {
+      "source": "artifacts/e2/results.json",
+      "select": "estimates[monitor=rule-pack,prevalence=0.001,budget=20,metric=recall_at_budget].n_independent_runs",
+      "format": "{:,d}"
+    },
+    "e2.rule.precision": {
+      "source": "artifacts/e2/results.json",
+      "select": "estimates[monitor=rule-pack,prevalence=0.001,budget=20,metric=precision_at_budget].estimate",
+      "format": "{:.3f}"
+    },
+    "e2.hypotheses": {
+      "source": "artifacts/e2/results.json",
+      "select": "hypotheses|len"
+    },
+    "e2.supported": {
+      "source": "artifacts/e2/results.json",
+      "select": "hypotheses|count:outcome=supported"
+    },
+    "e2.prereg.min_prevalence": {
+      "source": "prereg/0001-e2-main.md",
+      "select": "prevalences[-1]",
+      "format": "{:g}"
+    }
+  }
+}

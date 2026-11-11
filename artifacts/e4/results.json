@@ -1,0 +1,511 @@
+{
+ "confirmatory": true,
+ "experiment": "E4",
+ "hypotheses": [
+  {
+   "id": "H4.1-p1",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.2-p1",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.1-p2",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.2-p2",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.1-p3",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.2-p3",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.1-p4",
+   "outcome": "supported"
+  },
+  {
+   "id": "H4.2-p4",
+   "outcome": "supported"
+  }
+ ],
+ "pairs": [
+  {
+   "c1_seconds": 2.626,
+   "c2_seconds": 23.5295,
+   "chosen_escalation_rate": 0.2114742526881125,
+   "front": [
+    {
+     "cost": 2.626,
+     "escalation_rate": 0.0,
+     "kind": "stage1",
+     "precision": 0.0004784688995215311,
+     "recall": 0.0009569377990430622
+    },
+    {
+     "cost": 2.7283325849712123,
+     "escalation_rate": 0.004349118552081965,
+     "kind": "cascade",
+     "precision": 0.0009569377990430622,
+     "recall": 0.0019138755980861245
+    },
+    {
+     "cost": 2.7585778672285652,
+     "escalation_rate": 0.00563453822769568,
+     "kind": "cascade",
+     "precision": 0.0014354066985645933,
+     "recall": 0.0028708133971291866
+    },
+    {
+     "cost": 2.848528271890402,
+     "escalation_rate": 0.009457416090031758,
+     "kind": "cascade",
+     "precision": 0.0019138755980861245,
+     "recall": 0.003827751196172249
+    },
+    {
+     "cost": 2.9142984309796067,
+     "escalation_rate": 0.012252637369243152,
+     "kind": "cascade",
+     "precision": 0.0023923444976076554,
+     "recall": 0.004784688995215311
+    },
+    {
+     "cost": 2.999507530522857,
+     "escalation_rate": 0.015874010519681986,
+     "kind": "cascade",
+     "precision": 0.004784688995215312,
+     "recall": 0.009569377990430623
+    },
+    {
+     "cost": 3.109900917820643,
+     "escalation_rate": 0.02056571188595777,
+     "kind": "cascade",
+     "precision": 0.006220095693779906,
+     "recall": 0.012440191387559812
+    },
+    {
+     "cost": 3.2529220273547637,
+     "escalation_rate": 0.026644086247254044,
+     "kind": "cascade",
+     "precision": 0.00813397129186603,
+     "recall": 0.01626794258373206
+    },
+    {
+     "cost": 3.438214265169639,
+     "escalation_rate": 0.03451897682354658,
+     "kind": "cascade",
+     "precision": 0.011004784688995213,
+     "recall": 0.022009569377990427
+    },
+    {
+     "cost": 3.678271229531626,
+     "escalation_rate": 0.04472135954999582,
+     "kind": "cascade",
+     "precision": 0.011961722488038274,
+     "recall": 0.023923444976076548
+    },
+    {
+     "cost": 4.392208064457451,
+     "escalation_rate": 0.075063561251087,
+     "kind": "cascade",
+     "precision": 0.01770334928229664,
+     "recall": 0.03540669856459328
+    },
+    {
+     "cost": 4.914226163089041,
+     "escalation_rate": 0.09724924724660709,
+     "kind": "cascade",
+     "precision": 0.020574162679425825,
+     "recall": 0.04114832535885165
+    },
+    {
+     "cost": 5.590531234350132,
+     "escalation_rate": 0.1259921049894869,
+     "kind": "cascade",
+     "precision": 0.02631578947368419,
+     "recall": 0.05263157894736838
+    },
+    {
+     "cost": 6.46672412998436,
+     "escalation_rate": 0.1632301634112225,
+     "kind": "cascade",
+     "precision": 0.0311004784688995,
+     "recall": 0.062200956937799
+    },
+    {
+     "cost": 7.60188342862501,
+     "escalation_rate": 0.2114742526881154,
+     "kind": "cascade",
+     "precision": 0.03205741626794256,
+     "recall": 0.06411483253588512
+    },
+    {
+     "cost": 10.977882283571995,
+     "escalation_rate": 0.35495366597556244,
+     "kind": "cascade",
+     "precision": 0.036842105263157864,
+     "recall": 0.07368421052631573
+    },
+    {
+     "cost": 13.446353466215132,
+     "escalation_rate": 0.4598632978267763,
+     "kind": "cascade",
+     "precision": 0.04306220095693777,
+     "recall": 0.08612440191387553
+    },
+    {
+     "cost": 16.644402697572687,
+     "escalation_rate": 0.5957798804722875,
+     "kind": "cascade",
+     "precision": 0.054545454545454494,
+     "recall": 0.10909090909090899
+    }
+   ],
+   "index": "p1",
+   "max_cost": 11.76475,
+   "n_test_runs": 1710,
+   "n_train_runs": 1708,
+   "stage1": "model:qwen3-0.6b-q8_0",
+   "stage2": "model:qwen3-8b-q4_k_m",
+   "stage2_alone_test_recall": 0.0038314176245210726,
+   "stage2_alone_test_recall_ci": [
+    2.4096993583973896e-05,
+    0.021457298697269096
+   ],
+   "test_composition": {
+    "benign": 1188,
+    "independent_source_runs": 1400,
+    "synthetic_share": 0.18128654970760233,
+    "traces": 1710,
+    "violations": 522
+   },
+   "test_cost": 7.280392850879483,
+   "test_cost_ci": [
+    4.369043549522161,
+    11.005798004738113
+   ],
+   "test_recall": 0.06321839080459772,
+   "test_recall_ci": [
+    0.009578544061302681,
+    0.13218390804597702
+   ],
+   "train_cost": 7.601883428624943,
+   "train_recall": 0.08030592734225621
+  },
+  {
+   "c1_seconds": 0.000337,
+   "c2_seconds": 23.5295,
+   "chosen_escalation_rate": 0.07506356125108694,
+   "front": [
+    {
+     "cost": 0.000337,
+     "escalation_rate": 0.0,
+     "kind": "stage1",
+     "precision": 0.001032154684886176,
+     "recall": 0.002064309369772352
+    },
+    {
+     "cost": 0.06130469524256782,
+     "escalation_rate": 0.0025911173311191408,
+     "kind": "cascade",
+     "precision": 0.001337216946202193,
+     "recall": 0.002674433892404386
+    },
+    {
+     "cost": 0.07932422589070381,
+     "escalation_rate": 0.0033569445118129928,
+     "kind": "cascade",
+     "precision": 0.0017324430023853586,
+     "recall": 0.003464886004770717
+    },
+    {
+     "cost": 0.10266958497121259,
+     "escalation_rate": 0.004349118552081965,
+     "kind": "cascade",
+     "precision": 0.0022444815443283905,
+     "recall": 0.004488963088656781
+    },
+    {
+     "cost": 0.13291486722856544,
+     "escalation_rate": 0.005634538227695677,
+     "kind": "cascade",
+     "precision": 0.0031004736896597215,
+     "recall": 0.006200947379319443
+    },
+    {
+     "cost": 0.1720994047493743,
+     "escalation_rate": 0.007299874827317805,
+     "kind": "cascade",
+     "precision": 0.004281038086251572,
+     "recall": 0.008562076172503144
+    },
+    {
+     "cost": 0.22286527189040223,
+     "escalation_rate": 0.009457416090031758,
+     "kind": "cascade",
+     "precision": 0.005810528520507248,
+     "recall": 0.011621057041014496
+    },
+    {
+     "cost": 0.28863543097960687,
+     "escalation_rate": 0.012252637369243159,
+     "kind": "cascade",
+     "precision": 0.007792073106497646,
+     "recall": 0.015584146212995292
+    },
+    {
+     "cost": 0.4842379178206438,
+     "escalation_rate": 0.02056571188595779,
+     "kind": "cascade",
+     "precision": 0.009168086585541137,
+     "recall": 0.018336173171082274
+    },
+    {
+     "cost": 0.627259027354765,
+     "escalation_rate": 0.026644086247254086,
+     "kind": "cascade",
+     "precision": 0.009324773177201725,
+     "recall": 0.01864954635440345
+    },
+    {
+     "cost": 0.8125512651696402,
+     "escalation_rate": 0.03451897682354662,
+     "kind": "cascade",
+     "precision": 0.01134560466748162,
+     "recall": 0.02269120933496324
+    },
+    {
+     "cost": 1.052608229531626,
+     "escalation_rate": 0.04472135954999579,
+     "kind": "cascade",
+     "precision": 0.019482690216572993,
+     "recall": 0.038965380433145985
+    },
+    {
+     "cost": 1.363616109938722,
+     "escalation_rate": 0.05793914490060231,
+     "kind": "cascade",
+     "precision": 0.028838353376851575,
+     "recall": 0.05767670675370315
+    },
+    {
+     "cost": 1.7665450644574492,
+     "escalation_rate": 0.0750635612510869,
+     "kind": "cascade",
+     "precision": 0.032061751594154114,
+     "recall": 0.06412350318830823
+    }
+   ],
+   "index": "p2",
+   "max_cost": 11.76475,
+   "n_test_runs": 1710,
+   "n_train_runs": 1708,
+   "stage1": "rule:armour-reviewer-calibrated",
+   "stage2": "model:qwen3-8b-q4_k_m",
+   "stage2_alone_test_recall": 0.0038314176245210726,
+   "stage2_alone_test_recall_ci": [
+    2.4096993583973896e-05,
+    0.021457298697269096
+   ],
+   "test_composition": {
+    "benign": 1188,
+    "independent_source_runs": 1400,
+    "synthetic_share": 0.18128654970760233,
+    "traces": 1710,
+    "violations": 522
+   },
+   "test_cost": 1.7234562109853584,
+   "test_cost_ci": [
+    1.194350405754541,
+    2.212165289082122
+   ],
+   "test_recall": 0.061885697540743245,
+   "test_recall_ci": [
+    0.0406104179368084,
+    0.08505067424629378
+   ],
+   "train_cost": 1.76654506445745,
+   "train_recall": 0.07950727908359252
+  },
+  {
+   "c1_seconds": 2.626,
+   "c2_seconds": 13.526,
+   "chosen_escalation_rate": 0.097249247246607,
+   "front": [
+    {
+     "cost": 2.626,
+     "escalation_rate": 0.0,
+     "kind": "stage1",
+     "precision": 0.0004784688995215311,
+     "recall": 0.0009569377990430622
+    },
+    {
+     "cost": 2.6848261775354607,
+     "escalation_rate": 0.004349118552081965,
+     "kind": "cascade",
+     "precision": 0.0009569377990430622,
+     "recall": 0.0019138755980861245
+    },
+    {
+     "cost": 2.7022127640678115,
+     "escalation_rate": 0.00563453822769568,
+     "kind": "cascade",
+     "precision": 0.0014354066985645933,
+     "recall": 0.0028708133971291866
+    },
+    {
+     "cost": 2.7539210100337694,
+     "escalation_rate": 0.009457416090031758,
+     "kind": "cascade",
+     "precision": 0.0019138755980861245,
+     "recall": 0.003827751196172249
+    },
+    {
+     "cost": 2.8407118662892183,
+     "escalation_rate": 0.015874010519681986,
+     "kind": "cascade",
+     "precision": 0.002870813397129186,
+     "recall": 0.005741626794258372
+    },
+    {
+     "cost": 2.9041718189694645,
+     "escalation_rate": 0.02056571188595777,
+     "kind": "cascade",
+     "precision": 0.0033492822966507173,
+     "recall": 0.006698564593301435
+    },
+    {
+     "cost": 3.092903680515291,
+     "escalation_rate": 0.03451897682354658,
+     "kind": "cascade",
+     "precision": 0.004784688995215312,
+     "recall": 0.009569377990430623
+    },
+    {
+     "cost": 3.6413097294822023,
+     "escalation_rate": 0.075063561251087,
+     "kind": "cascade",
+     "precision": 0.0076555023923444996,
+     "recall": 0.015311004784688999
+    },
+    {
+     "cost": 3.9413933182576075,
+     "escalation_rate": 0.09724924724660709,
+     "kind": "cascade",
+     "precision": 0.00813397129186603,
+     "recall": 0.01626794258373206
+    }
+   ],
+   "index": "p3",
+   "max_cost": 6.763,
+   "n_test_runs": 1710,
+   "n_train_runs": 1708,
+   "stage1": "model:qwen3-0.6b-q8_0",
+   "stage2": "model:qwen3-4b-q4_k_m",
+   "stage2_alone_test_recall": 0.0,
+   "stage2_alone_test_recall_ci": [
+    0.0,
+    0.012161181004514604
+   ],
+   "test_composition": {
+    "benign": 1188,
+    "independent_source_runs": 1400,
+    "synthetic_share": 0.18128654970760233,
+    "traces": 1710,
+    "violations": 522
+   },
+   "test_cost": 3.878683800766283,
+   "test_cost_ci": [
+    2.6601735850487636,
+    5.597692263666841
+   ],
+   "test_recall": 0.017241379310344824,
+   "test_recall_ci": [
+    0.0,
+    0.03639846743295019
+   ],
+   "train_cost": 3.941393318257606,
+   "train_recall": 0.015296367112810705
+  },
+  {
+   "c1_seconds": 5.6865000000000006,
+   "c2_seconds": 23.5295,
+   "chosen_escalation_rate": 0.16323016341122154,
+   "front": [
+    {
+     "cost": 5.6865000000000006,
+     "escalation_rate": 0.0,
+     "kind": "stage1",
+     "precision": 0.0,
+     "recall": 0.0
+    },
+    {
+     "cost": 9.527224129984374,
+     "escalation_rate": 0.16323016341122307,
+     "kind": "cascade",
+     "precision": 0.0009569377990430622,
+     "recall": 0.0019138755980861245
+    },
+    {
+     "cost": 10.662383428625045,
+     "escalation_rate": 0.2114742526881168,
+     "kind": "cascade",
+     "precision": 0.0014354066985645933,
+     "recall": 0.0028708133971291866
+    }
+   ],
+   "index": "p4",
+   "max_cost": 11.76475,
+   "n_test_runs": 1710,
+   "n_train_runs": 1708,
+   "stage1": "model:qwen3-1.7b-q8_0",
+   "stage2": "model:qwen3-8b-q4_k_m",
+   "stage2_alone_test_recall": 0.0038314176245210726,
+   "stage2_alone_test_recall_ci": [
+    2.4096993583973896e-05,
+    0.021457298697269096
+   ],
+   "test_composition": {
+    "benign": 1188,
+    "independent_source_runs": 1400,
+    "synthetic_share": 0.18128654970760233,
+    "traces": 1710,
+    "violations": 522
+   },
+   "test_cost": 10.025350864028212,
+   "test_cost_ci": [
+    5.6865000000000006,
+    10.521462145218347
+   ],
+   "test_recall": 0.0019157088122605363,
+   "test_recall_ci": [
+    0.0,
+    0.005747126436781608
+   ],
+   "train_cost": 9.527224129984337,
+   "train_recall": 0.0019120458891013386
+  }
+ ],
+ "prereg": "prereg/0005-e4-cascades.md",
+ "prereg_config_sha256": "24289898cafbd5c5519fe9e6b9028faa3a5d8e16192993469bfcd0a2c59f1187",
+ "provenance": {
+  "analyzed_at": "2026-11-11T04:17:36+00:00",
+  "command": "tools/analyze.py e4 prereg/0005-e4-cascades.md",
+  "git_sha": "1a15982abf6de3c85d3cdc0e1c7d771643a534c9",
+  "model_calls": 0
+ },
+ "set_composition": {
+  "benign": 2373,
+  "independent_source_runs": 2800,
+  "synthetic_share": 0.18080748976009361,
+  "traces": 3418,
+  "violations": 1045
+ }
+}

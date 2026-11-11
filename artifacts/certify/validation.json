@@ -1,0 +1,3319 @@
+{
+ "artifact": "certify_validation",
+ "description": "Simulation study of the baserate.certify calculators (RQ2). Synthetic data only: binomial outcomes and binormal scores, no monitor or model results.",
+ "synthetic": true,
+ "mode": "full",
+ "criterion": "meets: simulated >= target - 2 * mcse (combined with target_mcse when the target is itself simulated)",
+ "settings": {
+  "mode": "full",
+  "sims": 100000,
+  "cluster_sims": 2000,
+  "budget_pilots": 5,
+  "budget_plan_sims": 400,
+  "budget_val_sims": 2000,
+  "budget_reps": 200
+ },
+ "grid": {
+  "zero_fp_runs": [
+   [
+    0.1,
+    0.05
+   ],
+   [
+    0.1,
+    0.01
+   ],
+   [
+    0.01,
+    0.05
+   ],
+   [
+    0.01,
+    0.01
+   ],
+   [
+    0.001,
+    0.05
+   ],
+   [
+    0.001,
+    0.01
+   ]
+  ],
+  "zero_miss_runs": [
+   [
+    0.5,
+    0.05
+   ],
+   [
+    0.5,
+    0.01
+   ],
+   [
+    0.8,
+    0.05
+   ],
+   [
+    0.8,
+    0.01
+   ],
+   [
+    0.9,
+    0.05
+   ],
+   [
+    0.9,
+    0.01
+   ],
+   [
+    0.95,
+    0.05
+   ],
+   [
+    0.95,
+    0.01
+   ],
+   [
+    0.99,
+    0.05
+   ],
+   [
+    0.99,
+    0.01
+   ]
+  ],
+  "clustered_traces_per_run": 3,
+  "fpr_runs_for_power": [
+   [
+    0.01,
+    0.002,
+    0.8
+   ],
+   [
+    0.01,
+    0.005,
+    0.8
+   ],
+   [
+    0.05,
+    0.02,
+    0.9
+   ],
+   [
+    0.001,
+    0.0002,
+    0.8
+   ]
+  ],
+  "recall_runs_for_power": [
+   [
+    0.8,
+    0.9,
+    0.8
+   ],
+   [
+    0.9,
+    0.97,
+    0.8
+   ],
+   [
+    0.5,
+    0.7,
+    0.9
+   ],
+   [
+    0.95,
+    0.99,
+    0.8
+   ]
+  ],
+  "joint_plan": [
+   {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "bonferroni"
+   },
+   {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "sidak"
+   },
+   {
+    "min_recall": 0.9,
+    "max_fpr": 0.001,
+    "true_recall": null,
+    "true_fpr": null,
+    "split": "bonferroni"
+   }
+  ],
+  "joint_power": 0.8,
+  "more_runs_power": 0.8,
+  "more_runs_fpr": [
+   [
+    1,
+    300,
+    0.01
+   ],
+   [
+    4,
+    600,
+    0.01
+   ],
+   [
+    6,
+    200,
+    0.05
+   ]
+  ],
+  "more_runs_recall": [
+   [
+    95,
+    100,
+    0.9
+   ],
+   [
+    40,
+    45,
+    0.8
+   ],
+   [
+    18,
+    20,
+    0.75
+   ]
+  ],
+  "two_look_fpr": [
+   0.01,
+   [
+    100,
+    300,
+    1000
+   ]
+  ],
+  "two_look_recall": [
+   0.9,
+   [
+    20,
+    50,
+    100
+   ]
+  ],
+  "budget": {
+   "population": "binormal_d3",
+   "prevalence": 0.001,
+   "reviews_per_10k": 20,
+   "pilot_neg": 10000,
+   "pilot_pos": 300,
+   "min_recall": 0.3,
+   "power": 0.8,
+   "method": "composite",
+   "n_neg_grid": [
+    5000,
+    20000
+   ],
+   "n_pos_grid": [
+    100,
+    300
+   ]
+  },
+  "alpha": 0.05
+ },
+ "summary": {
+  "rows": 72,
+  "meet": 67,
+  "guaranteed_rows": 61,
+  "guaranteed_meet": 61,
+  "other_rows": 11,
+  "other_meet": 6,
+  "rows_with_exact": 67,
+  "exact_meet": 62,
+  "not_meeting": [
+   "more_runs_fpr|max_fpr=0.01|n0=300|two_look_confidence",
+   "more_runs_fpr|max_fpr=0.01|n0=1000|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=20|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=50|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=100|two_look_confidence"
+  ],
+  "exact_not_meeting": [
+   "more_runs_fpr|max_fpr=0.01|n0=300|two_look_confidence",
+   "more_runs_fpr|max_fpr=0.01|n0=1000|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=20|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=50|two_look_confidence",
+   "more_runs_recall|min_recall=0.9|n0=100|two_look_confidence"
+  ]
+ },
+ "rows": [
+  {
+   "id": "zero_fp_runs|max_fpr=0.1|alpha=0.05|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.1,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_neg": 29
+   },
+   "true_rates": {
+    "fpr": 0.1
+   },
+   "exact": 0.9528987130275376,
+   "seed": [
+    20261104,
+    16955849743789633796
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95279,
+   "mcse": 0.0006706803702211656,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.1|alpha=0.01|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.1,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_neg": 44
+   },
+   "true_rates": {
+    "fpr": 0.1
+   },
+   "exact": 0.9903022627021247,
+   "seed": [
+    20261104,
+    9273358699775641077
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.99051,
+   "mcse": 0.0003065932142106214,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.01|alpha=0.05|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_neg": 299
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9504637433623375,
+   "seed": [
+    20261104,
+    14017180709677602864
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95141,
+   "mcse": 0.0006799192003466296,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.01|alpha=0.01|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_neg": 459
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9900790257989593,
+   "seed": [
+    20261104,
+    9246064801363686325
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.98985,
+   "mcse": 0.00031696967520568895,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.001|alpha=0.05|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_neg": 2995
+   },
+   "true_rates": {
+    "fpr": 0.001
+   },
+   "exact": 0.9500382966026436,
+   "seed": [
+    20261104,
+    1842813271205907726
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.94927,
+   "mcse": 0.0006939486083277352,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.001|alpha=0.01|confidence",
+   "calculator": "zero_fp_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_neg": 4603
+   },
+   "true_rates": {
+    "fpr": 0.001
+   },
+   "exact": 0.990001328406728,
+   "seed": [
+    20261104,
+    10453911845630244464
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.98995,
+   "mcse": 0.0003154203148181804,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.5|alpha=0.05|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_pos": 5
+   },
+   "true_rates": {
+    "recall": 0.5
+   },
+   "exact": 0.96875,
+   "seed": [
+    20261104,
+    3409190043690170332
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.96877,
+   "mcse": 0.0005500426083495713,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.5|alpha=0.01|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_pos": 7
+   },
+   "true_rates": {
+    "recall": 0.5
+   },
+   "exact": 0.9921875,
+   "seed": [
+    20261104,
+    4258074614982050587
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.99207,
+   "mcse": 0.0002804837802797159,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.8|alpha=0.05|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_pos": 14
+   },
+   "true_rates": {
+    "recall": 0.8
+   },
+   "exact": 0.95601953488896,
+   "seed": [
+    20261104,
+    826633476373349898
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95597,
+   "mcse": 0.0006487785377152978,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.8|alpha=0.01|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_pos": 21
+   },
+   "true_rates": {
+    "recall": 0.8
+   },
+   "exact": 0.9907766279631453,
+   "seed": [
+    20261104,
+    7074690240728230801
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.99064,
+   "mcse": 0.00030450599994088845,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.9|alpha=0.05|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_pos": 29
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9528987130275375,
+   "seed": [
+    20261104,
+    6967811749031114240
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95319,
+   "mcse": 0.0006679732322481195,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.9|alpha=0.01|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_pos": 44
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9903022627021247,
+   "seed": [
+    20261104,
+    2641046999815370838
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.99045,
+   "mcse": 0.000307551581039668,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.95|alpha=0.05|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_pos": 59
+   },
+   "true_rates": {
+    "recall": 0.95
+   },
+   "exact": 0.9515054747505769,
+   "seed": [
+    20261104,
+    502946875160054638
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95123,
+   "mcse": 0.0006811129649331305,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.95|alpha=0.01|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_pos": 90
+   },
+   "true_rates": {
+    "recall": 0.95
+   },
+   "exact": 0.9901116352903411,
+   "seed": [
+    20261104,
+    9187472171928619222
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.99053,
+   "mcse": 0.0003062730660701326,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.99|alpha=0.05|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.99,
+    "alpha": 0.05
+   },
+   "runs": {
+    "n_pos": 299
+   },
+   "true_rates": {
+    "recall": 0.99
+   },
+   "exact": 0.9504637433623376,
+   "seed": [
+    20261104,
+    11421237034721886126
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95034,
+   "mcse": 0.0006869780520511557,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.99|alpha=0.01|confidence",
+   "calculator": "zero_miss_runs",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.99,
+    "alpha": 0.01
+   },
+   "runs": {
+    "n_pos": 459
+   },
+   "true_rates": {
+    "recall": 0.99
+   },
+   "exact": 0.9900790257989595,
+   "seed": [
+    20261104,
+    16567953172026562045
+   ],
+   "note": null,
+   "target": 0.99,
+   "target_mcse": null,
+   "simulated": 0.98996,
+   "mcse": 0.0003152649425483279,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_fp_runs|max_fpr=0.01|alpha=0.05|traces_per_run=3|clustered_confidence",
+   "calculator": "zero_fp_runs",
+   "check": "clustered_confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "traces_per_run": 3,
+    "analysis": "estimate.fixed.rate_interval, method cluster_cp, alpha 2 * alpha"
+   },
+   "runs": {
+    "n_neg": 299,
+    "traces": 897
+   },
+   "true_rates": {
+    "run_level_fpr": 0.01
+   },
+   "exact": 0.9504637433623375,
+   "seed": [
+    20261104,
+    1893585608281428377
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.9595,
+   "mcse": 0.004407933189148855,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "zero_miss_runs|min_recall=0.9|alpha=0.05|traces_per_run=3|clustered_confidence",
+   "calculator": "zero_miss_runs",
+   "check": "clustered_confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.05,
+    "traces_per_run": 3,
+    "analysis": "estimate.fixed.rate_interval, method cluster_cp, alpha 2 * alpha"
+   },
+   "runs": {
+    "n_pos": 29,
+    "traces": 87
+   },
+   "true_rates": {
+    "run_level_recall": 0.9
+   },
+   "exact": 0.9528987130275375,
+   "seed": [
+    20261104,
+    10384039935361172431
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.9485,
+   "mcse": 0.004942051699446293,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.002|power=0.8|power",
+   "calculator": "fpr_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 773,
+    "first_runs": 628,
+    "horizon": 2532,
+    "events_allowed": 3,
+    "plan_min_power": 0.8875971145100711
+   },
+   "runs": {
+    "n_neg": 773
+   },
+   "true_rates": {
+    "fpr": 0.002
+   },
+   "exact": 0.9286430594934447,
+   "seed": [
+    20261104,
+    13756132457284014087
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.9292,
+   "mcse": 0.0008110940759246117,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.002|power=0.8|power_lowest_in_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 773,
+    "first_runs": 628,
+    "horizon": 2532,
+    "events_allowed": 3,
+    "plan_min_power": 0.8875971145100711
+   },
+   "runs": {
+    "n_neg": 912
+   },
+   "true_rates": {
+    "fpr": 0.002
+   },
+   "exact": 0.8875971145100711,
+   "seed": [
+    20261104,
+    15994342140843919074
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.88842,
+   "mcse": 0.000995640013257804,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.002|power=0.8|power_at_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 773,
+    "first_runs": 628,
+    "horizon": 2532,
+    "events_allowed": 3,
+    "plan_min_power": 0.8875971145100711
+   },
+   "runs": {
+    "n_neg": 2532
+   },
+   "true_rates": {
+    "fpr": 0.002
+   },
+   "exact": 0.9999773671658501,
+   "seed": [
+    20261104,
+    18059541984444283313
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99998,
+   "mcse": 1.4141994201674672e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.002|power=0.8|confidence",
+   "calculator": "fpr_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 773,
+    "first_runs": 628,
+    "horizon": 2532,
+    "events_allowed": 3,
+    "plan_min_power": 0.8875971145100711
+   },
+   "runs": {
+    "n_neg": 773
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9500052283536106,
+   "seed": [
+    20261104,
+    11090184360591245441
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.9506,
+   "mcse": 0.000685271041267614,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.005|power=0.8|power",
+   "calculator": "fpr_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.005,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 2185,
+    "first_runs": 1941,
+    "horizon": 7960,
+    "events_allowed": 14,
+    "plan_min_power": 0.8137121455003262
+   },
+   "runs": {
+    "n_neg": 2185
+   },
+   "true_rates": {
+    "fpr": 0.005
+   },
+   "exact": 0.8599939681465267,
+   "seed": [
+    20261104,
+    14861224101825214649
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.86064,
+   "mcse": 0.0010951656970522772,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.005|power=0.8|power_lowest_in_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.005,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 2185,
+    "first_runs": 1941,
+    "horizon": 7960,
+    "events_allowed": 14,
+    "plan_min_power": 0.8137121455003262
+   },
+   "runs": {
+    "n_neg": 2305
+   },
+   "true_rates": {
+    "fpr": 0.005
+   },
+   "exact": 0.8137121455003262,
+   "seed": [
+    20261104,
+    4538111561000651491
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.81396,
+   "mcse": 0.0012305653920048295,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.005|power=0.8|power_at_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.005,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 2185,
+    "first_runs": 1941,
+    "horizon": 7960,
+    "events_allowed": 14,
+    "plan_min_power": 0.8137121455003262
+   },
+   "runs": {
+    "n_neg": 7960
+   },
+   "true_rates": {
+    "fpr": 0.005
+   },
+   "exact": 0.9998548530665043,
+   "seed": [
+    20261104,
+    9076979991789954688
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99988,
+   "mcse": 3.463893762805219e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.01|true_fpr=0.005|power=0.8|confidence",
+   "calculator": "fpr_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.01,
+    "true_fpr": 0.005,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 2185,
+    "first_runs": 1941,
+    "horizon": 7960,
+    "events_allowed": 14,
+    "plan_min_power": 0.8137121455003262
+   },
+   "runs": {
+    "n_neg": 2185
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9500630991430433,
+   "seed": [
+    20261104,
+    10726075237299331472
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95003,
+   "mcse": 0.0006890065246425462,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.05|true_fpr=0.02|power=0.9|power",
+   "calculator": "fpr_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.05,
+    "true_fpr": 0.02,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 361,
+    "first_runs": 311,
+    "horizon": 1288,
+    "events_allowed": 11,
+    "plan_min_power": 0.9106405232170508
+   },
+   "runs": {
+    "n_neg": 361
+   },
+   "true_rates": {
+    "fpr": 0.02
+   },
+   "exact": 0.9380205051721767,
+   "seed": [
+    20261104,
+    16982824541714967958
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 0.93762,
+   "mcse": 0.0007647792858073497,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.05|true_fpr=0.02|power=0.9|power_lowest_in_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.05,
+    "true_fpr": 0.02,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 361,
+    "first_runs": 311,
+    "horizon": 1288,
+    "events_allowed": 11,
+    "plan_min_power": 0.9106405232170508
+   },
+   "runs": {
+    "n_neg": 385
+   },
+   "true_rates": {
+    "fpr": 0.02
+   },
+   "exact": 0.9106405232170508,
+   "seed": [
+    20261104,
+    4848940581654776744
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 0.91069,
+   "mcse": 0.0009018521159258872,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.05|true_fpr=0.02|power=0.9|power_at_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.05,
+    "true_fpr": 0.02,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 361,
+    "first_runs": 311,
+    "horizon": 1288,
+    "events_allowed": 11,
+    "plan_min_power": 0.9106405232170508
+   },
+   "runs": {
+    "n_neg": 1288
+   },
+   "true_rates": {
+    "fpr": 0.02
+   },
+   "exact": 0.9999972514734138,
+   "seed": [
+    20261104,
+    16445377649507931767
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 1.0,
+   "mcse": 0.0,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.05|true_fpr=0.02|power=0.9|confidence",
+   "calculator": "fpr_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.05,
+    "true_fpr": 0.02,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 361,
+    "first_runs": 311,
+    "horizon": 1288,
+    "events_allowed": 11,
+    "plan_min_power": 0.9106405232170508
+   },
+   "runs": {
+    "n_neg": 361
+   },
+   "true_rates": {
+    "fpr": 0.05
+   },
+   "exact": 0.95056647194707,
+   "seed": [
+    20261104,
+    9225658179583004686
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95088,
+   "mcse": 0.0006834268475850217,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.001|true_fpr=0.0002|power=0.8|power",
+   "calculator": "fpr_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "true_fpr": 0.0002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 7752,
+    "first_runs": 6294,
+    "horizon": 25516,
+    "events_allowed": 3,
+    "plan_min_power": 0.8864428130488918
+   },
+   "runs": {
+    "n_neg": 7752
+   },
+   "true_rates": {
+    "fpr": 0.0002
+   },
+   "exact": 0.9278924357838068,
+   "seed": [
+    20261104,
+    7465928595495941355
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.92838,
+   "mcse": 0.0008154175347636327,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.001|true_fpr=0.0002|power=0.8|power_lowest_in_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "true_fpr": 0.0002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 7752,
+    "first_runs": 6294,
+    "horizon": 25516,
+    "events_allowed": 3,
+    "plan_min_power": 0.8864428130488918
+   },
+   "runs": {
+    "n_neg": 9150
+   },
+   "true_rates": {
+    "fpr": 0.0002
+   },
+   "exact": 0.8864428130488918,
+   "seed": [
+    20261104,
+    13054439051054311321
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.88668,
+   "mcse": 0.001002390031873821,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.001|true_fpr=0.0002|power=0.8|power_at_horizon",
+   "calculator": "fpr_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "true_fpr": 0.0002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 7752,
+    "first_runs": 6294,
+    "horizon": 25516,
+    "events_allowed": 3,
+    "plan_min_power": 0.8864428130488918
+   },
+   "runs": {
+    "n_neg": 25516
+   },
+   "true_rates": {
+    "fpr": 0.0002
+   },
+   "exact": 0.9999929152575416,
+   "seed": [
+    20261104,
+    7573290864397904510
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99998,
+   "mcse": 1.4141994201674672e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "fpr_runs_for_power|max_fpr=0.001|true_fpr=0.0002|power=0.8|confidence",
+   "calculator": "fpr_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "max_fpr": 0.001,
+    "true_fpr": 0.0002,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 7752,
+    "first_runs": 6294,
+    "horizon": 25516,
+    "events_allowed": 3,
+    "plan_min_power": 0.8864428130488918
+   },
+   "runs": {
+    "n_neg": 7752
+   },
+   "true_rates": {
+    "fpr": 0.001
+   },
+   "exact": 0.9500240380205732,
+   "seed": [
+    20261104,
+    17864459089725103906
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.94955,
+   "mcse": 0.0006921329171481442,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.8|true_recall=0.9|power=0.8|power",
+   "calculator": "recall_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "true_recall": 0.9,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 94,
+    "first_runs": 82,
+    "horizon": 332,
+    "events_allowed": 12,
+    "plan_min_power": 0.8114803849592633
+   },
+   "runs": {
+    "n_pos": 94
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.8562185754036732,
+   "seed": [
+    20261104,
+    15357718710443954046
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.85626,
+   "mcse": 0.0011094089074818174,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.8|true_recall=0.9|power=0.8|power_lowest_in_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "true_recall": 0.9,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 94,
+    "first_runs": 82,
+    "horizon": 332,
+    "events_allowed": 12,
+    "plan_min_power": 0.8114803849592633
+   },
+   "runs": {
+    "n_pos": 99
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.8114803849592633,
+   "seed": [
+    20261104,
+    16213531675510082716
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.81137,
+   "mcse": 0.0012371286234664526,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.8|true_recall=0.9|power=0.8|power_at_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "true_recall": 0.9,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 94,
+    "first_runs": 82,
+    "horizon": 332,
+    "events_allowed": 12,
+    "plan_min_power": 0.8114803849592633
+   },
+   "runs": {
+    "n_pos": 332
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9998554119297953,
+   "seed": [
+    20261104,
+    9231008754491594617
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99986,
+   "mcse": 3.7413954615895524e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.8|true_recall=0.9|power=0.8|confidence",
+   "calculator": "recall_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "true_recall": 0.9,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 94,
+    "first_runs": 82,
+    "horizon": 332,
+    "events_allowed": 12,
+    "plan_min_power": 0.8114803849592633
+   },
+   "runs": {
+    "n_pos": 94
+   },
+   "true_rates": {
+    "recall": 0.8
+   },
+   "exact": 0.9532246258057002,
+   "seed": [
+    20261104,
+    18286220812217057022
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95369,
+   "mcse": 0.0006645704168859758,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.9|true_recall=0.97|power=0.8|power",
+   "calculator": "recall_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "true_recall": 0.97,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 89,
+    "first_runs": 76,
+    "horizon": 332,
+    "events_allowed": 4,
+    "plan_min_power": 0.8075672886602611
+   },
+   "runs": {
+    "n_pos": 89
+   },
+   "true_rates": {
+    "recall": 0.97
+   },
+   "exact": 0.8703384878645717,
+   "seed": [
+    20261104,
+    15841007266405697554
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.87019,
+   "mcse": 0.0010628234279502875,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.9|true_recall=0.97|power=0.8|power_lowest_in_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "true_recall": 0.97,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 89,
+    "first_runs": 76,
+    "horizon": 332,
+    "events_allowed": 4,
+    "plan_min_power": 0.8075672886602611
+   },
+   "runs": {
+    "n_pos": 102
+   },
+   "true_rates": {
+    "recall": 0.97
+   },
+   "exact": 0.8075672886602611,
+   "seed": [
+    20261104,
+    3414829365035409509
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.80918,
+   "mcse": 0.0012426090600023807,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.9|true_recall=0.97|power=0.8|power_at_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "true_recall": 0.97,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 89,
+    "first_runs": 76,
+    "horizon": 332,
+    "events_allowed": 4,
+    "plan_min_power": 0.8075672886602611
+   },
+   "runs": {
+    "n_pos": 332
+   },
+   "true_rates": {
+    "recall": 0.97
+   },
+   "exact": 0.9999161358758974,
+   "seed": [
+    20261104,
+    3303797153008086882
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99991,
+   "mcse": 2.999864996962938e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.9|true_recall=0.97|power=0.8|confidence",
+   "calculator": "recall_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "true_recall": 0.97,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 89,
+    "first_runs": 76,
+    "horizon": 332,
+    "events_allowed": 4,
+    "plan_min_power": 0.8075672886602611
+   },
+   "runs": {
+    "n_pos": 89
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9503021143506218,
+   "seed": [
+    20261104,
+    14815005211045199458
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.94984,
+   "mcse": 0.0006902461473996069,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.5|true_recall=0.7|power=0.9|power",
+   "calculator": "recall_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "true_recall": 0.7,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 58,
+    "first_runs": 53,
+    "horizon": 200,
+    "events_allowed": 22,
+    "plan_min_power": 0.9115613002367782
+   },
+   "runs": {
+    "n_pos": 58
+   },
+   "true_rates": {
+    "recall": 0.7
+   },
+   "exact": 0.9255955158627961,
+   "seed": [
+    20261104,
+    11923935467616165337
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 0.92748,
+   "mcse": 0.0008201271218536795,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.5|true_recall=0.7|power=0.9|power_lowest_in_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "true_recall": 0.7,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 58,
+    "first_runs": 53,
+    "horizon": 200,
+    "events_allowed": 22,
+    "plan_min_power": 0.9115613002367782
+   },
+   "runs": {
+    "n_pos": 59
+   },
+   "true_rates": {
+    "recall": 0.7
+   },
+   "exact": 0.9115613002367782,
+   "seed": [
+    20261104,
+    5097302145089662022
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 0.91192,
+   "mcse": 0.0008962249360512128,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.5|true_recall=0.7|power=0.9|power_at_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "true_recall": 0.7,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 58,
+    "first_runs": 53,
+    "horizon": 200,
+    "events_allowed": 22,
+    "plan_min_power": 0.9115613002367782
+   },
+   "runs": {
+    "n_pos": 200
+   },
+   "true_rates": {
+    "recall": 0.7
+   },
+   "exact": 0.9999801911931099,
+   "seed": [
+    20261104,
+    6973125869777050892
+   ],
+   "note": null,
+   "target": 0.9,
+   "target_mcse": null,
+   "simulated": 0.99998,
+   "mcse": 1.4141994201674672e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.5|true_recall=0.7|power=0.9|confidence",
+   "calculator": "recall_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.5,
+    "true_recall": 0.7,
+    "power": 0.9,
+    "alpha": 0.05,
+    "plan_runs": 58,
+    "first_runs": 53,
+    "horizon": 200,
+    "events_allowed": 22,
+    "plan_min_power": 0.9115613002367782
+   },
+   "runs": {
+    "n_pos": 58
+   },
+   "true_rates": {
+    "recall": 0.5
+   },
+   "exact": 0.9565255501350445,
+   "seed": [
+    20261104,
+    5816098867440353187
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95653,
+   "mcse": 0.000644828342274128,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.95|true_recall=0.99|power=0.8|power",
+   "calculator": "recall_runs_for_power",
+   "check": "power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "true_recall": 0.99,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 124,
+    "first_runs": 124,
+    "horizon": 492,
+    "events_allowed": 2,
+    "plan_min_power": 0.8044236171451631
+   },
+   "runs": {
+    "n_pos": 124
+   },
+   "true_rates": {
+    "recall": 0.99
+   },
+   "exact": 0.8715535097463496,
+   "seed": [
+    20261104,
+    6414516779572562001
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.87358,
+   "mcse": 0.0010508947787480913,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.95|true_recall=0.99|power=0.8|power_lowest_in_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_lowest_in_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "true_recall": 0.99,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 124,
+    "first_runs": 124,
+    "horizon": 492,
+    "events_allowed": 2,
+    "plan_min_power": 0.8044236171451631
+   },
+   "runs": {
+    "n_pos": 152
+   },
+   "true_rates": {
+    "recall": 0.99
+   },
+   "exact": 0.8044236171451631,
+   "seed": [
+    20261104,
+    14722764017042459704
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.80465,
+   "mcse": 0.0012537478913242487,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.95|true_recall=0.99|power=0.8|power_at_horizon",
+   "calculator": "recall_runs_for_power",
+   "check": "power_at_horizon",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "true_recall": 0.99,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 124,
+    "first_runs": 124,
+    "horizon": 492,
+    "events_allowed": 2,
+    "plan_min_power": 0.8044236171451631
+   },
+   "runs": {
+    "n_pos": 492
+   },
+   "true_rates": {
+    "recall": 0.99
+   },
+   "exact": 0.9999858944536968,
+   "seed": [
+    20261104,
+    4095310964064588957
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.99996,
+   "mcse": 1.999959999600992e-05,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "recall_runs_for_power|min_recall=0.95|true_recall=0.99|power=0.8|confidence",
+   "calculator": "recall_runs_for_power",
+   "check": "confidence",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.95,
+    "true_recall": 0.99,
+    "power": 0.8,
+    "alpha": 0.05,
+    "plan_runs": 124,
+    "first_runs": 124,
+    "horizon": 492,
+    "events_allowed": 2,
+    "plan_min_power": 0.8044236171451631
+   },
+   "runs": {
+    "n_pos": 124
+   },
+   "true_rates": {
+    "recall": 0.95
+   },
+   "exact": 0.9504702223213131,
+   "seed": [
+    20261104,
+    10612408201208076357
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.94988,
+   "mcse": 0.0006899854027441454,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "joint_plan|min_recall=0.8|max_fpr=0.01|split=bonferroni|true_recall=0.9|true_fpr=0.002|simultaneous_coverage",
+   "calculator": "joint_plan",
+   "check": "simultaneous_coverage",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "bonferroni",
+    "alpha": 0.05,
+    "power": 0.8,
+    "alpha_recall": 0.025,
+    "alpha_fpr": 0.025,
+    "plan_joint_power": 0.8695961812889106
+   },
+   "runs": {
+    "n_pos": 143,
+    "n_neg": 1022
+   },
+   "true_rates": {
+    "recall": 0.8,
+    "fpr": 0.01
+   },
+   "exact": 0.951281761667777,
+   "seed": [
+    20261104,
+    7086250328547412390
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95112,
+   "mcse": 0.0006818412249197025,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "joint_plan|min_recall=0.8|max_fpr=0.01|split=bonferroni|true_recall=0.9|true_fpr=0.002|joint_power",
+   "calculator": "joint_plan",
+   "check": "joint_power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "bonferroni",
+    "alpha": 0.05,
+    "power": 0.8,
+    "alpha_recall": 0.025,
+    "alpha_fpr": 0.025,
+    "plan_joint_power": 0.8695961812889106
+   },
+   "runs": {
+    "n_pos": 143,
+    "n_neg": 1022
+   },
+   "true_rates": {
+    "recall": 0.9,
+    "fpr": 0.002
+   },
+   "exact": 0.8695961812889106,
+   "seed": [
+    20261104,
+    4153222565396175601
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.86973,
+   "mcse": 0.0010644234453449435,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "joint_plan|min_recall=0.8|max_fpr=0.01|split=sidak|true_recall=0.9|true_fpr=0.002|simultaneous_coverage",
+   "calculator": "joint_plan",
+   "check": "simultaneous_coverage",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "sidak",
+    "alpha": 0.05,
+    "power": 0.8,
+    "alpha_recall": 0.025320565519103666,
+    "alpha_fpr": 0.025320565519103666,
+    "plan_joint_power": 0.8699424770701691
+   },
+   "runs": {
+    "n_pos": 143,
+    "n_neg": 1020
+   },
+   "true_rates": {
+    "recall": 0.8,
+    "fpr": 0.01
+   },
+   "exact": 0.9509611897100895,
+   "seed": [
+    20261104,
+    14094789168678444627
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95121,
+   "mcse": 0.0006812454469572622,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "joint_plan|min_recall=0.8|max_fpr=0.01|split=sidak|true_recall=0.9|true_fpr=0.002|joint_power",
+   "calculator": "joint_plan",
+   "check": "joint_power",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.8,
+    "max_fpr": 0.01,
+    "true_recall": 0.9,
+    "true_fpr": 0.002,
+    "split": "sidak",
+    "alpha": 0.05,
+    "power": 0.8,
+    "alpha_recall": 0.025320565519103666,
+    "alpha_fpr": 0.025320565519103666,
+    "plan_joint_power": 0.8699424770701691
+   },
+   "runs": {
+    "n_pos": 143,
+    "n_neg": 1020
+   },
+   "true_rates": {
+    "recall": 0.9,
+    "fpr": 0.002
+   },
+   "exact": 0.8699424770701691,
+   "seed": [
+    20261104,
+    3352829132767092886
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.87014,
+   "mcse": 0.0010629975559708496,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "joint_plan|min_recall=0.9|max_fpr=0.001|split=bonferroni|simultaneous_coverage",
+   "calculator": "joint_plan",
+   "check": "simultaneous_coverage",
+   "guaranteed": true,
+   "params": {
+    "min_recall": 0.9,
+    "max_fpr": 0.001,
+    "true_recall": null,
+    "true_fpr": null,
+    "split": "bonferroni",
+    "alpha": 0.05,
+    "power": null,
+    "alpha_recall": 0.025,
+    "alpha_fpr": 0.025,
+    "plan_joint_power": null
+   },
+   "runs": {
+    "n_pos": 36,
+    "n_neg": 3688
+   },
+   "true_rates": {
+    "recall": 0.9,
+    "fpr": 0.001
+   },
+   "exact": 0.9530583995197505,
+   "seed": [
+    20261104,
+    2603628977404354880
+   ],
+   "note": null,
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95313,
+   "mcse": 0.0006683801545527812,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_fpr|false_positives=1|runs=300|max_fpr=0.01|conditional_power",
+   "calculator": "more_runs_fpr",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "false_positives": 1,
+    "runs": 300,
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 173,
+    "at_observed_rate": 355,
+    "for_power": 749
+   },
+   "runs": {
+    "n_neg": 1049,
+    "added": 749
+   },
+   "true_rates": {
+    "observed_fpr": 0.0033333333333333335
+   },
+   "exact": 0.8919578286243468,
+   "seed": [
+    20261104,
+    7680244930182426315
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.89321,
+   "mcse": 0.0009766570324325733,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_fpr|false_positives=4|runs=600|max_fpr=0.01|conditional_power",
+   "calculator": "more_runs_fpr",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "false_positives": 4,
+    "runs": 600,
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 313,
+    "at_observed_rate": 1929,
+    "for_power": 4375
+   },
+   "runs": {
+    "n_neg": 4975,
+    "added": 4375
+   },
+   "true_rates": {
+    "observed_fpr": 0.006666666666666667
+   },
+   "exact": 0.8395749025153283,
+   "seed": [
+    20261104,
+    824830740709968466
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.83898,
+   "mcse": 0.0011622932487113569,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_fpr|false_positives=6|runs=200|max_fpr=0.05|conditional_power",
+   "calculator": "more_runs_fpr",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "false_positives": 6,
+    "runs": 200,
+    "max_fpr": 0.05,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 34,
+    "at_observed_rate": 143,
+    "for_power": 424
+   },
+   "runs": {
+    "n_neg": 624,
+    "added": 424
+   },
+   "true_rates": {
+    "observed_fpr": 0.03
+   },
+   "exact": 0.8583268287728402,
+   "seed": [
+    20261104,
+    9753396085447888763
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.85762,
+   "mcse": 0.0011050245952013917,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_recall|detected=95|runs=100|min_recall=0.9|conditional_power",
+   "calculator": "more_runs_recall",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "detected": 95,
+    "runs": 100,
+    "min_recall": 0.9,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 3,
+    "at_observed_rate": 7,
+    "for_power": 67
+   },
+   "runs": {
+    "n_pos": 167,
+    "added": 67
+   },
+   "true_rates": {
+    "observed_miss_rate": 0.05
+   },
+   "exact": 0.8820684025424869,
+   "seed": [
+    20261104,
+    10576512787133445692
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.88112,
+   "mcse": 0.0010234624839240566,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_recall|detected=40|runs=45|min_recall=0.8|conditional_power",
+   "calculator": "more_runs_recall",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "detected": 40,
+    "runs": 45,
+    "min_recall": 0.8,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 5,
+    "at_observed_rate": 17,
+    "for_power": 61
+   },
+   "runs": {
+    "n_pos": 106,
+    "added": 61
+   },
+   "true_rates": {
+    "observed_miss_rate": 0.1111111111111111
+   },
+   "exact": 0.8649661175760515,
+   "seed": [
+    20261104,
+    5907742831420020072
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.86602,
+   "mcse": 0.0010771692513249717,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_recall|detected=18|runs=20|min_recall=0.75|conditional_power",
+   "calculator": "more_runs_recall",
+   "check": "conditional_power",
+   "guaranteed": true,
+   "params": {
+    "detected": 18,
+    "runs": 20,
+    "min_recall": 0.75,
+    "alpha": 0.05,
+    "power": 0.8,
+    "certified_now": false,
+    "if_no_events": 3,
+    "at_observed_rate": 7,
+    "for_power": 25
+   },
+   "runs": {
+    "n_pos": 45,
+    "added": 25
+   },
+   "true_rates": {
+    "observed_miss_rate": 0.1
+   },
+   "exact": 0.9020063788045353,
+   "seed": [
+    20261104,
+    17957220788722568816
+   ],
+   "note": null,
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.90151,
+   "mcse": 0.0009422829718295877,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_fpr|max_fpr=0.01|n0=100|two_look_confidence",
+   "calculator": "more_runs_fpr",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "n0": 100,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "0": 199,
+     "1": null,
+     "2": null,
+     "3": null,
+     "4": null,
+     "5": null,
+     "6": null,
+     "7": null,
+     "8": null,
+     "9": null,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null
+    }
+   },
+   "runs": {
+    "n_neg": 100
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9504637433623375,
+   "seed": [
+    20261104,
+    8546000050999133269
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.95058,
+   "mcse": 0.0006854025357408595,
+   "sims": 100000,
+   "meets": true,
+   "exact_meets": true
+  },
+  {
+   "id": "more_runs_fpr|max_fpr=0.01|n0=300|two_look_confidence",
+   "calculator": "more_runs_fpr",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "n0": 300,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "1": 749,
+     "2": 4788,
+     "3": null,
+     "4": null,
+     "5": null,
+     "6": null,
+     "7": null,
+     "8": null,
+     "9": null,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null,
+     "16": null,
+     "17": null,
+     "18": null,
+     "19": null,
+     "20": null,
+     "21": null,
+     "22": null
+    }
+   },
+   "runs": {
+    "n_neg": 300
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9176158331782475,
+   "seed": [
+    20261104,
+    2297901513202736344
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.91742,
+   "mcse": 0.0008704053285682481,
+   "sims": 100000,
+   "meets": false,
+   "exact_meets": false
+  },
+  {
+   "id": "more_runs_fpr|max_fpr=0.01|n0=1000|two_look_confidence",
+   "calculator": "more_runs_fpr",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "max_fpr": 0.01,
+    "alpha": 0.05,
+    "n0": 1000,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "5": 818,
+     "6": 2254,
+     "7": 5099,
+     "8": 13492,
+     "9": 59032,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null,
+     "16": null,
+     "17": null,
+     "18": null,
+     "19": null,
+     "20": null,
+     "21": null,
+     "22": null,
+     "23": null,
+     "24": null,
+     "25": null,
+     "26": null,
+     "27": null,
+     "28": null,
+     "29": null,
+     "30": null,
+     "31": null,
+     "32": null,
+     "33": null,
+     "34": null,
+     "35": null,
+     "36": null,
+     "37": null,
+     "38": null,
+     "39": null,
+     "40": null
+    }
+   },
+   "runs": {
+    "n_neg": 1000
+   },
+   "true_rates": {
+    "fpr": 0.01
+   },
+   "exact": 0.9298827969570165,
+   "seed": [
+    20261104,
+    11776386756710191874
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.92988,
+   "mcse": 0.0008074848952147648,
+   "sims": 100000,
+   "meets": false,
+   "exact_meets": false
+  },
+  {
+   "id": "more_runs_recall|min_recall=0.9|n0=20|two_look_confidence",
+   "calculator": "more_runs_recall",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.05,
+    "n0": 20,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "0": 9,
+     "1": 183,
+     "2": null,
+     "3": null,
+     "4": null,
+     "5": null,
+     "6": null,
+     "7": null,
+     "8": null,
+     "9": null,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null,
+     "16": null
+    }
+   },
+   "runs": {
+    "n_pos": 20
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.933839027458441,
+   "seed": [
+    20261104,
+    14776811774643362697
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.93333,
+   "mcse": 0.0007888289491391655,
+   "sims": 100000,
+   "meets": false,
+   "exact_meets": false
+  },
+  {
+   "id": "more_runs_recall|min_recall=0.9|n0=50|two_look_confidence",
+   "calculator": "more_runs_recall",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.05,
+    "n0": 50,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "2": 79,
+     "3": 260,
+     "4": 1305,
+     "5": null,
+     "6": null,
+     "7": null,
+     "8": null,
+     "9": null,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null,
+     "16": null,
+     "17": null,
+     "18": null,
+     "19": null,
+     "20": null,
+     "21": null,
+     "22": null,
+     "23": null,
+     "24": null,
+     "25": null
+    }
+   },
+   "runs": {
+    "n_pos": 50
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9297298254517846,
+   "seed": [
+    20261104,
+    12224517660749041958
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.93008,
+   "mcse": 0.0008064192061204891,
+   "sims": 100000,
+   "meets": false,
+   "exact_meets": false
+  },
+  {
+   "id": "more_runs_recall|min_recall=0.9|n0=100|two_look_confidence",
+   "calculator": "more_runs_recall",
+   "check": "two_look_confidence",
+   "guaranteed": false,
+   "params": {
+    "min_recall": 0.9,
+    "alpha": 0.05,
+    "n0": 100,
+    "power": 0.8,
+    "procedure": "look at n0; stop if certified; else add for_power runs and certify",
+    "added_runs_by_first_look_events": {
+     "5": 67,
+     "6": 198,
+     "7": 471,
+     "8": 1233,
+     "9": 5389,
+     "10": null,
+     "11": null,
+     "12": null,
+     "13": null,
+     "14": null,
+     "15": null,
+     "16": null,
+     "17": null,
+     "18": null,
+     "19": null,
+     "20": null,
+     "21": null,
+     "22": null,
+     "23": null,
+     "24": null,
+     "25": null,
+     "26": null,
+     "27": null,
+     "28": null,
+     "29": null,
+     "30": null,
+     "31": null,
+     "32": null,
+     "33": null,
+     "34": null,
+     "35": null,
+     "36": null,
+     "37": null
+    }
+   },
+   "runs": {
+    "n_pos": 100
+   },
+   "true_rates": {
+    "recall": 0.9
+   },
+   "exact": 0.9336728974072726,
+   "seed": [
+    20261104,
+    8451874865681222585
+   ],
+   "note": "Diagnostic, not a documented guarantee: the certificate on all runs treats the total as fixed in advance; see 'Adding runs after a look' in baserate.certify.samplesize.",
+   "target": 0.95,
+   "target_mcse": null,
+   "simulated": 0.93174,
+   "mcse": 0.0007974996702193674,
+   "sims": 100000,
+   "meets": false,
+   "exact_meets": false
+  },
+  {
+   "id": "plan_budget|n_neg=5000|n_pos=100|power_calibration",
+   "calculator": "plan_budget",
+   "check": "power_calibration",
+   "guaranteed": false,
+   "params": {
+    "population": "binormal_d3",
+    "prevalence": 0.001,
+    "reviews_per_10k": 20,
+    "pilot_neg": 10000,
+    "pilot_pos": 300,
+    "min_recall": 0.3,
+    "power": 0.8,
+    "method": "composite",
+    "n_neg_grid": [
+     5000,
+     20000
+    ],
+    "n_pos_grid": [
+     100,
+     300
+    ],
+    "alpha": 0.05,
+    "flag_rate": 0.002,
+    "true_recall_at_budget": 0.512006320225217,
+    "pilots": 5,
+    "pilot_recalls_at_budget": [
+     0.5015000000000007,
+     0.533333333333333,
+     0.5099999999999993,
+     0.5666666666666668,
+     0.47666666666666574
+    ],
+    "pilot_tail_neg": [
+     15,
+     15,
+     15,
+     15,
+     16
+    ],
+    "pilot_seeds": [
+     [
+      20261104,
+      6688236120114048250
+     ],
+     [
+      20261104,
+      1861033059695148753
+     ],
+     [
+      20261104,
+      16853961832107847802
+     ],
+     [
+      20261104,
+      6459029311091588291
+     ],
+     [
+      20261104,
+      2287250123114630986
+     ]
+    ],
+    "plan_seeds": [
+     20261104,
+     20261105,
+     20261106,
+     20261107,
+     20261108
+    ],
+    "plan_sims": 400,
+    "reps": 200,
+    "e0_unsupported_source": "artifacts/e0/summary.json",
+    "planned_powers": [
+     0.6225,
+     0.5825,
+     0.3875,
+     0.68,
+     0.415
+    ],
+    "planned_mcse_each": [
+     0.02423807696579908,
+     0.024657339171127123,
+     0.024358969087381346,
+     0.0233238075793812,
+     0.024636101558485262
+    ],
+    "planned_median_lower_each": [
+     0.3137652808915149,
+     0.3161478428331782,
+     0.2908066462728331,
+     0.34377072906556505,
+     0.29080664627283326
+    ],
+    "true_median_lower": 0.30924360760247344,
+    "e0_unsupported_cells": [
+     "budget_recall:composite|binormal_d3|n2000_p100|p0.001|b5"
+    ]
+   },
+   "runs": {
+    "n_neg": 5000,
+    "n_pos": 100
+   },
+   "true_rates": {
+    "recall_at_budget": 0.512006320225217
+   },
+   "exact": null,
+   "seed": [
+    20261104,
+    17116060227901640965
+   ],
+   "note": "Pilot-resampling estimate, not a documented guarantee; see baserate.certify.atbudget. Target: planned power averaged over the pilots.",
+   "target": 0.5375,
+   "target_mcse": 0.05790617410950235,
+   "simulated": 0.5575,
+   "mcse": 0.01110616382915361,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": null
+  },
+  {
+   "id": "plan_budget|n_neg=5000|n_pos=300|power_calibration",
+   "calculator": "plan_budget",
+   "check": "power_calibration",
+   "guaranteed": false,
+   "params": {
+    "population": "binormal_d3",
+    "prevalence": 0.001,
+    "reviews_per_10k": 20,
+    "pilot_neg": 10000,
+    "pilot_pos": 300,
+    "min_recall": 0.3,
+    "power": 0.8,
+    "method": "composite",
+    "n_neg_grid": [
+     5000,
+     20000
+    ],
+    "n_pos_grid": [
+     100,
+     300
+    ],
+    "alpha": 0.05,
+    "flag_rate": 0.002,
+    "true_recall_at_budget": 0.512006320225217,
+    "pilots": 5,
+    "pilot_recalls_at_budget": [
+     0.5015000000000007,
+     0.533333333333333,
+     0.5099999999999993,
+     0.5666666666666668,
+     0.47666666666666574
+    ],
+    "pilot_tail_neg": [
+     15,
+     15,
+     15,
+     15,
+     16
+    ],
+    "pilot_seeds": [
+     [
+      20261104,
+      6688236120114048250
+     ],
+     [
+      20261104,
+      1861033059695148753
+     ],
+     [
+      20261104,
+      16853961832107847802
+     ],
+     [
+      20261104,
+      6459029311091588291
+     ],
+     [
+      20261104,
+      2287250123114630986
+     ]
+    ],
+    "plan_seeds": [
+     20261104,
+     20261105,
+     20261106,
+     20261107,
+     20261108
+    ],
+    "plan_sims": 400,
+    "reps": 200,
+    "e0_unsupported_source": "artifacts/e0/summary.json",
+    "planned_powers": [
+     0.9375,
+     0.7575,
+     0.665,
+     0.92,
+     0.78
+    ],
+    "planned_mcse_each": [
+     0.012103072956898178,
+     0.021429754431630803,
+     0.023599523300270285,
+     0.013564659966250532,
+     0.020712315177207976
+    ],
+    "planned_median_lower_each": [
+     0.36225865524862116,
+     0.3687138933432094,
+     0.32693201688118956,
+     0.3914281641193514,
+     0.33806869535420436
+    ],
+    "true_median_lower": 0.35580872833468546,
+    "e0_unsupported_cells": [
+     "budget_recall:composite|binormal_d3|n2000_p100|p0.001|b5"
+    ]
+   },
+   "runs": {
+    "n_neg": 5000,
+    "n_pos": 300
+   },
+   "true_rates": {
+    "recall_at_budget": 0.512006320225217
+   },
+   "exact": null,
+   "seed": [
+    20261104,
+    2053562220600942203
+   ],
+   "note": "Pilot-resampling estimate, not a documented guarantee; see baserate.certify.atbudget. Target: planned power averaged over the pilots.",
+   "target": 0.8119999999999999,
+   "target_mcse": 0.05148664875479856,
+   "simulated": 0.856,
+   "mcse": 0.007850605072222142,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": null
+  },
+  {
+   "id": "plan_budget|n_neg=20000|n_pos=100|power_calibration",
+   "calculator": "plan_budget",
+   "check": "power_calibration",
+   "guaranteed": false,
+   "params": {
+    "population": "binormal_d3",
+    "prevalence": 0.001,
+    "reviews_per_10k": 20,
+    "pilot_neg": 10000,
+    "pilot_pos": 300,
+    "min_recall": 0.3,
+    "power": 0.8,
+    "method": "composite",
+    "n_neg_grid": [
+     5000,
+     20000
+    ],
+    "n_pos_grid": [
+     100,
+     300
+    ],
+    "alpha": 0.05,
+    "flag_rate": 0.002,
+    "true_recall_at_budget": 0.512006320225217,
+    "pilots": 5,
+    "pilot_recalls_at_budget": [
+     0.5015000000000007,
+     0.533333333333333,
+     0.5099999999999993,
+     0.5666666666666668,
+     0.47666666666666574
+    ],
+    "pilot_tail_neg": [
+     15,
+     15,
+     15,
+     15,
+     16
+    ],
+    "pilot_seeds": [
+     [
+      20261104,
+      6688236120114048250
+     ],
+     [
+      20261104,
+      1861033059695148753
+     ],
+     [
+      20261104,
+      16853961832107847802
+     ],
+     [
+      20261104,
+      6459029311091588291
+     ],
+     [
+      20261104,
+      2287250123114630986
+     ]
+    ],
+    "plan_seeds": [
+     20261104,
+     20261105,
+     20261106,
+     20261107,
+     20261108
+    ],
+    "plan_sims": 400,
+    "reps": 200,
+    "e0_unsupported_source": "artifacts/e0/summary.json",
+    "planned_powers": [
+     0.87,
+     0.945,
+     0.74,
+     0.9725,
+     0.595
+    ],
+    "planned_mcse_each": [
+     0.016815171720800236,
+     0.011399013115178002,
+     0.02193171219946131,
+     0.00817675822071314,
+     0.024544602257930356
+    ],
+    "planned_median_lower_each": [
+     0.35152513087166026,
+     0.3847793573021621,
+     0.32786214497053356,
+     0.39441833305958185,
+     0.3092436076024732
+    ],
+    "true_median_lower": 0.3512674998378352,
+    "e0_unsupported_cells": [
+     "budget_recall:composite|binormal_d3|n2000_p100|p0.001|b5"
+    ]
+   },
+   "runs": {
+    "n_neg": 20000,
+    "n_pos": 100
+   },
+   "true_rates": {
+    "recall_at_budget": 0.512006320225217
+   },
+   "exact": null,
+   "seed": [
+    20261104,
+    2851399350018293512
+   ],
+   "note": "Pilot-resampling estimate, not a documented guarantee; see baserate.certify.atbudget. Target: planned power averaged over the pilots.",
+   "target": 0.8244999999999999,
+   "target_mcse": 0.07010884394996113,
+   "simulated": 0.8845,
+   "mcse": 0.007147018609182434,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": null
+  },
+  {
+   "id": "plan_budget|n_neg=20000|n_pos=300|power_calibration",
+   "calculator": "plan_budget",
+   "check": "power_calibration",
+   "guaranteed": false,
+   "params": {
+    "population": "binormal_d3",
+    "prevalence": 0.001,
+    "reviews_per_10k": 20,
+    "pilot_neg": 10000,
+    "pilot_pos": 300,
+    "min_recall": 0.3,
+    "power": 0.8,
+    "method": "composite",
+    "n_neg_grid": [
+     5000,
+     20000
+    ],
+    "n_pos_grid": [
+     100,
+     300
+    ],
+    "alpha": 0.05,
+    "flag_rate": 0.002,
+    "true_recall_at_budget": 0.512006320225217,
+    "pilots": 5,
+    "pilot_recalls_at_budget": [
+     0.5015000000000007,
+     0.533333333333333,
+     0.5099999999999993,
+     0.5666666666666668,
+     0.47666666666666574
+    ],
+    "pilot_tail_neg": [
+     15,
+     15,
+     15,
+     15,
+     16
+    ],
+    "pilot_seeds": [
+     [
+      20261104,
+      6688236120114048250
+     ],
+     [
+      20261104,
+      1861033059695148753
+     ],
+     [
+      20261104,
+      16853961832107847802
+     ],
+     [
+      20261104,
+      6459029311091588291
+     ],
+     [
+      20261104,
+      2287250123114630986
+     ]
+    ],
+    "plan_seeds": [
+     20261104,
+     20261105,
+     20261106,
+     20261107,
+     20261108
+    ],
+    "plan_sims": 400,
+    "reps": 200,
+    "e0_unsupported_source": "artifacts/e0/summary.json",
+    "planned_powers": [
+     0.9975,
+     1.0,
+     0.955,
+     1.0,
+     0.97
+    ],
+    "planned_mcse_each": [
+     0.002496873044429746,
+     0.0,
+     0.010365206220813944,
+     0.0,
+     0.008529361054615993
+    ],
+    "planned_median_lower_each": [
+     0.3946837076621867,
+     0.42903074919416806,
+     0.37519377698800455,
+     0.43760492384124333,
+     0.3590322149038155
+    ],
+    "true_median_lower": 0.39949088308437264,
+    "e0_unsupported_cells": [
+     "budget_recall:composite|binormal_d3|n2000_p100|p0.001|b5"
+    ]
+   },
+   "runs": {
+    "n_neg": 20000,
+    "n_pos": 300
+   },
+   "true_rates": {
+    "recall_at_budget": 0.512006320225217
+   },
+   "exact": null,
+   "seed": [
+    20261104,
+    540968333487025782
+   ],
+   "note": "Pilot-resampling estimate, not a documented guarantee; see baserate.certify.atbudget. Target: planned power averaged over the pilots.",
+   "target": 0.9845,
+   "target_mcse": 0.00930053761886915,
+   "simulated": 0.997,
+   "mcse": 0.0012229063741758816,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": null
+  },
+  {
+   "id": "plan_budget|chosen_design|power",
+   "calculator": "plan_budget",
+   "check": "chosen_design_power",
+   "guaranteed": false,
+   "params": {
+    "population": "binormal_d3",
+    "prevalence": 0.001,
+    "reviews_per_10k": 20,
+    "pilot_neg": 10000,
+    "pilot_pos": 300,
+    "min_recall": 0.3,
+    "power": 0.8,
+    "method": "composite",
+    "n_neg_grid": [
+     5000,
+     20000
+    ],
+    "n_pos_grid": [
+     100,
+     300
+    ],
+    "alpha": 0.05,
+    "flag_rate": 0.002,
+    "true_recall_at_budget": 0.512006320225217,
+    "pilots": 5,
+    "pilot_recalls_at_budget": [
+     0.5015000000000007,
+     0.533333333333333,
+     0.5099999999999993,
+     0.5666666666666668,
+     0.47666666666666574
+    ],
+    "pilot_tail_neg": [
+     15,
+     15,
+     15,
+     15,
+     16
+    ],
+    "pilot_seeds": [
+     [
+      20261104,
+      6688236120114048250
+     ],
+     [
+      20261104,
+      1861033059695148753
+     ],
+     [
+      20261104,
+      16853961832107847802
+     ],
+     [
+      20261104,
+      6459029311091588291
+     ],
+     [
+      20261104,
+      2287250123114630986
+     ]
+    ],
+    "plan_seeds": [
+     20261104,
+     20261105,
+     20261106,
+     20261107,
+     20261108
+    ],
+    "plan_sims": 400,
+    "reps": 200,
+    "e0_unsupported_source": "artifacts/e0/summary.json",
+    "chosen_designs": [
+     [
+      5000,
+      300
+     ],
+     [
+      20000,
+      100
+     ],
+     [
+      20000,
+      300
+     ],
+     [
+      5000,
+      300
+     ],
+     [
+      20000,
+      300
+     ]
+    ]
+   },
+   "runs": {},
+   "true_rates": {
+    "recall_at_budget": 0.512006320225217
+   },
+   "exact": null,
+   "seed": [
+    20261104,
+    7463217821512314043
+   ],
+   "note": "Pilot-resampling estimate, not a documented guarantee; see baserate.certify.atbudget. Simulated: the true power of each pilot's chosen design, averaged over the pilots that chose one (from the calibration rows' studies).",
+   "target": 0.8,
+   "target_mcse": null,
+   "simulated": 0.9180999999999999,
+   "mcse": 0.0034847661327555403,
+   "sims": 2000,
+   "meets": true,
+   "exact_meets": null
+  }
+ ],
+ "provenance": {
+  "git_sha": "074fd26521bc3b1267dab90f5f58ad6da79020f6",
+  "git_dirty_src_tools": false,
+  "seed": 20261104,
+  "seeding": "each row: numpy SeedSequence([seed, first 8 bytes of sha256(row id)])",
+  "command": "python3 tools/validate_certify.py artifacts/certify/validation.json",
+  "started_at": "2026-11-04T02:12:07+00:00",
+  "seconds": 128.3,
+  "section_seconds": {
+   "zero_event": 0.18,
+   "clustered": 1.68,
+   "power_plans": 0.65,
+   "joint_plans": 1.18,
+   "more_runs": 0.17,
+   "two_looks": 1.89,
+   "budget": 122.56
+  },
+  "environment": {
+   "python": "3.11.17",
+   "numpy": "2.4.6",
+   "scipy": "1.17.1",
+   "platform": "Linux-6.18.44-fc-v233-x86_64-with-glibc2.39",
+   "cpus": 4
+  },
+  "models": "none (pure simulation; no model calls)",
+  "usage": {
+   "model_calls": 0,
+   "cash_usd": 0
+  }
+ }
+}

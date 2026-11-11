@@ -1,0 +1,21 @@
+{
+ "monitor": "rule:armour-reviewer-calibrated",
+ "set": "primary",
+ "confirmatory": true,
+ "prereg": "prereg/0003-e2-main-study.md",
+ "prereg_config_sha256": "f4a08f810bf1b8d5b13dfd05c3f2310875171aca8a4d8f733537e2452b91094b",
+ "family": "rule",
+ "scores_file": "artifacts/scores/primary/rule_armour-reviewer-calibrated.jsonl.gz",
+ "scores_sha256": "d99487ba0a06749a94621773506e00432a51872af2cb7a89e9d36144c7bd2ae9",
+ "traces": 3418,
+ "corpus_manifest_sha256": "f8a124a8580eeb401c563e6a35176771fb8619a824a1ed3ea669d706c7c656aa",
+ "prefixes": true,
+ "concurrency": 1,
+ "threads": 4,
+ "wall_seconds_this_session": 3.4,
+ "scored_at": "2026-11-04T18:13:57+00:00",
+ "git_sha": "874bd88012fe3dee7b9c9b2e6c9bcc2e04405b7d",
+ "command": "tools/score_monitors.py --monitor rule:armour-reviewer-calibrated --set primary --prefixes",
+ "cap_share": "0.2",
+ "usage_note": "local model calls are logged to artifacts/usage/ledger.jsonl"
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "baserate-review/1",
+  "reviewed_commit": "c433208173f69791cab7bc23601962515d7a325e",
+  "reviewed_at": "2026-11-11T05:25:05Z",
+  "reviewer": "subagent",
+  "previous_review": "e403a4e7774e182f5b6c491df1ed17766bc54968",
+  "verdict": "SHIP",
+  "blocking": [],
+  "resolved": [
+    {"id": "B1", "evidence": "tools/analyze.py now builds breakdowns for every primary monitor, using derived_scores for the ensemble and the cascade. artifacts/e2/results.json has 81 breakdown rows across 9 monitors, and the 63 earlier rows are unchanged. The new rows match my independent recomputation: ensemble inserted 0.1068 [0.0637, 0.1539] and natural 0.0141 [0.0032, 0.0457]; cascade inserted 0.0324 [0.0113, 0.0542] and natural 0.0141 [0.0011, 0.0394]. The README first screen and key results, the REPORT abstract, and REPORT 5.2 now give the source split and say that the cascade's natural-violation interval contains the random-review rate."},
+    {"id": "B2", "evidence": "ttd() now counts a violation only when its full-trace score is caught under the same tie draw. The 0.6B row changed from share caught 0.122 to 0.001, which equals its recall at the budget (0.000957), with a median delay of 3 from the one caught violation. The rule and 1.7B rows are unchanged, as expected for monotone or uncaught scores. REPORT now describes the measure as preregistered."},
+    {"id": "B3", "evidence": "The 'near zero in every domain' premise is gone from README and REPORT. H3.2 is now reported with its banked shares (0.893 and 1.000) and the caveat that rule-monitor pairs into devops lose more, which matches the E3 pairs."},
+    {"id": "B4", "evidence": "g7 now calls e2_missing, which checks the preregistered monitors, sets, metrics, and method, the fixed-threshold and time-to-detection rows, breakdowns for every primary monitor, and the ladder rungs. I re-ran my counterexample (dropping model:qwen3-4b-q4_k_m) on a clone of c433208 and G7 now fails ('estimate model:qwen3-4b-q4_k_m primary p0.01 b5 recall_at_budget (composite) (and 57 more)'). Unmodified HEAD passes."},
+    {"id": "B5", "evidence": "g8 now compares the listed hypotheses with expected_hypotheses from the prereg/0004 and prereg/0005 configs. I re-ran my counterexample (dropping the two not_supported H3.1 entries) and G8 now fails ('E3 lacks preregistered hypotheses: H3.1-armour-reviewer-calibrated, H3.1-qwen3-0.6b-q8_0'). Unmodified HEAD passes."}
+  ],
+  "checks": [
+    "E2, E3, and E4 re-run from the banked shards and scores in a scratch root match artifacts/*/results.json in every field except provenance",
+    "python tools/ship_check.py --fast at c433208: 13/14; the only failure is G12 (latest review was BLOCK)",
+    "The Proc.status change in G10, G12, and G13 still requires a zero exit code, so a failing tool cannot pass on its status line alone",
+    "The README and REPORT numbers changed since e403a4e match the artifacts (source split, H3.2 shares, the p4 cascade 0.002 [0.000, 0.006], the 0.6B time to detection)"
+  ],
+  "non_blocking": [
+    {"id": "N1", "title": "Still open: FPR at the budget is banked and printed by baserate eval far tighter than the benign runs can certify; label it as fixed by the budget or drop the interval", "location": "artifacts/e2/results.json (fpr_at_budget); src/baserate/estimate/atbudget.py:276"},
+    {"id": "N2", "title": "Still open: the three Armour rule configurations score the corpus identically, and the documents do not say so", "location": "artifacts/scores/primary/rule_*.jsonl.gz; README.md:4-5"},
+    {"id": "N3", "title": "Still open: dataset-set estimates with 7 to 8 clusters are marked E0-supported by the closest-design rule", "location": "artifacts/e2/results.json (set=dataset)"},
+    {"id": "N8", "title": "Still open: smaller undeclared analysis choices are missing from the deviations paragraph", "location": "docs/REPORT.md (section 6, Deviations)"},
+    {"id": "N9", "title": "Still open: E4 n_train_runs and n_test_runs double count shared source runs", "location": "tools/analyze.py (run_e4); artifacts/e4/results.json"},
+    {"id": "N10", "title": "Still open: bootstraps resample the two classes independently despite shared source runs", "location": "tools/analyze.py; src/baserate/cascade/optimize.py"},
+    {"id": "N11", "title": "Still open: E0 support for 100 violations is extrapolated to 1,045", "location": "artifacts/e0/summary.json"},
+    {"id": "N12", "title": "Still open: G6 does not check audit items against the corpus or the preregistered sample (checked by hand: consistent)", "location": "tools/ship_check.py (g6)"},
+    {"id": "N13", "title": "Still open: fixed template values in inserted calls are a possible tell", "location": "src/baserate/traces/domains/browser.py:339"},
+    {"id": "N14", "title": "Still open: the auditor instructions are not banked", "location": "artifacts/corpus/label_audit.json"},
+    {"id": "N15", "title": "Still open: the cascade escalation threshold is not re-estimated in the E2 bootstrap", "location": "tools/analyze.py (derived_scores)"},
+    {"id": "N19", "title": "Still open: CLAUDE.md and DECISIONS.md D13 disagree on naming the session model in commit trailers", "location": "CLAUDE.md; DECISIONS.md D13"}
+  ],
+  "final_line": "REVIEW: SHIP"
+}

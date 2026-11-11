@@ -1,0 +1,16 @@
+# base-rate fixture
+
+This document is a test fixture for tools/claimcheck.py and tools/freshness.py.
+
+At a prevalence of {{param:1e-3}} and a review budget of {{param:20}} per {{param:10,000}} trajectories, the rule monitor's recall at budget was {{claim:e2.rule.recall}} ({{param:95%}} interval {{claim:e2.rule.recall.ci}}), from {{claim:e2.rule.runs}} independent source runs.
+
+| Monitor | Recall at budget | Independent source runs |
+|---|---|---|
+| rule-pack | {{claim:e2.rule.recall}} | {{claim:e2.rule.runs}} |
+
+1. The plan is frozen in `prereg/0001-e2-main.md`, dated {{date:2026-10-23}}; see section 6 and gate G7.
+2. Built with Python {{version:3.11}}; the brief asks for {{brief:At least 4 monitor families}}.
+
+Hypotheses supported: {{claim:e2.supported}} of {{claim:e2.hypotheses}}. The smallest preregistered prevalence is {{claim:e2.prereg.min_prevalence}}.
+
+Source: [results](artifacts/e2/results.json), https://arxiv.org/abs/2512.22154, reviewed at commit 9330c9d.

@@ -1,0 +1,62 @@
+{
+  "schema": "baserate-models/1",
+  "runtime": {
+    "name": "llama.cpp",
+    "repository": "https://github.com/ggml-org/llama.cpp",
+    "tag": "b11700",
+    "commit": "23f7aabc16c72f6f707dba227251c35d7bd1ed96",
+    "build": "cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF; targets llama-server llama-cli"
+  },
+  "models": {
+    "qwen3-0.6b-q8_0": {
+      "hf_repo": "Qwen/Qwen3-0.6B-GGUF",
+      "revision": "23749fefcc72300e3a2ad315e1317431b06b590a",
+      "file": "Qwen3-0.6B-Q8_0.gguf",
+      "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+      "bytes": 639446688,
+      "params_b": 0.6,
+      "quant": "Q8_0",
+      "license": "apache-2.0"
+    },
+    "qwen3-1.7b-q8_0": {
+      "hf_repo": "Qwen/Qwen3-1.7B-GGUF",
+      "revision": "90862c4b9d2787eaed51d12237eafdfe7c5f6077",
+      "file": "Qwen3-1.7B-Q8_0.gguf",
+      "sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+      "bytes": 1834426016,
+      "params_b": 1.7,
+      "quant": "Q8_0",
+      "license": "apache-2.0"
+    },
+    "qwen3-4b-q4_k_m": {
+      "hf_repo": "Qwen/Qwen3-4B-GGUF",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "file": "Qwen3-4B-Q4_K_M.gguf",
+      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "bytes": 2497280256,
+      "params_b": 4.0,
+      "quant": "Q4_K_M",
+      "license": "apache-2.0"
+    },
+    "qwen3-4b-q8_0": {
+      "hf_repo": "Qwen/Qwen3-4B-GGUF",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "file": "Qwen3-4B-Q8_0.gguf",
+      "sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300",
+      "bytes": 4280404704,
+      "params_b": 4.0,
+      "quant": "Q8_0",
+      "license": "apache-2.0"
+    },
+    "qwen3-8b-q4_k_m": {
+      "hf_repo": "Qwen/Qwen3-8B-GGUF",
+      "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "bytes": 5027783488,
+      "params_b": 8.0,
+      "quant": "Q4_K_M",
+      "license": "apache-2.0"
+    }
+  }
+}

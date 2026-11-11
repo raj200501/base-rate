@@ -1,0 +1,275 @@
+{
+  "schema": "baserate-citecheck/1",
+  "references": [
+    {
+      "key": "openai-monitoring-2026",
+      "claimed": {
+        "title": "How we monitor internal coding agents for misalignment",
+        "authors": "OpenAI",
+        "year": 2026,
+        "url": "https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment"
+      },
+      "retrieved_at": "2026-11-04T01:21:58Z",
+      "final_url": "https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment",
+      "page_title": null,
+      "content_sha256": null,
+      "verified": false,
+      "notes": "NOT VERIFIED, needs Raj for a manual check. The official page could not be opened. curl through the session proxy returned HTTP 403 and the body was a bot-challenge interstitial (9858 bytes, sha256 b9b0bac6445b868fec352221e4051d8ccb23316e94af595edc47461ca76a524f, which is not the post, so content_sha256 is null). WebFetch also returned HTTP 403. No workaround was attempted, per the bot-protection rule. Corroboration only, not verification: a web search returned this exact URL, and a LessWrong linkpost (https://www.lesswrong.com/posts/syB2r2X4E7nmw58co/openai-how-we-monitor-internal-coding-agents-for, opened 2026-10-23T02:00:19Z, HTTP 200, body sha256 c6fb46db0df5d35b7cff33c8f1bdeac29b3a008ca1d6fbacea36beceb8a00ddd) titled 'OpenAI: How we monitor internal coding agents for misalignment' by Marcus Williams, dated 19 Mar 2026, says it is a linkpost for the exact OpenAI URL above (with a trailing slash). That is a third-party copy, not an official OpenAI copy, so the official page's title, byline and date were not seen. The brief's description (monitoring at scale, false negatives not yet quantified) was not checked against the post. Please open the URL in a browser and confirm title, date, and that description. Second attempt 2026-11-04: one ordinary curl request through the session proxy again returned HTTP 403 with a 9858-byte bot-challenge body (sha256 438909a66dbf2083d637c64da518af8b679e6f8f43b7332dba35eb0f2be8086d, not the post). Still unverified; no workaround attempted. Raj to check manually."
+    },
+    {
+      "key": "aisi-async-control-2025",
+      "claimed": {
+        "title": "Async Control",
+        "authors": "UK AISI",
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2512.13526"
+      },
+      "retrieved_at": "2026-10-23T01:57:34Z",
+      "final_url": "https://arxiv.org/abs/2512.13526",
+      "page_title": "[2512.13526] Async Control: Stress-testing Asynchronous Control Measures for LLM Agents",
+      "content_sha256": "b8d98255ba0e5bf3ea46efe68c5258181923a88fde24f380db5a2f631bb0478e",
+      "verified": true,
+      "notes": "Matches. The brief gives the short form 'Async Control'; the full title is 'Async Control: Stress-testing Asynchronous Control Measures for LLM Agents', so cite the full title. Authors on the abs page (9): Stickland, Asa Cooper; Michelfeit, Jan; Mani, Arathi; Griffin, Charlie; Matthews, Ollie; Korbak, Tomek; Inglis, Rogan; Makins, Oliver; Cooney, Alan. The abs page lists individuals only; the 'UK AI Security Institute' affiliation (the brief's 'UK AISI') was seen in the paper's HTML full text at https://arxiv.org/html/2512.13526. Year: submitted 2025-12-15 (arXiv export API published 2025-12-15T16:56:28Z, same title and author count). The brief's gloss (balanced games, then extrapolated) is consistent with the abstract: a red-blue team game, then extrapolation of deployment risk from the monitor's false negative rate. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "practical-challenges-2025",
+      "claimed": {
+        "title": "Practical challenges of control monitoring",
+        "authors": null,
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2512.22154"
+      },
+      "retrieved_at": "2026-10-23T01:57:35Z",
+      "final_url": "https://arxiv.org/abs/2512.22154",
+      "page_title": "[2512.22154] Practical challenges of control monitoring in frontier AI deployments",
+      "content_sha256": "f666a6c9cbf5eeb0c982ea65a9e922346c570504e565d63e14b48cff0d600a00",
+      "verified": true,
+      "notes": "Matches. The brief's title is a prefix of the real title 'Practical challenges of control monitoring in frontier AI deployments', so cite the full title. The brief names no authors. Authors on the abs page (7): Lindner, David; Griffin, Charlie; Korbak, Tomek; Zimmermann, Roland S.; Irving, Geoffrey; Farquhar, Sebastian; Cooney, Alan. Affiliations in the full text: Google DeepMind, UK AI Security Institute, University of Oxford. Year 2025: arXiv export API published 2025-12-15T15:54:36Z, primary category cs.CR, full text header '15 Dec 2025'. The full text was read at https://arxiv.org/html/2512.22154 (HTML body sha256 4d4b2280995f02fc1165a4ff8a656446c17fd2e1b29a3f24733fd3a1932e26e0) for docs/RELATED_WORK_NOTES.md. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "basharena-2025",
+      "claimed": {
+        "title": "BashArena",
+        "authors": null,
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2512.15688"
+      },
+      "retrieved_at": "2026-10-23T01:57:35Z",
+      "final_url": "https://arxiv.org/abs/2512.15688",
+      "page_title": "[2512.15688] BashArena: A Control Setting for Highly Privileged AI Agents",
+      "content_sha256": "381cb897c7cc995b7e17c103ed596fdb65424216b8ef4eb32aa34f733a5c4553",
+      "verified": true,
+      "notes": "Matches. The brief gives the short name 'BashArena'; the full title is 'BashArena: A Control Setting for Highly Privileged AI Agents'. The brief names no authors. Authors on the abs page (5): Kaufman, Adam; Lucassen, James; Tracy, Tyler; Rushing, Cody; Bhatt, Aryan (Redwood Research affiliation seen in the HTML full text). Year 2025: arXiv export API published 2025-12-17T18:45:25Z. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "linuxarena-2026",
+      "claimed": {
+        "title": "LinuxArena",
+        "authors": "Redwood Research",
+        "year": 2026,
+        "url": "https://blog.redwoodresearch.org/p/introducing-linuxarena"
+      },
+      "retrieved_at": "2026-10-23T01:57:35Z",
+      "final_url": "https://blog.redwoodresearch.org/p/introducing-linuxarena",
+      "page_title": "Introducing LinuxArena - by Tyler - Redwood Research blog",
+      "content_sha256": "234a6c35109fc2f0cda27c6d87b0e90c4eece76e6726df1b2c20a93c937ab3d5",
+      "verified": true,
+      "notes": "Matches. Page heading 'Introducing LinuxArena', subtitle 'A new control setting for more realistic software engineering deployments', published on the Redwood Research blog on Apr 20, 2026 (datePublished 2026-04-20T21:51:28+00:00). The byline is the first name 'Tyler' only; the page gives no surname, so cite the venue (Redwood Research blog) and do not assert an individual author without a further source. No redirect. The post is a short announcement, not a paper. content_sha256 is of the post HTML body."
+    },
+    {
+      "key": "shade-arena-2025",
+      "claimed": {
+        "title": "SHADE-Arena",
+        "authors": "Anthropic",
+        "year": 2025,
+        "url": "https://www.anthropic.com/research/shade-arena-sabotage-monitoring"
+      },
+      "retrieved_at": "2026-10-23T01:57:36Z",
+      "final_url": "https://www.anthropic.com/research/shade-arena-sabotage-monitoring",
+      "page_title": "SHADE-Arena: Evaluating sabotage in LLM agents \\ Anthropic",
+      "content_sha256": "c6ebedc05c5eea31f5b6b18817ab9ba4ef32a520e7c59f1a296b1754df46e2a1",
+      "verified": true,
+      "notes": "Matches. The on-page heading is 'SHADE-Arena: Evaluating sabotage and monitoring in LLM agents', which differs slightly from the HTML title and og:title ('SHADE-Arena: Evaluating sabotage in LLM agents'). Published Jun 16, 2025 (article:published_time 2025-06-16), team Alignment. No per-author byline: the page says the work was a collaboration between researchers at Anthropic, Scale AI and Redwood Research plus named individuals, so 'Anthropic' is correct for the venue but is not the full author list. The post links to a paper, which was not opened here. No redirect. content_sha256 is of the post HTML body."
+    },
+    {
+      "key": "monitorbench-2026",
+      "claimed": {
+        "title": "MonitorBench",
+        "authors": null,
+        "year": 2026,
+        "url": "https://arxiv.org/abs/2603.28590"
+      },
+      "retrieved_at": "2026-10-23T01:57:36Z",
+      "final_url": "https://arxiv.org/abs/2603.28590",
+      "page_title": "[2603.28590] MonitorBench: A Comprehensive Benchmark for Chain-of-Thought Monitorability in Large Language Models",
+      "content_sha256": "4dae884d3416c532f5c7cb278770e4f411230dd4361fd58dc77495afcdf2fbcc",
+      "verified": true,
+      "notes": "Matches. The brief gives only 'MonitorBench (2026)'; the full title is as shown in page_title. Authors on the abs page (11): Wang, Han; Sun, Yifan; Ko, Brian; Talati, Mann; Gong, Jiawen; Li, Zimeng; Yu, Naicheng; Yu, Xucheng; Shen, Wei; Jolly, Vedant; Zhang, Huan. Year 2026: arXiv export API published 2026-03-30T15:37:42Z, last updated 2026-09-28T14:42:45Z. Topical flag for Raj: the abstract is about chain-of-thought monitorability (whether reasoning reveals decision-critical factors), not about monitors of agent actions or traces, so the README should describe it that way. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "trace-2026",
+      "claimed": {
+        "title": "TRACE, reward-hack detection in code environments",
+        "authors": null,
+        "year": 2026,
+        "url": "https://arxiv.org/abs/2601.20103"
+      },
+      "retrieved_at": "2026-10-23T01:57:36Z",
+      "final_url": "https://arxiv.org/abs/2601.20103",
+      "page_title": "[2601.20103] Benchmarking Reward Hack Detection in Code Environments via Contrastive Analysis",
+      "content_sha256": "19ed67b175ece906e92bf44ccaaa411d7206a10939c86a72f551e9ef62dcdace",
+      "verified": true,
+      "notes": "Matches, with a naming note. The brief's 'TRACE' is the benchmark name (expanded in the abstract as 'Testing Reward Anomalies in Code Environments'); the paper title is 'Benchmarking Reward Hack Detection in Code Environments via Contrastive Analysis', so cite that title. The brief names no authors. Authors on the abs page (3): Deshpande, Darshan; Kannappan, Anand; Qian, Rebecca. Year 2026: arXiv export API published 2026-01-27T22:45:43Z, primary category cs.SE. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "armour",
+      "claimed": {
+        "title": "Armour",
+        "authors": "Raj (raj200501)",
+        "year": null,
+        "url": "https://github.com/raj200501/armour"
+      },
+      "retrieved_at": "2026-10-23T02:04:27Z",
+      "final_url": "https://github.com/raj200501/armour",
+      "page_title": "GitHub - raj200501/armour: Armour is a dependency-light evaluation framework for trace-level safety in tool-using AI agents.",
+      "content_sha256": null,
+      "verified": true,
+      "notes": "Read through WebFetch only, so evidence is weaker than for the other references; please eyeball it. curl through the session proxy returned HTTP 403 with 'GitHub access to this repository is not enabled for this session', a session policy denial that was not worked around, so no page body or hash was captured (content_sha256 is null; the 403 body is not the page). WebFetch opened the page (retrieved_at is the time of the last of two WebFetch calls; the first was minutes earlier). Seen: repository raj200501/armour, public, MIT license, 5 commits on main, description 'Armour is a dependency-light evaluation framework for trace-level safety in tool-using AI agents.', page header 'GitHub - raj200501/armour: ...' (the HTML title element itself was not visible to the tool, so page_title is the header text it reported). README rows matched the brief's description: normalized trace schema, '100 safety cases' ('100 built-in eval cases' in the results snapshot), rule-based detectors, policy-pack replay, and a judge-comparison report. Commits page: 5 commits, all by raj200501, all dated Jun 5, 2026 (year 2026; the brief gives no year, so claimed.year is null). Authorship: raj200501 is the GitHub login in this repository's own commit author email for Raj Kashikar. Not checked: file contents, licenses of linked artifacts, and whether the figures in the README reproduce. Local clone check, 2026-11-04: read-only clone at /home/user/raj200501/armour, HEAD 639eb62ae17a8c3876137f375176417ff6671ea0. README.md at that commit starts with the title line '# Armour' followed by 'Armour is a dependency-light evaluation framework for **trace-level safety in ...'. SHA-256 of README.md at that commit (git show <commit>:README.md): 99407c4115f196ccb8f9f3e689fa78ad29a3c987d9adce204bf005d0d06b413f. The web observation above is kept."
+    },
+    {
+      "key": "hua-cascades-2025",
+      "claimed": {
+        "title": "Combining cost-constrained runtime monitors for AI safety",
+        "authors": "Hua, Baskerville, Lemoine, Hopman, Bhatt, Tracy",
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2507.15886"
+      },
+      "retrieved_at": "2026-11-04T01:21:35Z",
+      "final_url": "https://arxiv.org/abs/2507.15886",
+      "page_title": "[2507.15886] Combining Cost-Constrained Runtime Monitors for AI Safety",
+      "content_sha256": "a8dca98fff72282b5a637548942ee0729bd4f7183304caf230483b90b38747da",
+      "verified": true,
+      "notes": "Matches (capitalization differs). Authors on the abs page (6): Hua, Tim Tian; Baskerville, James; Lemoine, Henri; Hopman, Mia; Bhatt, Aryan; Tracy, Tyler. citation_date 2025/07/19 (v1), online date 2025/10/21 (latest version). Year 2025. Full text read via https://arxiv.org/html/2507.15886 (WebFetch summary, not hashed) for docs/RELATED_WORK_NOTES.md. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "korbak-safety-case-2025",
+      "claimed": {
+        "title": "A sketch of an AI control safety case",
+        "authors": "Korbak, Clymer, Hilton, Shlegeris, Irving",
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2501.17315"
+      },
+      "retrieved_at": "2026-11-04T01:21:35Z",
+      "final_url": "https://arxiv.org/abs/2501.17315",
+      "page_title": "[2501.17315] A sketch of an AI control safety case",
+      "content_sha256": "e4250e96789b4c9c9ba5a67da3e31e6c6536405940b9a8e9dad8e4065a585f89",
+      "verified": true,
+      "notes": "Matches. Authors on the abs page (5): Korbak, Tomek; Clymer, Joshua; Hilton, Benjamin; Shlegeris, Buck; Irving, Geoffrey. citation_date 2025/01/28. Abstract read via WebFetch for the notes. content_sha256 is of the abs page body."
+    },
+    {
+      "key": "clopper-pearson-1934",
+      "claimed": {
+        "title": "The use of confidence or fiducial limits illustrated in the case of the binomial",
+        "authors": "Clopper, C. J.; Pearson, E. S.",
+        "year": 1934,
+        "url": "https://doi.org/10.1093/biomet/26.4.404"
+      },
+      "retrieved_at": "2026-11-04T01:21:36Z",
+      "final_url": "https://api.crossref.org/works/10.1093/biomet/26.4.404",
+      "page_title": "THE USE OF CONFIDENCE OR FIDUCIAL LIMITS ILLUSTRATED IN THE CASE OF THE BINOMIAL (Crossref title, upper case as registered)",
+      "content_sha256": "274ac3c0653955ce12387459fb334cea3b16fbeb5e1dcf0d3fba2b0e1137fffb",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: Biometrika 26(4), pages 404-413, issued 1934, authors C. J. Clopper and E. S. Pearson, URL https://doi.org/10.1093/biomet/26.4.404. doi.org redirected to https://academic.oup.com/biomet/article-lookup/doi/10.1093/biomet/26.4.404, which returned 403 ('Just a moment...' challenge). content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "brown-cai-dasgupta-2001",
+      "claimed": {
+        "title": "Interval estimation for a binomial proportion",
+        "authors": "Brown, L. D.; Cai, T. T.; DasGupta, A.",
+        "year": 2001,
+        "url": "https://doi.org/10.1214/ss/1009213286"
+      },
+      "retrieved_at": "2026-11-04T01:21:37Z",
+      "final_url": "https://api.crossref.org/works/10.1214/ss/1009213286",
+      "page_title": "Interval Estimation for a Binomial Proportion (Crossref title)",
+      "content_sha256": "ce3cc44b170fca1cd21e678ff96a04698e701c858c50e8e2526f05cb9293333f",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: Statistical Science 16(2), pages 101-133, issued 2001-05-01, authors Brown, Cai, DasGupta. doi.org redirected to https://projecteuclid.org/journals/statistical-science/volume-16/issue-2/Interval-Estimation-for-a-Binomial-Proportion/10.1214/ss/1009213286.full, whose URL slug confirms the title, but the body returned (1161 bytes) was a bot-protection page with no metadata. content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "rubin-1981",
+      "claimed": {
+        "title": "The Bayesian bootstrap",
+        "authors": "Rubin, D. B.",
+        "year": 1981,
+        "url": "https://doi.org/10.1214/aos/1176345338"
+      },
+      "retrieved_at": "2026-11-04T01:21:37Z",
+      "final_url": "https://api.crossref.org/works/10.1214/aos/1176345338",
+      "page_title": "The Bayesian Bootstrap (Crossref title)",
+      "content_sha256": "507fa7976c6438d6948477e59162107dfc428457bb660a1d778934493890aa28",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: The Annals of Statistics 9(1), pages 130-134, issued 1981-01-01, author Rubin. The Crossref record lists the family name only as 'Rubin'; the initials were not on the record I saw, so cite as Rubin without asserting initials from this check. doi.org redirected to https://projecteuclid.org/journals/annals-of-statistics/volume-9/issue-1/The-Bayesian-Bootstrap/10.1214/aos/1176345338.full (slug confirms title; body was a bot-protection page). content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "wilson-1927",
+      "claimed": {
+        "title": "Probable inference, the law of succession, and statistical inference",
+        "authors": "Wilson, E. B.",
+        "year": 1927,
+        "url": "https://doi.org/10.1080/01621459.1927.10502953"
+      },
+      "retrieved_at": "2026-11-04T01:21:38Z",
+      "final_url": "https://api.crossref.org/works/10.1080/01621459.1927.10502953",
+      "page_title": "Probable Inference, the Law of Succession, and Statistical Inference (Crossref title)",
+      "content_sha256": "23d777d9bb9bff9e8db9868cbdfec9c0247217081e21e6107953f58efdc0a891",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: Journal of the American Statistical Association 22(158), pages 209-212, issued 1927-06, author Edwin B. Wilson. doi.org redirected to https://www.tandfonline.com/doi/abs/10.1080/01621459.1927.10502953, which returned 403 ('Just a moment...'). content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "hanley-lippman-hand-1983",
+      "claimed": {
+        "title": "If nothing goes wrong, is everything all right? Interpreting zero numerators",
+        "authors": "Hanley, J. A.; Lippman-Hand, A.",
+        "year": 1983,
+        "url": "https://doi.org/10.1001/jama.1983.03330370053031"
+      },
+      "retrieved_at": "2026-11-04T01:21:38Z",
+      "final_url": "https://api.crossref.org/works/10.1001/jama.1983.03330370053031",
+      "page_title": "If Nothing Goes Wrong, Is Everything All Right? : Interpreting Zero Numerators (Crossref title plus subtitle)",
+      "content_sha256": "0c1b230fcd83ec9a450da63534ed390cb69d0b4bddefbd3b301c3b77a4e665cc",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: JAMA 249(13), page 1743, issued 1983-04-01, title 'If Nothing Goes Wrong, Is Everything All Right?', subtitle 'Interpreting Zero Numerators'. Crossref lists only one author, James A. Hanley. The second author was confirmed from NCBI PubMed (official NLM record, PMID 6827763, https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=6827763, retrieved 2026-11-04T01:22:15Z, body sha256 4f6b0f5e526a1d6079b03f10a865e3d1ea0e15331c4215755dd6a6e6a5b1f4b8): title 'If nothing goes wrong, is everything all right? Interpreting zero numerators.', authors Hanley JA and Lippman-Hand A, 1983 Apr 1, JAMA. The PubMed summary did not list the DOI, so the DOI-to-PMID link rests on matching title, journal, and date. doi.org redirected to a jamanetwork.com URL that returned 403. content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "gebru-datasheets-2021",
+      "claimed": {
+        "title": "Datasheets for datasets",
+        "authors": "Gebru, T.; Morgenstern, J.; Vecchione, B.; Vaughan, J. W.; Wallach, H.; Daume III, H.; Crawford, K.",
+        "year": 2021,
+        "url": "https://doi.org/10.1145/3458723"
+      },
+      "retrieved_at": "2026-11-04T01:22:01Z",
+      "final_url": "https://api.crossref.org/works/10.1145/3458723",
+      "page_title": "Datasheets for datasets (Crossref title)",
+      "content_sha256": "1dddff42d0a56da39ff386026288196c16b261f02c2c86c28df24e1611ff885c",
+      "verified": true,
+      "notes": "Verified through Crossref's REST API (official DOI registration agency metadata), because the publisher landing page served a bot challenge or 403 and no workaround was attempted. Crossref: Communications of the ACM 64(12), pages 86-92, issued 2021-11-19, seven authors: Timnit Gebru, Jamie Morgenstern, Briana Vecchione, Jennifer Wortman Vaughan, Hanna Wallach, Hal Daume III, Kate Crawford. The first Crossref request returned HTTP 429 and was retried once after a pause. doi.org redirected to https://dl.acm.org/doi/10.1145/3458723, which returned 403 ('Just a moment...'). content_sha256 is of the Crossref JSON body."
+    },
+    {
+      "key": "qwen3-2025",
+      "claimed": {
+        "title": "Qwen3 technical report",
+        "authors": "Yang, An et al. (Qwen team)",
+        "year": 2025,
+        "url": "https://arxiv.org/abs/2505.09388"
+      },
+      "retrieved_at": "2026-11-04T01:21:35Z",
+      "final_url": "https://arxiv.org/abs/2505.09388",
+      "page_title": "[2505.09388] Qwen3 Technical Report",
+      "content_sha256": "2d65e4e15e6de89bd7eca7329348dd74ec866b1c344e3a5246b16ba91292e86a",
+      "verified": true,
+      "notes": "Matches. The abs page lists 60 individual authors starting with Yang, An; Li, Anfeng; Yang, Baosong; the string 'Qwen Team' as a group author was not checked on the page, so cite as Yang et al. citation_date 2025/05/14. content_sha256 is of the abs page body."
+    }
+  ]
+}

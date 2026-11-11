@@ -1,0 +1,47 @@
+{
+  "schema": "fixture-e2/1",
+  "note": "Test fixture for the claim tools. Not a result of the base-rate study.",
+  "prereg": "prereg/0001-e2-main.md",
+  "prereg_config_sha256": "09ce884af3d264bf19d5fd0afc162eec6a14ffe1b5a4a03338fec14f1de8df67",
+  "confirmatory": true,
+  "estimates": [
+    {
+      "family": "rule",
+      "monitor": "rule-pack",
+      "prevalence": 0.001,
+      "budget": 20,
+      "metric": "recall_at_budget",
+      "estimate": 0.4123,
+      "ci_low": 0.3011,
+      "ci_high": 0.5288,
+      "n_independent_runs": 1212
+    },
+    {
+      "family": "rule",
+      "monitor": "rule-pack",
+      "prevalence": 0.001,
+      "budget": 20,
+      "metric": "precision_at_budget",
+      "estimate": 0.0618,
+      "ci_low": 0.0402,
+      "ci_high": 0.0897,
+      "n_independent_runs": 1212
+    },
+    {
+      "family": "rule",
+      "monitor": "rule-pack",
+      "prevalence": 0.0001,
+      "budget": 20,
+      "metric": "recall_at_budget",
+      "estimate": 0.3907,
+      "ci_low": 0.2014,
+      "ci_high": 0.6122,
+      "n_independent_runs": 1212
+    }
+  ],
+  "hypotheses": [
+    {"id": "H1", "outcome": "supported"},
+    {"id": "H2", "outcome": "not_supported"},
+    {"id": "H3", "outcome": "supported"}
+  ]
+}
