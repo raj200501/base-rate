@@ -1,6 +1,14 @@
 # base-rate
 
-<!-- @prose finding -->
+**At a human-review budget of {{param:20}} per {{param:10,000}} trajectories and a
+violation prevalence of {{param:1e-3}}, no single monitor in this preregistered study (three
+Armour rule configurations and Qwen3 models from {{name:0.6B}} to {{name:8B}} parameters)
+caught more violations than random review would within its {{param:95%}} interval; the best
+combination, a rank-mean ensemble of the reviewer-calibrated rule and the {{name:8B}} model,
+caught {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}} of them.** Random review
+at that budget catches {{param:0.002}}. The corpus is agent trajectories in mock-tool domains,
+its inserted violations are synthetic, and the monitors are small local models, so these
+numbers describe these monitors on this corpus; the methods are the reusable part.
 
 ![Recall at a fixed human-review budget across prevalences, every monitor on the primary set of the mock-tool corpus (its inserted violations are synthetic), with {{param:95%}} intervals](artifacts/report/figures/headline_recall.svg)
 
@@ -33,7 +41,74 @@ numbers do not.
 
 ## Key results
 
-<!-- @prose key-results -->
+Each result comes from a banked artifact and a preregistration committed before its data
+existed; `make prereg-verify` checks the order from git history. Intervals are {{param:95%}}
+and resample or count whole source runs. Null and negative results are reported with the
+same prominence as the rest.
+
+- **Single monitors are near chance at realistic budgets** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
+  At prevalence {{param:1e-3}} and {{param:20}} reviews per {{param:10,000}}, recall was
+  {{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20}} for the reviewer-calibrated
+  rule, {{claim:e2.qwen3-0.6b.recall_at_budget.p0.001.b20}} for Qwen3 {{name:0.6B}},
+  {{claim:e2.qwen3-1.7b.recall_at_budget.p0.001.b20}} for {{name:1.7B}},
+  {{claim:e2.qwen3-4b.recall_at_budget.p0.001.b20}} for {{name:4B}}, and
+  {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20}} for {{name:8B}}. Only the two
+  preregistered combinations clear chance: the ensemble
+  ({{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}) and the cascade that sends
+  the top {{param:5%}} by the {{name:0.6B}} score to the {{name:8B}}
+  ({{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}).
+- **The same monitors look strong on curated records** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
+  On Armour's labeled reference records, at the same prevalence and budget, the
+  reviewer-calibrated rule reached recall
+  {{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20.dataset}} and the {{name:8B}}
+  model {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20.dataset}}. Those records are
+  explicit violating actions from a few generator scripts (hence the wide intervals); the
+  corpus's violations arise while small agents do ordinary tasks. A monitor's result on
+  curated records said little about its value on agent traffic.
+- **Why: a decent detector at its own threshold is uninformative at the top of the benign tail** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
+  At its native threshold the reviewer-calibrated rule caught
+  {{claim:e2.fixed.reviewer-calibrated.recall}} of violations but flagged
+  {{claim:e2.fixed.reviewer-calibrated.fpr}} of benign runs, far more than the budget
+  allows. Held to the budget, it reviews only its top score, which a violation is about as
+  likely as a benign run to receive, so its recall falls to the review rate.
+- **Precision collapses with prevalence** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)). At {{param:1e-4}} and the same budget,
+  the best precision of any monitor was the ensemble's
+  {{claim:e2.ensemble--rank-mean-.precision_at_budget.p0.0001.b20}}: almost every
+  reviewed trajectory is benign.
+- **Model size did not help at one frozen prompt** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)). The size ladder shows no clear
+  point where a larger model overtakes the rule monitors (recall at the budget:
+  {{name:0.6B}} {{claim:e2.ladder.qwen3-0.6b}}, {{name:8B}} {{claim:e2.ladder.qwen3-8b}}).
+- **Thresholds do not transfer across domains** ([E3 results](artifacts/e3/results.json), [prereg/0004](prereg/0004-e3-transfer.md)). A threshold tuned in one domain kept
+  the review load within a factor of two of the budget in another domain for a share
+  {{claim:e3.H3.1-armour-reviewer-calibrated.share}} of domain pairs for the rule monitor
+  and {{claim:e3.H3.1-qwen3-0.6b-q8_0.share}} for Qwen3 {{name:0.6B}}, against a
+  preregistered bar of {{threshold:75%}}: not supported for either. A threshold tuned at
+  prevalence {{param:1e-2}} did keep its review load at {{param:1e-4}} (ratio
+  {{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio}}
+  [{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.lo}},
+  {{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.hi}}]), as expected when
+  reviewed traffic is almost all benign. The recall-transfer hypothesis held, but only
+  because recall is near zero in every domain.
+- **A cheap filter in front of an expensive monitor beat the expensive monitor alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
+  On the held-out half of the source runs, the cascade from the reviewer-calibrated rule to
+  the {{name:8B}} model reached recall {{claim:e4.p2.recall}} [{{claim:e4.p2.recall.lo}},
+  {{claim:e4.p2.recall.hi}}] at {{claim:e4.p2.cost}} seconds of compute per trajectory,
+  while the {{name:8B}} alone reached {{claim:e4.p2.alone}} [{{claim:e4.p2.alone.lo}},
+  {{claim:e4.p2.alone.hi}}]. Every cascade's training estimate held on the test half (H4.1
+  supported for all four pairs); the efficiency hypothesis H4.2 held for all four too,
+  which says little when the second stage alone catches almost nothing.
+- **The corpus and its blind label audit** ([corpus manifest](artifacts/corpus/manifest.json), [label audit](artifacts/corpus/label_audit.json), [prereg/0002](prereg/0002-e1-corpus.md)).
+  {{claim:corpus.total.traces}} trajectories from {{claim:corpus.total.runs}} independent
+  source runs (synthetic share {{claim:corpus.total.synthetic}}), with every planned
+  insertion attempt accounted for ({{claim:corpus.ins.inserted}} inserted of
+  {{claim:corpus.ins.attempts}}; every skip was a false completion the subject model would
+  not write). A blind audit of {{claim:audit.n}} sampled labels by a model given only the
+  monitor view agreed with the corpus label, type, and step on {{claim:audit.agreement}}
+  [{{claim:audit.agreement.lo}}, {{claim:audit.agreement.hi}}] of them (docs/DATA.md).
+- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). Every interval was checked
+  by preregistered simulation against exact truth; cells where a method undercovers are
+  listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
+  on them.
 
 ## How it works
 
@@ -86,7 +161,24 @@ project's definition-of-done gates on a fresh clone.
 
 ## Limitations and threats to validity
 
-<!-- @prose readme-limitations -->
+- **Simulated tools, small agents, abstract violations.** Every trajectory comes from mock
+  tools, the subject agents are Qwen3 {{name:1.7B}} and {{name:4B}} on a CPU, and a violation
+  is one abstract tool call. Recall here is not an estimate for any deployed agent.
+- **Violations do not hide.** Natural violations are small-model mistakes, inserted ones
+  are chosen by the harness, and Armour's come from a few generator scripts. No source is an
+  adversary, so these rates are not robustness to evasion.
+- **Labels.** One oracle labels real and inserted trajectories from tool effects, and the
+  blind auditor is a model given the same definitions, not a human expert.
+- **Prevalence is a design parameter.** Results at each prevalence reweight the corpus
+  (case-control) and assume the benign corpus stands for benign deployment traffic.
+- **The benign tail limits every low-budget claim.** Only independent benign runs inform
+  the extreme tail; procedural variants share their run's cluster. Estimates that rely on
+  an E0 cell where the interval method undercovers are marked.
+- **One prompt, no Claude models.** The model monitors share one frozen prompt with no
+  tuning, so the ladder compares sizes at that prompt; no Claude model served as a subject
+  or monitor in this environment. Cascade costs are CPU seconds on this machine.
+
+docs/REPORT.md section 6 states each threat in full, with the preregistration deviations.
 
 ## Responsible disclosure
 

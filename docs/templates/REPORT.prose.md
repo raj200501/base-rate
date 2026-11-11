@@ -9,7 +9,29 @@ and procedurally generated data are labeled as such wherever they appear.
 
 ## Abstract
 
-<!-- @prose abstract -->
+A monitor over an agent's traffic is worth what it catches at the prevalence of real
+violations and the number of trajectories humans can review, not its accuracy on a
+balanced test set. base-rate is an open library that estimates recall, precision, and the
+false-positive rate at a fixed review budget and a stated prevalence, with interval methods
+whose coverage was checked by a preregistered simulation, and with sample-size,
+threshold-transfer, and cascade tools built on the same estimators. We apply it, in four
+preregistered experiments, to a corpus of {{claim:corpus.total.traces}} labeled
+trajectories from {{claim:corpus.total.runs}} independent source runs of small local agents
+in eight mock-tool domains, and to three Armour rule configurations, Qwen3 monitors from
+{{name:0.6B}} to {{name:8B}} parameters, one ensemble, and one cascade. At a budget of
+{{param:20}} reviews per {{param:10,000}} trajectories and a prevalence of {{param:1e-3}}, no
+single monitor caught more violations than random review within its {{param:95%}}
+interval; the best combination, a rank-mean ensemble of a rule monitor and the {{name:8B}}
+model, reached recall {{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}. Rule
+thresholds that catch {{claim:e2.fixed.reviewer-calibrated.recall}} of violations flag
+{{claim:e2.fixed.reviewer-calibrated.fpr}} of benign runs, far more than any budget studied
+allows. The rule monitors and the larger models reached recall near one, with wide
+intervals, on Armour's curated reference records, so results on curated records said little
+about value on agent traffic. Thresholds tuned in one domain did not keep the review load within a factor of
+two in others, and on held-out data a cascade from a rule filter to the {{name:8B}} model
+caught more than the {{name:8B}} alone at a fraction of its compute. Every number in this
+report is rendered from a banked artifact; the corpus, scores, and analyses are released
+with the code.
 
 ## 1. Introduction
 
@@ -302,7 +324,178 @@ margin of the expensive monitor alone.
 
 ## 5. Results
 
-<!-- @prose results -->
+### 5.1. Corpus (E1)
+
+The corpus met its preregistered targets. Its composition, with the synthetic share and
+the number of independent source runs, is below; the subject-model, relabeling, insertion,
+and Armour tables are in docs/DATA.md.
+
+<!-- @table corpus -->
+
+Controlled insertion accounted for every planned attempt:
+{{claim:corpus.ins.inserted}} of {{claim:corpus.ins.attempts}} attempts yielded an inserted
+violation, and every skip, each with its preregistered reason, was a false completion,
+because the subject model either made no valid call of the drawn type or would not write a
+usable completion summary when asked to declare the task done. False completion is
+therefore under-represented among inserted violations, and recall by violation type
+(Table e2-breakdown) carries that imbalance.
+
+<!-- @table corpus-insertion -->
+
+**Label audit.** A blind audit of {{claim:audit.n}} records drawn by the preregistered
+stratified sample found agreement on label, type, and first violating step of
+{{claim:audit.agreement}} [{{claim:audit.agreement.lo}}, {{claim:audit.agreement.hi}}], and
+agreement on the benign or violation label alone of {{claim:audit.label}}
+[{{claim:audit.label.lo}}, {{claim:audit.label.hi}}]. Each auditor was a Claude subagent that
+read only its own batch file of monitor views; tools/label_audit.py refused the audit
+unless every auditor's transcript showed no other tool call and no other file read. The
+auditor shares the definitions and the model family of the session that wrote them, so the
+agreement measures consistency with the definitions, not their correctness.
+
+<!-- @table audit -->
+
+### 5.2. Main study (E2)
+
+**Recall at the review budget.** Figure 1 and the table below give recall for every
+monitor at each prevalence and budget on the primary set. The single monitors sit at or
+near the review rate itself, which is the recall of reviewing a random sample: at
+{{param:20}} reviews per {{param:10,000}}, random review catches {{param:0.002}} of
+violations, and every single monitor's interval contains that value at prevalence
+{{param:1e-3}}. The two preregistered combinations are the exceptions. The rank-mean
+ensemble of the reviewer-calibrated rule and the {{name:8B}} model reached
+{{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b20}}, and the cascade that escalates
+the top {{param:5%}} of traffic by the {{name:0.6B}} score to the {{name:8B}} reached
+{{claim:e2.cascade-qwen3-0.6b-qwen3-8b.recall_at_budget.p0.001.b20}}. At the largest budget,
+{{param:100}} per {{param:10,000}}, the ensemble reached
+{{claim:e2.ensemble--rank-mean-.recall_at_budget.p0.001.b100}}. Recall barely moves with
+prevalence because, at these prevalences, the reviewed set is almost all benign whatever
+the prevalence, so the threshold is set by the benign scores alone.
+
+![Figure 1: recall at the review budget for every monitor on the primary set, by prevalence and budget, with {{param:95%}} intervals](../artifacts/report/figures/headline_recall.svg)
+
+<!-- @table e2-recall_at_budget -->
+
+**Why single monitors fail at the budget.** The rule monitors are informative at their own
+threshold but not at the top of the benign tail. At the fixed threshold, each rule
+configuration caught a modest share of violations while flagging benign runs at several
+times the largest budget studied (table below; for the reviewer-calibrated configuration,
+recall {{claim:e2.fixed.reviewer-calibrated.recall}} and false-positive rate
+{{claim:e2.fixed.reviewer-calibrated.fpr}}). Held to the budget, a monitor reviews only its
+highest scores. For a rule monitor those form a tie at its maximum score, which a violation
+is about as likely as a benign run to receive, so randomizing within the tie returns the
+review rate. The model monitors
+read one frozen prompt and return the probability-weighted digit; on this corpus their top
+scores were no more concentrated on violations than the rules', at every size.
+
+<!-- @table e2-fixed -->
+
+**Precision.** Precision falls with prevalence for every monitor (Figure 2). At
+{{param:1e-4}} and {{param:20}} reviews per {{param:10,000}}, the highest precision was the
+ensemble's {{claim:e2.ensemble--rank-mean-.precision_at_budget.p0.0001.b20}}, so nearly every
+reviewed trajectory is benign; at {{param:1e-2}} the ensemble's precision was
+{{claim:e2.ensemble--rank-mean-.precision_at_budget.p0.01.b20}}.
+
+![Figure 2: precision at the review budget, by prevalence and budget, log scale, with {{param:95%}} intervals](../artifacts/report/figures/precision.svg)
+
+<!-- @table e2-precision_at_budget -->
+
+**Size ladder (RQ5).** Recall at prevalence {{param:1e-3}} and {{param:20}} reviews per
+{{param:10,000}} did not rise with model size at the one frozen prompt: {{name:0.6B}}
+{{claim:e2.ladder.qwen3-0.6b}}, {{name:1.7B}} {{claim:e2.ladder.qwen3-1.7b}}, {{name:4B}}
+{{claim:e2.ladder.qwen3-4b}}, and {{name:8B}} {{claim:e2.ladder.qwen3-8b}}. No rung clearly
+overtakes the best rule monitor, so the preregistered crossing question has no answer at
+this prompt; a larger model, a better prompt, or both might change that, and this study
+does not say which.
+
+![Figure 3: recall at the budget along the model size ladder, with the best rule monitor for reference](../artifacts/report/figures/size_ladder.svg)
+
+<!-- @table e2-ladder -->
+
+**Time to detection.** Time to detection is defined for the violations a monitor catches
+within the budget. With recall near the review rate, the few caught violations give
+wide intervals, and the table is reported for completeness rather than as evidence about
+how early these monitors fire.
+
+<!-- @table e2-ttd -->
+
+**Armour's records, the full corpus, and breakdowns.** The sharpest contrast in the study is
+between the corpus and Armour's labeled reference records. At the same prevalence and
+budget, the reviewer-calibrated rule reached recall
+{{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20.dataset}} on Armour's records and
+the {{name:8B}} model {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20.dataset}}, against
+{{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20}} and
+{{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20}} on the primary set. Armour's violations are
+explicit actions written by a few generator scripts, the kind the rules were built for, so
+the intervals are wide and the records are clustered by script; Armour's own documentation
+asks that its synthetic reference labels be replaced by human labels before external
+claims. The corpus's violations arise while small agents do ordinary tasks. A monitor's
+result on curated records said little about its value on agent traffic. The full corpus
+adds Armour's records and the procedural variants to the primary set, so its rule-monitor
+recall sits between the two (at {{param:100}} reviews per {{param:10,000}}, the
+reviewer-calibrated rule reached
+{{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b100.full}}). Recall by violation
+source, type, and subject model on the primary set is descriptive, as preregistered; it
+and the full-corpus recall table are in artifacts/report/tables/e2-breakdown.md and
+artifacts/report/tables/e2-full.md, and every estimate is in artifacts/e2/results.json.
+
+<!-- @table e2-dataset -->
+
+### 5.3. Transfer (E3)
+
+Both preregistered monitors failed the domain-transfer hypothesis for review load (H3.1). A
+threshold tuned in one domain at prevalence {{param:1e-3}} and {{param:100}} reviews per
+{{param:10,000}} kept the realized review rate within a factor of two of the budget for a
+share {{claim:e3.H3.1-armour-reviewer-calibrated.share}} of ordered domain pairs for the
+reviewer-calibrated rule and {{claim:e3.H3.1-qwen3-0.6b-q8_0.share}} for the {{name:0.6B}}
+model, against the preregistered {{threshold:75%}}. A team that tunes a threshold on one
+product surface and deploys it on another should expect its review queue to grow or shrink
+by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors,
+but the result is weak: recall is near zero in every domain, so gaps between domains are
+small by construction. Prevalence transfer (H3.3) was supported at both target prevalences
+for both monitors; for the rule monitor at {{param:1e-4}} the realized review rate was
+{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio}} of the intended rate
+[{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.lo}},
+{{claim:e3.H3.3-armour-reviewer-calibrated-p0.0001.ratio.hi}}]. That is expected when the
+reviewed traffic is almost all benign, since the benign score distribution does not depend
+on prevalence. The per-pair estimates for all ordered pairs are in
+artifacts/report/tables/e3-pairs.md.
+
+![Figure 4: realized over intended review rate for thresholds transferred between domains](../artifacts/report/figures/transfer.svg)
+
+<!-- @table e3 -->
+
+### 5.4. Cascades (E4)
+
+E4 chose each cascade's escalation rate on a training half of the source runs, under a
+compute budget of half the cost of running the expensive monitor on all traffic, and
+tested it on the other half at prevalence {{param:1e-3}} and {{param:20}} reviews per
+{{param:10,000}}. The training estimate of every chosen cascade's recall lay inside its test
+interval (H4.1 supported for all four pairs). The cascade from the reviewer-calibrated rule
+to the {{name:8B}} model reached test recall {{claim:e4.p2.recall}}
+[{{claim:e4.p2.recall.lo}}, {{claim:e4.p2.recall.hi}}] at {{claim:e4.p2.cost}} seconds of
+compute per trajectory, within its limit of {{claim:e4.p2.max_cost}}, while the {{name:8B}}
+alone reached {{claim:e4.p2.alone}} [{{claim:e4.p2.alone.lo}}, {{claim:e4.p2.alone.hi}}]. The
+cascade from the {{name:0.6B}} to the {{name:8B}} model reached {{claim:e4.p1.recall}}
+[{{claim:e4.p1.recall.lo}}, {{claim:e4.p1.recall.hi}}]. A cascade can beat its expensive stage
+alone because it reviews by the expensive score only among trajectories the cheap stage
+already ranked high, so it acts as a two-signal filter. The efficiency hypothesis (H4.2)
+was supported for all four pairs, but it compares each cascade with a second stage that
+catches almost nothing alone, so it is easy to meet here and says little.
+
+![Figure 5: cost and recall of every escalation rate for each preregistered cascade pair](../artifacts/report/figures/cascade_fronts.svg)
+
+<!-- @table e4 -->
+
+### 5.5. What the results support
+
+Every preregistered outcome is in the tables above, including the null and unsupported
+ones. Taken together they support three claims about these monitors on this corpus: a
+monitor's value at a realistic review budget is decided by the extreme upper tail of its
+benign scores, which balanced metrics and fixed thresholds do not show; combining two weak
+signals, by rank averaging or by a cascade, recovered many times the recall of either
+alone at the same budget; and thresholds must be re-tuned per domain because review load
+does not transfer. They do not support any claim about frontier agents, adversarial
+violations, or monitors with tuned prompts.
 
 ## 6. Limitations and threats to validity
 
