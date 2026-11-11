@@ -12,7 +12,7 @@ JUNIT_XML ?= runs/junit.xml
 DEMO_OUT ?= runs/demo_output.txt
 
 .PHONY: help setup doctor test lint typecheck ci demo prereg-verify claimcheck \
-	freshness citecheck secrets-scan budget review report reproduce ship-check
+	freshness citecheck secrets-scan budget review review-start report reproduce ship-check
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -63,6 +63,9 @@ budget: ## Show cash_usd and whether every cap was respected
 
 review: ## Independent review (headless opus, else the reviewer subagent)
 	python3 tools/review.py
+
+review-start: ## Check the daily review cap, log the reviewer-subagent run, then run the reviewer subagent
+	python3 tools/review.py --start-subagent
 
 report: ## Build figures, tables, numbers, and documents from banked artifacts
 	env -u BASERATE_ROOT BASERATE_NO_MODEL_CALLS=1 uv run --frozen --offline python tools/report.py

@@ -2,10 +2,14 @@
 
 When headless Claude is usable (claude CLI present, billing guard clean, daily
 review cap not used up), runs the ``reviewer`` agent through
-``claude -p --model opus`` in a fresh clone and writes
-``artifacts/review/latest.json``. Otherwise prints why and asks for the
-``reviewer`` subagent, which writes that file itself; the main session never
-edits it.
+``claude -p --model opus`` in a fresh clone, with the per-run turn cap, and
+writes ``artifacts/review/latest.json``. Otherwise prints why and points to the
+subagent path, which starts with ``make review-start`` (``--start-subagent``):
+that checks the current UTC day's review cap at ``CAP_SHARE`` and, only if a run
+remains, logs the ``claude_review_run`` entry before the ``reviewer`` subagent
+runs, so the entry lands in the commit the review covers (DECISIONS.md D9, D27).
+A day whose cap is used up gets no review. The subagent writes
+``artifacts/review/latest.json`` itself; the main session never edits it.
 
 Either way it then validates ``artifacts/review/latest.json`` and prints its
 verdict. The last line is ``REVIEW: SHIP``, ``REVIEW: BLOCK``, ``REVIEW: STALE``
@@ -17,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
@@ -156,11 +161,100 @@ def headless_blockers(root: Path) -> list[str]:
         entries = budget_mod.read_ledger(root / LEDGER)
     except budget_mod.BudgetError as exc:
         return [*reasons, f"budget: {exc}"]
-    share = float(os.environ.get("CAP_SHARE", "1"))
+    try:
+        share = cap_share(root)
+    except ValueError as exc:
+        return [*reasons, str(exc)]
     today = datetime.now(UTC).date().isoformat()
     if budget_mod.calls_remaining(caps, entries, "claude_review_run", today, share) <= 0:
         reasons.append("daily review cap used up")
     return reasons
+
+
+def cap_share(root: Path) -> float:
+    """The cap share in force: budget.toml's ``cap_share``, lowered by ``CAP_SHARE`` if set.
+
+    Raises:
+        ValueError: If either is not a finite number in (0, 1] (BudgetError is a ValueError).
+    """
+    raw = os.environ.get("CAP_SHARE")
+    if raw is not None:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = math.nan
+        if not (math.isfinite(value) and 0 < value <= 1):
+            raise ValueError(f"CAP_SHARE must be a number in (0, 1], got {raw!r}")
+    caps = budget_mod.load_budget(root / "budget.toml")
+    return budget_mod.share_in_force(caps, raw)
+
+
+def headless_turn_cap(root: Path) -> int:
+    """The per-run turn cap (``claude_agent_max_turns``) at ``CAP_SHARE``.
+
+    Brief section 8 sets it per headless run, which a headless review is.
+    """
+    caps = budget_mod.load_budget(root / "budget.toml")
+    return int(budget_mod.effective_cap(caps, "claude_agent_max_turns", cap_share(root)))
+
+
+def start_subagent(root: Path, now: datetime | None = None) -> int:
+    """Check today's review cap and log this reviewer-subagent run (``make review-start``).
+
+    The main session runs this before it launches the ``reviewer`` subagent. If
+    the current UTC day's ``claude_review_run`` cap at ``CAP_SHARE`` is used up,
+    or the budget files are invalid, or the ledger already breaks a cap, it logs
+    nothing and returns non-zero: no review runs. Otherwise it appends one
+    ``claude_review_run`` entry now, so the entry is part of the commit the
+    review then covers, and returns 0.
+    """
+    now = (now or datetime.now(UTC)).astimezone(UTC)
+    today = now.date().isoformat()
+    try:
+        share = cap_share(root)
+        caps = budget_mod.load_budget(root / "budget.toml")
+        entries = budget_mod.read_ledger(root / LEDGER)
+        waivers = budget_mod.load_waivers(root / "budget_waivers.toml")
+        report = budget_mod.check_ledger(caps, entries, waivers)
+    except (ValueError, budget_mod.BudgetError) as exc:
+        print(f"cannot start a review: {exc}; no review runs")
+        return 2
+    if not report.ok:
+        print(f"the usage ledger already breaks a cap ({report.violations[0]}); no review runs")
+        return 1
+    cap = budget_mod.effective_cap(caps, "claude_review_runs_per_day", share)
+    used = sum(
+        1 for e in entries if e.kind == "claude_review_run" and budget_mod.utc_day(e.ts) == today
+    )
+    if budget_mod.calls_remaining(caps, entries, "claude_review_run", today, share) <= 0:
+        print(
+            f"daily review cap used up: {used} claude_review_run on {today} (UTC), cap {cap:g} "
+            f"(claude_review_runs_per_day at CAP_SHARE={share:g}); no review runs today"
+        )
+        return 1
+    entry = {
+        "ts": now.isoformat(timespec="seconds"),
+        "kind": "claude_review_run",
+        "backend": "claude-subagent",
+        "purpose": "make review",
+        "cash_usd": 0,
+        "plan_equivalent_usd": 0,
+        "cap_share": share,
+        "note": (
+            "reviewer subagent run, logged when the run starts so the entry lands in "
+            "the commit the review covers (DECISIONS.md D9, D27)"
+        ),
+    }
+    path = root / LEDGER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry) + "\n")
+    print(
+        f"logged claude_review_run {used + 1} of {cap:g} for {today} (UTC) at "
+        f"CAP_SHARE={share:g}; commit the ledger, then run the `reviewer` subagent now "
+        f"(.claude/agents/reviewer.md); it writes {LATEST}"
+    )
+    return 0
 
 
 def run_headless(root: Path) -> None:
@@ -175,31 +269,12 @@ def run_headless(root: Path) -> None:
             f"Review commit {head} of this repository as specified in your instructions. "
             f"The previous review, if any, is {LATEST}. Reply with only the JSON object."
         )
-        cmd = [
-            "claude",
-            "-p",
-            "--model",
-            "opus",
-            "--output-format",
-            "stream-json",
-            "--verbose",
-            "--restricted",
-            "--strict-mcp-config",
-            "--tools",
-            REVIEWER_TOOLS,
-            "--permission-mode",
-            "dontAsk",
-            "--allowedTools",
-            REVIEWER_TOOLS,
-            "--system-prompt",
-            body,
-            prompt,
-        ]
+        cmd = headless_command(body, prompt, max_turns=headless_turn_cap(root))
         env = {
             k: v for k, v in os.environ.items() if k not in {"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"}
         }
         proc = subprocess.run(cmd, cwd=clone, env=env, capture_output=True, text=True, check=False)
-    result_text, cost = "", 0.0
+    result_text, cost, turns = "", 0.0, None
     for line in proc.stdout.splitlines():
         try:
             event = json.loads(line)
@@ -208,7 +283,9 @@ def run_headless(root: Path) -> None:
         if event.get("type") == "result":
             result_text = str(event.get("result", ""))
             cost = float(event.get("total_cost_usd", 0.0) or 0.0)
-    _append_ledger(root, cost)
+            if isinstance(event.get("num_turns"), int):
+                turns = int(event["num_turns"])
+    _append_ledger(root, cost, turns=turns)
     match = re.search(r"\{.*\}", result_text, flags=re.S)
     if not match:
         raise SystemExit("headless reviewer returned no JSON; see its output above")
@@ -218,16 +295,47 @@ def run_headless(root: Path) -> None:
     _bank(root, review)
 
 
-def _append_ledger(root: Path, plan_equivalent_usd: float) -> None:
-    entry = {
+def headless_command(body: str, prompt: str, max_turns: int) -> list[str]:
+    """The headless reviewer command, limited to ``max_turns`` agentic turns.
+
+    ``--max-turns`` is Claude Code's documented print-mode turn limit.
+    """
+    return [
+        "claude",
+        "-p",
+        "--model",
+        "opus",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--restricted",
+        "--strict-mcp-config",
+        "--max-turns",
+        str(max_turns),
+        "--tools",
+        REVIEWER_TOOLS,
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        REVIEWER_TOOLS,
+        "--system-prompt",
+        body,
+        prompt,
+    ]
+
+
+def _append_ledger(root: Path, plan_equivalent_usd: float, turns: int | None = None) -> None:
+    entry: dict[str, Any] = {
         "ts": datetime.now(UTC).isoformat(timespec="seconds"),
         "kind": "claude_review_run",
         "backend": "claude-plan",
         "model": "opus",
         "cash_usd": 0,
         "plan_equivalent_usd": plan_equivalent_usd,
-        "cap_share": float(os.environ.get("CAP_SHARE", "1")),
+        "cap_share": cap_share(root),
     }
+    if turns is not None:
+        entry["turns"] = turns
     path = root / LEDGER
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
@@ -249,16 +357,26 @@ def _bank(root: Path, review: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Run (or request) a review, then validate and print the verdict."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--validate-only", action="store_true", help="never launch a reviewer")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--validate-only", action="store_true", help="never launch a reviewer")
+    mode.add_argument(
+        "--start-subagent",
+        action="store_true",
+        help="check today's review cap and log the reviewer-subagent run (make review-start)",
+    )
     parser.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args(argv)
     root = args.root.resolve()
+    if args.start_subagent:
+        return start_subagent(root)
     if not args.validate_only:
         blockers = headless_blockers(root)
         if blockers:
             print("headless review unavailable: " + "; ".join(blockers))
             print(
-                "run the `reviewer` subagent (.claude/agents/reviewer.md); it writes " + str(LATEST)
+                "the subagent path starts with `make review-start`, which checks today's "
+                "review cap and logs the run; then run the `reviewer` subagent "
+                f"(.claude/agents/reviewer.md), which writes {LATEST}"
             )
         else:
             run_headless(root)
