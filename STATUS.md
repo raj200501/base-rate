@@ -38,7 +38,10 @@ repository public; this branch fast-forwarded to that merge. G14: Raj accepted t
 2026-11-11 review-run overrun (D25) with a dated waiver scoped to that day and kind
 (DECISIONS.md D26, budget_waivers.toml); make budget and G14 honor exactly that waiver,
 tests show every other overrun still fails, and caps and CAP_SHARE=0.2 are unchanged. G12
-waits for the next day's review allowance (2026-11-12 UTC).
+waits for the next day's review allowance (2026-11-12 UTC). Scheduled: the G12 review at
+2026-11-12 00:05 UTC (one review run a day, logged when it starts) and a heartbeat every
+two hours. A development QA workflow is checking every change since the last SHIP review
+before that run.
 
 ## Next three actions
 

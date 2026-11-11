@@ -79,3 +79,19 @@ Iteration history moved out of STATUS.md. Newest last.
   turn" after a BLOCK. Raj gave one two-hour window for the final push, so the sequence
   was restarted in the same session after every blocking issue was fixed, with a second
   `make review` before the full ship-check. Nothing else in the sequence changed.
+
+## 2026-11-11 Goal turn 5 (after the public release)
+
+- Raj merged the release commit into main and made the repository public; the branch
+  fast-forwarded to that merge commit.
+- G14: Raj accepted the 2026-11-11 review-run overrun (D25). DECISIONS.md D26 records the
+  dated waiver, budget_waivers.toml states it, and make budget and G14 honor exactly that
+  waiver; tests show every other overrun still fails. Fast check 13/14 (G12 waits for the
+  next day's review allowance). main updated to 543f7ef (RELEASE-READY).
+- Daily caps now count UTC days whatever an entry's offset; D27 records which Claude runs
+  the ledger records, from the brief's own cap comments.
+- Lapse: commit 5b11611 was pushed with make ci failing on ruff format --check (D14 says
+  make ci passes before every push); the next commit (0d38549) formatted the file with make
+  ci passing. Commits are now made only when make ci passes in the same command.
+- Scheduled: the G12 review at 2026-11-12 00:05 UTC, logged in the ledger when it starts;
+  a heartbeat every two hours.
