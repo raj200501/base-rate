@@ -1,4 +1,4 @@
-goal_turn: 3
+goal_turn: 4
 STATE: ACTIVE
 
 # Status
@@ -7,47 +7,46 @@ Updated 2026-11-11 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.
 
 ## Gates
 
-All results are banked and rendered; the final sequence (brief 10.6) is under way: the
-fast check, then make review, then the full make ship-check and the local v1.0 tag.
+Final sequence outcome (brief 10.6, recorded at the start of this iteration): at commit
+19dbd5a the full `make ship-check` printed SHIP-CHECK: PASS 14/14, the latest `make review`
+ended REVIEW: SHIP, and the local tag v1.0 points there (not pushed; tags are never pushed).
+The release sprint then revised README.md, so G12 needs a fresh review of the new commit.
 
 | Gate | State | What is left |
 |---|---|---|
-| G1 Build and tests | tests pass, core coverage above the floor | |
-| G2 Static quality | passes (every type: ignore has a code and a reason) | |
-| G3 CI parity | make ci passes locally | CI runs only on main and PRs into main (D14) |
-| G4 Offline demo | make demo matches golden output | |
-| G5 Statistical engine | E0 banked; E2 headline estimates list the E0 cells they rely on | |
-| G6 Corpus | corpus, blind label audit (artifacts/corpus/label_audit.json), datasheet docs/DATA.md | |
-| G7 Main study | E2 confirmatory results banked (artifacts/e2/results.json) | |
-| G8 Transfer and cascades | E3 and E4 banked and reported, null results included | |
-| G9 Usable by others | README names the three offline examples | |
-| G10 Claim integrity | claimcheck and freshness pass on README, REPORT, DATA | |
-| G11 Preregistration integrity | prereg-verify passes; every artifact cites an earlier frozen prereg | |
-| G12 Independent review | first make review BLOCK (five issues), all fixed | second make review |
-| G13 Documentation | README per section 11, REPORT complete | |
+| G1 Build and tests | passes (make test) | |
+| G2 Static quality | passes (make lint, make typecheck) | |
+| G3 CI parity | passes (make ci) | CI runs only on main and PRs into main (D14) |
+| G4 Offline demo | passes (make demo) | |
+| G5 Statistical engine | passes | |
+| G6 Corpus | passes | |
+| G7 Main study | passes (checked against prereg/0003) | |
+| G8 Transfer and cascades | passes (hypotheses checked against prereg/0004, 0005) | |
+| G9 Usable by others | passes | |
+| G10 Claim integrity | passes (claimcheck, freshness, reproduce) | |
+| G11 Preregistration integrity | passes | |
+| G12 Independent review | SHIP for c433208 | fresh make review of the release commit |
+| G13 Documentation | passes | |
 | G14 Hygiene | passes | |
 
 ## Now
 
-Every experiment is banked and committed. E2 to E4 ran from the banked scores
-(tools/analyze.py); the blind label audit ran as a Claude Code workflow in which each of
-twenty auditors read only its own batch file of monitor views, and tools/label_audit.py
-accepted it on that evidence. make report rendered README.md, docs/REPORT.md, and
-docs/DATA.md from the artifacts; claimcheck and freshness pass. The headline is a negative
-result for single monitors at realistic budgets (README first screen).
-
-Fixes made while finishing: E2's independent-run count per estimate counted a source run
-behind both an inserted violation and its benign trace twice (now the union; estimates
-unchanged); the E4 table header carried untagged digits; the real-prose test fixture now
-mirrors the study's monitors and cascade pairs.
+Release sprint for Raj (2026-11-11): the branch is safe to publish (secrets-scan clean,
+nothing under private/ tracked, third-party material licensed and attributed, no personal
+data beyond Raj's name and GitHub noreply address); make lint, typecheck, test, and demo
+pass; README.md gained a one-paragraph pitch, a section on what is built and validated,
+and a Status section that states the gate results as of 19dbd5a and what is open. No
+experiment ran during the sprint.
 
 ## Next three actions
 
-1. Final sequence (brief 10.6): make review with the reviewer subagent; on SHIP commit only
-   artifacts/review/; run the full make ship-check; tag v1.0 locally on PASS 14/14.
-2. On a BLOCK, fix every blocking issue in a later turn and start the sequence again.
-3. After v1.0: the Stretch Ladder (brief section 7), starting with adapters for real agent
-   transcripts.
+1. Run make review on the release commit, then the full make ship-check; on PASS 14/14 move
+   the local tag v1.0 to that commit.
+2. Log this session's Claude subagent runs in the usage ledger (two make review runs and
+   the twenty label-audit auditors), which are not yet recorded there.
+3. Work the open non-blocking review issues (docs/REVIEW_LOG.md), starting with N1 (the
+   false-positive-rate interval printed tighter than the benign runs can certify), then the
+   Stretch Ladder.
 
 ## Environment
 

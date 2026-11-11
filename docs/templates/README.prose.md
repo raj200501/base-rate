@@ -1,5 +1,14 @@
 # base-rate
 
+**What is an AI agent monitor worth when violations are rare and humans can review only a
+few trajectories?** base-rate is an open Python library and a preregistered study for that
+question. The library estimates a monitor's recall, precision, and false-positive rate at a
+fixed human-review budget and a stated violation prevalence, with intervals that respect how
+few independent runs stand behind them; it sizes the labeled samples a claim needs, checks
+whether thresholds transfer, and optimizes cheap-to-expensive cascades. The study applies it
+to {{claim:corpus.total.traces}} labeled agent trajectories in mock-tool domains and to rule
+and model monitors, with every result number in this README rendered from a committed artifact.
+
 **At a human-review budget of {{param:20}} per {{param:10,000}} trajectories and a
 violation prevalence of {{param:1e-3}}, no single monitor in this preregistered study (three
 Armour rule configurations and Qwen3 models from {{name:0.6B}} to {{name:8B}} parameters)
@@ -40,6 +49,26 @@ case. Every trajectory is from simulated tools with abstract violations; the sub
 agents and model monitors are small local open-weight models; and the results describe
 these monitors on this corpus. The methods transfer to other monitors and data; the
 numbers do not.
+
+## What is built and validated
+
+- **The library** (`src/baserate`, MIT): recall, precision, and false-positive rate at a
+  review budget and prevalence, with cluster-aware intervals; `baserate certify` (how many
+  independent runs a claim needs); threshold-transfer checks; cascade sweeps and a
+  budget-constrained optimizer; a monitor report card; an Armour trace adapter; a CLI and
+  three offline examples. It is covered by a test suite that `make test` runs offline.
+- **Validated before use:** E0, a preregistered simulation study, checked the coverage of
+  the budget-recall and fixed-threshold interval methods against exact truth on a grid of
+  score distributions, sample sizes, prevalences, and budgets. Cells where a method
+  undercovers are listed in docs/UNSUPPORTED.md, and the library warns there.
+- **The data:** a labeled corpus with step-level violation labels, a datasheet
+  (docs/DATA.md), a blind label audit, and a canary string in every record.
+- **The integrity checks:** every experiment was preregistered under prereg/ and
+  `make prereg-verify` checks from git history that each result came after its plan; no
+  number in README.md, docs/REPORT.md, or docs/DATA.md is typed by hand (`make claimcheck`,
+  `make freshness`, docs/CLAIMS.md); `make reproduce` rebuilds every result from the banked
+  artifacts; `make ship-check` runs the project's definition-of-done gates on a fresh
+  clone; and an independent review (`make review`) must end in SHIP.
 
 ## Key results
 
@@ -120,6 +149,22 @@ same prominence as the rest.
   truth; cells where a method undercovers are
   listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
   on them.
+
+## Status
+
+- **Complete:** experiments E0 to E4 ran as preregistered and are banked under artifacts/;
+  every result above comes from them, and none comes from an unfinished experiment.
+- **Gates:** at commit `19dbd5a`, `make ship-check` printed
+  `{{brief:SHIP-CHECK: PASS 14/14}}` on a fresh clone, after the second independent review
+  returned SHIP with no blocking issues (artifacts/review/latest.json). The first review had
+  blocked the release on five issues, all fixed and recorded in CORRECTIONS.md. This page
+  was revised for the public release after that commit, so the review gate needs a fresh
+  `make review` before `make ship-check` passes on the current commit.
+- **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
+  false-positive-rate intervals at the budget are printed tighter than the benign runs can
+  certify and that the three Armour rule configurations score this corpus identically; no
+  Claude model has been run as a subject or a monitor (DECISIONS.md D2); and the stretch
+  goals (adapters for real agent transcripts, streaming monitors) have not started.
 
 ## How it works
 
