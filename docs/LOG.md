@@ -59,3 +59,13 @@ Iteration history moved out of STATUS.md. Newest last.
 - 2026-11-05 11:17 UTC: the pipeline finished. Every score file prereg/0003 lists is
   banked and committed, each citing prereg/0003 and the corpus manifest hash, and the
   set of files matches the preregistered plan (monitors, sets, and prefix scores).
+
+## 2026-11-11 Final push
+
+- E2, E3, and E4 ran from the banked scores; the E2 independent-run count per estimate
+  now counts a source run once across both classes (estimates unchanged).
+- The blind label audit ran as a Claude Code workflow: twenty auditors, each reading only
+  its own batch file; the evidence check accepted it.
+- make report rendered README.md, docs/REPORT.md, and docs/DATA.md from the artifacts;
+  the E4 table header's digits are now tagged, and the real-prose test fixture mirrors the
+  study's monitors and cascade pairs. Final sequence started.

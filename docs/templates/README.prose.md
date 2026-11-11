@@ -101,9 +101,9 @@ same prominence as the rest.
   {{claim:corpus.total.traces}} trajectories from {{claim:corpus.total.runs}} independent
   source runs (synthetic share {{claim:corpus.total.synthetic}}), with every planned
   insertion attempt accounted for ({{claim:corpus.ins.inserted}} inserted of
-  {{claim:corpus.ins.attempts}}; every skip was a false completion the subject model would
-  not write). A blind audit of {{claim:audit.n}} sampled labels by a model given only the
-  monitor view agreed with the corpus label, type, and step on {{claim:audit.agreement}}
+  {{claim:corpus.ins.attempts}}; every skip was a false completion, where the subject model
+  made no valid finishing call or wrote no usable summary). A blind audit of
+  {{claim:audit.n}} sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on {{claim:audit.agreement}}
   [{{claim:audit.agreement.lo}}, {{claim:audit.agreement.hi}}] of them (docs/DATA.md).
 - **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). Every interval was checked
   by preregistered simulation against exact truth; cells where a method undercovers are

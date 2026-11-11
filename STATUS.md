@@ -7,56 +7,47 @@ Updated 2026-11-05 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.
 
 ## Gates
 
-Passing now (fast check): G1, G2, G3, G4, G11, G14. Everything else waits on data
-(E1 to E4), the report, or the review.
+All results are banked and rendered; the final sequence (brief 10.6) is under way: the
+fast check, then make review, then the full make ship-check and the local v1.0 tag.
 
 | Gate | State | What is left |
 |---|---|---|
-| G1 Build and tests | tests pass | coverage floor is checked at ship-check |
-| G2 Static quality | passes | |
+| G1 Build and tests | tests pass, core coverage above the floor | |
+| G2 Static quality | passes (every type: ignore has a code and a reason) | |
 | G3 CI parity | make ci passes locally | CI runs only on main and PRs into main (D14) |
 | G4 Offline demo | make demo matches golden output | |
-| G5 Statistical engine | E0 banked (all 2,376 cells; failures documented, library warns) | E2 headline cross-check once E2 exists |
-| G6 Corpus | corpus built and banked (artifacts/corpus: composition, relabeling and insertion logs, seed ranges, canary in every record) | blind audit (sample drawn, workflow ready), datasheet render |
-| G7 Main study | every score file prereg/0003 lists is banked (three rule monitors, the Qwen3 ladder; each cites prereg/0003 and the corpus hash) | E2 analysis (tools/analyze.py), then the report |
-| G8 Transfer and cascades | E3 and E4 preregistered; E3 set fixed to its prereg (D22); E4 cost timing fixed; member scores banked | E3 and E4 analysis |
-| G9 Usable by others | CLI, card, three offline examples, fresh-venv check done | README must name the examples (render) |
-| G10 Claim integrity | claimcheck and freshness cover README, REPORT, DATA; numbers.json source hashes and make reproduce checked | render on real results |
-| G11 Preregistration integrity | prereg-verify passes (7 preregistrations); merges, renames, amendments, shallow clones handled in both checks | confirmatory artifacts after the pipeline |
-| G12 Independent review | two adversarial review rounds run and fixed (D21) | final make review |
-| G13 Documentation | every table built; G13 rejects unwritten sections; method, limitations, datasheet drafted | results prose, README finding |
+| G5 Statistical engine | E0 banked; E2 headline estimates list the E0 cells they rely on | |
+| G6 Corpus | corpus, blind label audit (artifacts/corpus/label_audit.json), datasheet docs/DATA.md | |
+| G7 Main study | E2 confirmatory results banked (artifacts/e2/results.json) | |
+| G8 Transfer and cascades | E3 and E4 banked and reported, null results included | |
+| G9 Usable by others | README names the three offline examples | |
+| G10 Claim integrity | claimcheck and freshness pass on README, REPORT, DATA | |
+| G11 Preregistration integrity | prereg-verify passes; every artifact cites an earlier frozen prereg | |
+| G12 Independent review | three adversarial rounds fixed (D21) | final make review |
+| G13 Documentation | README per section 11, REPORT complete | |
 | G14 Hygiene | passes | |
 
 ## Now
 
-The unattended pipeline (tools/run_pipeline.sh) finished on 2026-11-05 at 11:17 UTC, and
-everything it banked is committed: both corpus batches, both insertion runs under
-prereg/0007, the corpus build (artifacts/corpus), the blind audit sample (runs/audit), and
-every score file prereg/0003 lists (artifacts/scores: three rule monitors and the Qwen3
-0.6B, 1.7B, 4B, and 8B monitors on their preregistered sets, with prefix scores where the
-plan asks for them; each file cites prereg/0003 and the corpus manifest hash). The
-insertion log in the corpus manifest accounts for every planned attempt; the skips all
-fall in false_completion, which the report must state.
+Every experiment is banked and committed. E2 to E4 ran from the banked scores
+(tools/analyze.py); the blind label audit ran as a Claude Code workflow in which each of
+twenty auditors read only its own batch file of monitor views, and tools/label_audit.py
+accepted it on that evidence. make report rendered README.md, docs/REPORT.md, and
+docs/DATA.md from the artifacts; claimcheck and freshness pass. The headline is a negative
+result for single monitors at realistic budgets (README first screen).
 
-Interruptions during the run: the VM was reclaimed once (D20) and the container restarted
-once (2026-11-04 22:21 UTC); the 4B server was killed once for memory (D24); the 0.6B
-dataset step crashed once on a response cache race (fixed with a test); the 8B server
-start outlasted a fixed wait after the restart (now a deadline, fixed with a test). Each
-time the pipeline resumed from its banked runs, and the corpus build keeps a current
-banked corpus.
-
-The blind label audit has each auditor agent read only its own batch file
-(tools/label_audit.py batches), and the evidence check allows nothing else.
+Fixes made while finishing: E2's independent-run count per estimate counted a source run
+behind both an inserted violation and its benign trace twice (now the union; estimates
+unchanged); the E4 table header carried untagged digits; the real-prose test fixture now
+mirrors the study's monitors and cascade pairs.
 
 ## Next three actions
 
-1. Blind label audit: `tools/label_audit.py batches`, the audit workflow with each agent
-   reading its batch file, `tools/audit_evidence.py`, `tools/label_audit.py score`; then
-   render docs/DATA.md.
-2. Run E2, E3, and E4 (tools/analyze.py) on the banked scores, commit, then make report.
-3. Write the results prose, README finding, and limitations (insertion and relabeling
-   tables into the report, with the false_completion skips), then make review and the
-   final sequence.
+1. Final sequence (brief 10.6): make review with the reviewer subagent; on SHIP commit only
+   artifacts/review/; run the full make ship-check; tag v1.0 locally on PASS 14/14.
+2. On a BLOCK, fix every blocking issue in a later turn and start the sequence again.
+3. After v1.0: the Stretch Ladder (brief section 7), starting with adapters for real agent
+   transcripts.
 
 ## Environment
 
