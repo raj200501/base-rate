@@ -791,8 +791,10 @@ def table_e4(reg: Registry, e4: dict[str, Any]) -> str:
                 ),
                 ci_tag(reg, f"{cid}.cost", src, f"{sel}.test_cost", f"{sel}.test_cost_ci"),
                 reg.tag(f"{cid}.max_cost", src, f"{sel}.max_cost", "{:.3f}"),
-                reg.tag(f"{cid}.h41", src, f"hypotheses[id=H4.1-{idx}].outcome", "{}"),
-                reg.tag(f"{cid}.h42", src, f"hypotheses[id=H4.2-{idx}].outcome", "{}"),
+                f"{name(f'H4.1-{idx}')}: "
+                + reg.tag(f"{cid}.h41", src, f"hypotheses[id=H4.1-{idx}].outcome", "{}"),
+                f"{name(f'H4.2-{idx}')}: "
+                + reg.tag(f"{cid}.h42", src, f"hypotheses[id=H4.2-{idx}].outcome", "{}"),
             ]
         )
     first = e4["pairs"][0]["index"]

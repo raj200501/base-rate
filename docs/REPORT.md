@@ -583,10 +583,10 @@ catches almost nothing alone, so it is easy to meet here and says little.
 
 | Pair | Stage 1 | Stage 2 | Escalation rate | Cascade recall (test) | Stage 2 alone (test) | Cost, s per trace (test) | Cost cap | H4.1 | H4.2 |
 |---|---|---|---|---|---|---|---|---|---|
-| `p1` | `model:qwen3-0.6b-q8_0` | `model:qwen3-8b-q4_k_m` | 0.211 | 0.063 [0.010, 0.132] | 0.004 [0.000, 0.021] | 7.280 [4.369, 11.006] | 11.765 | supported | supported |
-| `p2` | `rule:armour-reviewer-calibrated` | `model:qwen3-8b-q4_k_m` | 0.075 | 0.062 [0.041, 0.085] | 0.004 [0.000, 0.021] | 1.723 [1.194, 2.212] | 11.765 | supported | supported |
-| `p3` | `model:qwen3-0.6b-q8_0` | `model:qwen3-4b-q4_k_m` | 0.097 | 0.017 [0.000, 0.036] | 0.000 [0.000, 0.012] | 3.879 [2.660, 5.598] | 6.763 | supported | supported |
-| `p4` | `model:qwen3-1.7b-q8_0` | `model:qwen3-8b-q4_k_m` | 0.163 | 0.002 [0.000, 0.006] | 0.004 [0.000, 0.021] | 10.025 [5.687, 10.521] | 11.765 | supported | supported |
+| `p1` | `model:qwen3-0.6b-q8_0` | `model:qwen3-8b-q4_k_m` | 0.211 | 0.063 [0.010, 0.132] | 0.004 [0.000, 0.021] | 7.280 [4.369, 11.006] | 11.765 | `H4.1-p1`: supported | `H4.2-p1`: supported |
+| `p2` | `rule:armour-reviewer-calibrated` | `model:qwen3-8b-q4_k_m` | 0.075 | 0.062 [0.041, 0.085] | 0.004 [0.000, 0.021] | 1.723 [1.194, 2.212] | 11.765 | `H4.1-p2`: supported | `H4.2-p2`: supported |
+| `p3` | `model:qwen3-0.6b-q8_0` | `model:qwen3-4b-q4_k_m` | 0.097 | 0.017 [0.000, 0.036] | 0.000 [0.000, 0.012] | 3.879 [2.660, 5.598] | 6.763 | `H4.1-p3`: supported | `H4.2-p3`: supported |
+| `p4` | `model:qwen3-1.7b-q8_0` | `model:qwen3-8b-q4_k_m` | 0.163 | 0.002 [0.000, 0.006] | 0.004 [0.000, 0.021] | 10.025 [5.687, 10.521] | 11.765 | `H4.1-p4`: supported | `H4.2-p4`: supported |
 
 ### 5.5. What the results support
 
