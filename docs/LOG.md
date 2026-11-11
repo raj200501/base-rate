@@ -69,3 +69,13 @@ Iteration history moved out of STATUS.md. Newest last.
 - make report rendered README.md, docs/REPORT.md, and docs/DATA.md from the artifacts;
   the E4 table header's digits are now tagged, and the real-prose test fixture mirrors the
   study's monitors and cascade pairs. Final sequence started.
+- First `make review` (reviewer subagent, of e403a4e): BLOCK with five blocking issues
+  (preregistered breakdowns missing for the ensemble and cascade; time to detection not
+  as preregistered; a false premise in the E3 prose; G7 and G8 able to pass with results
+  missing) and twenty non-blocking ones (docs/REVIEW_LOG.md). All five were fixed with
+  tests, E2 was re-run, the documents were corrected (CORRECTIONS.md), and G10's status
+  parsing was fixed after a full dry run showed uv's stderr warning failing it.
+- Interpretation of brief 10.6 step 2: the brief restarts the final sequence "in a later
+  turn" after a BLOCK. Raj gave one two-hour window for the final push, so the sequence
+  was restarted in the same session after every blocking issue was fixed, with a second
+  `make review` before the full ship-check. Nothing else in the sequence changed.

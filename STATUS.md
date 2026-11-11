@@ -23,7 +23,7 @@ fast check, then make review, then the full make ship-check and the local v1.0 t
 | G9 Usable by others | README names the three offline examples | |
 | G10 Claim integrity | claimcheck and freshness pass on README, REPORT, DATA | |
 | G11 Preregistration integrity | prereg-verify passes; every artifact cites an earlier frozen prereg | |
-| G12 Independent review | three adversarial rounds fixed (D21) | final make review |
+| G12 Independent review | first make review BLOCK (five issues), all fixed | second make review |
 | G13 Documentation | README per section 11, REPORT complete | |
 | G14 Hygiene | passes | |
 
