@@ -99,6 +99,18 @@ def test_word_count_skips_code() -> None:
     assert ship_check.word_count("one two\n```\nthree four five\n```\nsix") == 3
 
 
+def test_status_line_ignores_stderr_after_it() -> None:
+    """A tool's status line counts even when a warning on stderr follows it (G10, G12, G13)."""
+    out = "REPRODUCE: PASS 4 checks\nwarning: UV_NATIVE_TLS is deprecated\n"
+    proc = ship_check.Proc(0, out, 1.0)
+    assert proc.tail() == "warning: UV_NATIVE_TLS is deprecated"
+    assert proc.status("REPRODUCE:") == "REPRODUCE: PASS 4 checks"
+    assert ship_check.Proc(0, "noise\nREVIEW: BLOCK\nREVIEW: SHIP\n", 1.0).status("REVIEW:") == (
+        "REVIEW: SHIP"
+    )
+    assert ship_check.Proc(1, "nothing here\n", 1.0).status("REPRODUCE:") == ""
+
+
 def test_trunc_limits_evidence_to_one_short_line() -> None:
     out = ship_check.trunc("a\nb " + "x" * 500)
     assert "\n" not in out and len(out) <= ship_check.EVIDENCE_MAX

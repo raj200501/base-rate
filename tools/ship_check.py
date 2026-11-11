@@ -68,6 +68,8 @@ E2_PREVALENCES = (1e-2, 1e-3, 1e-4)
 E2_BUDGETS = (5, 20, 100)
 E2_MIN_FAMILIES = 4
 E2_METRICS = ("recall_at_budget", "precision_at_budget")
+E2_PREREG_METRICS = ("recall_at_budget", "precision_at_budget", "fpr_at_budget")
+E2_BREAKDOWN_GROUPS = ("violation_source", "violation_type", "subject_model")
 E0_MIN_REPLICATES = 2000
 E0_MIN_REPLICATES_BOOTSTRAP = 500
 E0_TOLERANCE = 0.015
@@ -152,6 +154,15 @@ class Proc:
     def tail(self, n: int = 1) -> str:
         lines = [ln for ln in self.out.splitlines() if ln.strip()]
         return " | ".join(lines[-n:]) if lines else ""
+
+    def status(self, prefix: str) -> str:
+        """The last line starting with ``prefix`` (a tool's status line), or "".
+
+        Output is stdout then stderr, so a warning on stderr (for example uv's
+        deprecation notices) can follow the status line; the tail is not enough.
+        """
+        lines = [ln.strip() for ln in self.out.splitlines() if ln.strip().startswith(prefix)]
+        return lines[-1] if lines else ""
 
 
 @dataclass
@@ -1036,6 +1047,89 @@ def g6(ctx: Ctx) -> str:
     )
 
 
+def e2_missing(config: dict[str, Any], res: dict[str, Any]) -> list[str]:
+    """What prereg/0003's config commits the E2 results to that the results file lacks.
+
+    Every preregistered monitor on each of its sets needs every prevalence, budget, and
+    metric, made with the preregistered headline method; the preregistered
+    fixed-threshold, time-to-detection, and size-ladder monitors need their rows; and
+    every monitor on the primary set needs its breakdowns by violation source, violation
+    type, and subject model (prereg/0003 restricts them to no family).
+    """
+    method = (config.get("headline") or {}).get("method")
+    have = {
+        (
+            e.get("monitor"),
+            e.get("set"),
+            float(e["prevalence"]),
+            int(e["budget"]),
+            e.get("metric"),
+            e.get("method"),
+        )
+        for e in res.get("estimates", [])
+    }
+    monitors = [m for m in config.get("monitors", []) if isinstance(m, dict)]
+    missing = [
+        f"estimate {m['id']} {s} p{float(p):g} b{int(b)} {metric} ({method})"
+        for m in monitors
+        for s in m.get("sets", [])
+        for p in config.get("prevalences", [])
+        for b in config.get("budgets_per_10k", [])
+        for metric in E2_PREREG_METRICS
+        if (m["id"], s, float(p), int(b), metric, method) not in have
+    ]
+    fixed = {(r.get("monitor"), r.get("set")) for r in res.get("fixed_threshold", [])}
+    missing += [
+        f"fixed-threshold rows for {m}"
+        for m in (config.get("fixed_threshold") or {}).get("monitors", [])
+        if (m, "primary") not in fixed
+    ]
+    ttd = {r.get("monitor") for r in res.get("time_to_detection", [])}
+    missing += [
+        f"time to detection for {m}"
+        for m in (config.get("time_to_detection") or {}).get("monitors", [])
+        if m not in ttd
+    ]
+    groups = {(r.get("monitor"), r.get("by")) for r in res.get("breakdowns", [])}
+    missing += [
+        f"breakdown by {g} for {m['id']}"
+        for m in monitors
+        if "primary" in m.get("sets", [])
+        for g in E2_BREAKDOWN_GROUPS
+        if (m["id"], g) not in groups
+    ]
+    rungs = {r.get("monitor") for r in (res.get("size_ladder") or {}).get("rungs", [])}
+    missing += [
+        f"size-ladder rung for {m['id']}"
+        for m in monitors
+        if m.get("family") == "model" and m["id"] not in rungs
+    ]
+    return missing
+
+
+def expected_hypotheses(exp: str, config: dict[str, Any]) -> list[str]:
+    """Hypothesis ids a preregistration commits its results to, named as tools/analyze.py does.
+
+    E3: H3.1 and H3.2 per monitor and H3.3 per monitor and target prevalence, the monitor
+    named without its family prefix; E4: H4.1 and H4.2 per cascade pair index.
+    """
+    if exp == "e3":
+        ids = []
+        for mon in config.get("monitors", []):
+            short = str(mon["id"] if isinstance(mon, dict) else mon).split(":", 1)[-1]
+            for kind in config.get("hypotheses", ["H3.1", "H3.2", "H3.3"]):
+                if kind == "H3.3":
+                    ids += [f"H3.3-{short}-p{float(t):g}" for t in config["target_prevalences"]]
+                else:
+                    ids.append(f"{kind}-{short}")
+        return ids
+    return [
+        f"{kind}-{pair['index']}"
+        for pair in config.get("pairs", [])
+        for kind in config.get("hypotheses", ["H4.1", "H4.2"])
+    ]
+
+
 def g7(ctx: Ctx) -> str:
     """Main study: E2 as preregistered, with intervals, from artifacts."""
     art_rel = "artifacts/e2/results.json"
@@ -1068,7 +1162,16 @@ def g7(ctx: Ctx) -> str:
         scores.is_file() and sha256_file(scores) == res.get("scores_sha256"),
         "E2 scores file missing or hash mismatch",
     )
-    return f"{len(by_monitor)} monitors in {len(families)} families, full grid, intervals present"
+    missing = e2_missing(config, res)
+    more = f" (and {len(missing) - 1} more)" if len(missing) > 1 else ""
+    need(
+        not missing,
+        f"E2 lacks what its preregistration plans: {missing[0] if missing else ''}{more}",
+    )
+    return (
+        f"{len(by_monitor)} monitors in {len(families)} families, full grid, intervals present; "
+        "every preregistered monitor, set, and analysis present"
+    )
 
 
 def g8(ctx: Ctx) -> str:
@@ -1080,9 +1183,15 @@ def g8(ctx: Ctx) -> str:
     for exp in ("e3", "e4"):
         art_rel = f"artifacts/{exp}/results.json"
         res = load_json(rel(ctx, art_rel))
-        check_prereg_link(ctx, art_rel, res)
+        config = check_prereg_link(ctx, art_rel, res)
         hyps = res.get("hypotheses", [])
         need(bool(hyps), f"{exp.upper()} lists no hypotheses")
+        listed = {str(h.get("id")) for h in hyps}
+        absent = [i for i in expected_hypotheses(exp, config) if i not in listed]
+        need(
+            not absent,
+            f"{exp.upper()} lacks preregistered hypotheses: {', '.join(absent[:3])}",
+        )
         for h in hyps:
             need(
                 h.get("outcome") in {"supported", "not_supported", "inconclusive"},
@@ -1164,8 +1273,12 @@ def g10(ctx: Ctx) -> str:
     fr = ctx.make("freshness", timeout=3600)
     need(fr.ok, f"make freshness failed: {fr.tail()}")
     rp = ctx.make("reproduce", timeout=7200)
-    need(rp.ok and "REPRODUCE: PASS" in rp.tail(), f"make reproduce failed: {rp.tail()}")
-    return f"claimcheck ({cc.tail()}), freshness ({fr.tail()}), and reproduce passed"
+    rstat = rp.status("REPRODUCE:")
+    need(
+        rp.ok and rstat.startswith("REPRODUCE: PASS"),
+        f"make reproduce failed: {rstat or rp.tail()}",
+    )
+    return f"claimcheck ({cc.tail()}), freshness ({fr.tail()}), and reproduce passed ({rstat})"
 
 
 def g11(ctx: Ctx) -> str:
@@ -1298,7 +1411,11 @@ def g12(ctx: Ctx) -> str:
         "review-validate",
         timeout=300,
     )
-    need(proc.ok and proc.tail() == "REVIEW: SHIP", f"make review validation: {proc.tail()}")
+    verdict = proc.status("REVIEW:")
+    need(
+        proc.ok and verdict == "REVIEW: SHIP",
+        f"make review validation: {verdict or proc.tail()}",
+    )
     n_logged = len(review.get("non_blocking", []))
     return f"REVIEW: SHIP for {reviewed[:12]}; {n_logged} non-blocking logged"
 
@@ -1406,10 +1523,10 @@ def g13(ctx: Ctx) -> str:
         rel_fig = str(target.relative_to(ctx.clone.resolve()))
         need(rel_fig in generated, f"REPORT.md figure not generated by make report: {fig}")
     cc = ctx.make("citecheck", timeout=600)
-    m = re.search(r"CITECHECK: PASS (\d+)/(\d+)", cc.tail())
+    m = re.search(r"CITECHECK: PASS (\d+)/(\d+)", cc.status("CITECHECK:"))
     need(
         cc.ok and m is not None and m.group(1) == m.group(2) and int(m.group(1)) > 0,
-        f"make citecheck: {cc.tail() or 'failed'}",
+        f"make citecheck: {cc.status('CITECHECK:') or cc.tail() or 'failed'}",
     )
     assert m is not None
     return (

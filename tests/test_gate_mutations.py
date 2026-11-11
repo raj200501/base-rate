@@ -1360,3 +1360,218 @@ def test_g10_recipe_must_cover_both_documents(g10: Any, tmp_path: Path) -> None:
     )
     g10.commit("narrow the recipe")
     assert_fail(10, g10, tmp_path, "make claimcheck does not cover README.md and docs/REPORT.md")
+
+
+# ================================================================== G7 and G8
+
+P_E2, P_E3, P_E4 = "prereg/0003-e2.md", "prereg/0004-e3.md", "prereg/0005-e4.md"
+RULE, M_SMALL, M_LARGE = "rule:r", "model:m1", "model:m2"
+ENSEMBLE = f"ensemble:rank-mean({RULE},{M_LARGE})"
+CASCADE = f"cascade:{M_SMALL}>{M_LARGE}@0.05"
+E2_CFG: dict[str, Any] = {
+    "experiment": "E2",
+    "sets": ["primary", "full"],
+    "monitors": [
+        {"id": RULE, "family": "rule", "sets": ["primary", "full"]},
+        {"id": M_SMALL, "family": "model", "params_b": 0.6, "sets": ["primary"]},
+        {"id": M_LARGE, "family": "model", "params_b": 8.0, "sets": ["primary"]},
+        {"id": ENSEMBLE, "family": "ensemble", "sets": ["primary"]},
+        {"id": CASCADE, "family": "cascade", "sets": ["primary"]},
+    ],
+    "prevalences": [0.01, 0.001, 0.0001],
+    "budgets_per_10k": [5, 20, 100],
+    "headline": {"set": "primary", "method": "composite"},
+    "fixed_threshold": {"monitors": [RULE], "threshold": 0.2},
+    "time_to_detection": {"monitors": [RULE, M_SMALL], "prevalence": 0.001, "budget_per_10k": 20},
+    "size_ladder": {"prevalence": 0.001, "budget_per_10k": 20},
+}
+E3_CFG: dict[str, Any] = {
+    "experiment": "E3",
+    "monitors": [RULE, M_SMALL],
+    "target_prevalences": [0.001, 0.0001],
+    "hypotheses": ["H3.1", "H3.2", "H3.3"],
+}
+E4_CFG: dict[str, Any] = {
+    "experiment": "E4",
+    "pairs": [{"index": "p1", "stage1": M_SMALL, "stage2": M_LARGE}],
+    "hypotheses": ["H4.1", "H4.2"],
+}
+E3_IDS = [
+    "H3.1-r", "H3.2-r", "H3.3-r-p0.001", "H3.3-r-p0.0001",
+    "H3.1-m1", "H3.2-m1", "H3.3-m1-p0.001", "H3.3-m1-p0.0001",
+]  # fmt: skip
+E4_IDS = ["H4.1-p1", "H4.2-p1"]
+SCORES = b"scores\n"
+
+
+def e2_full_results() -> dict[str, Any]:
+    """E2 results holding everything E2_CFG preregisters."""
+    mons = E2_CFG["monitors"]
+    ci = {"ci_low": 0.05, "ci_high": 0.2}
+    return {
+        "confirmatory": True,
+        "prereg": P_E2,
+        "prereg_config_sha256": chainlib.sha256_obj(E2_CFG),
+        "estimates": [
+            {
+                "monitor": m["id"],
+                "family": m["family"],
+                "set": s,
+                "prevalence": p,
+                "budget": b,
+                "metric": metric,
+                "method": "composite",
+                "estimate": 0.1,
+                **ci,
+                "n_independent_runs": 100,
+            }
+            for m in mons
+            for s in m["sets"]
+            for p in E2_CFG["prevalences"]
+            for b in E2_CFG["budgets_per_10k"]
+            for metric in ("recall_at_budget", "precision_at_budget", "fpr_at_budget")
+        ],
+        "fixed_threshold": [
+            {"monitor": RULE, "set": "primary", "prevalence": p, "metric": metric, **ci}
+            for p in E2_CFG["prevalences"]
+            for metric in ("recall", "fpr", "precision")
+        ],
+        "time_to_detection": [
+            {"monitor": m, "prevalence": 0.001, "budget": 20, "share_caught": 0.1}
+            for m in E2_CFG["time_to_detection"]["monitors"]
+        ],
+        "breakdowns": [
+            {"monitor": m["id"], "by": g, "value": "x", "recall": 0.1, **ci}
+            for m in mons
+            if "primary" in m["sets"]
+            for g in ("violation_source", "violation_type", "subject_model")
+        ],
+        "size_ladder": {
+            "prevalence": 0.001,
+            "budget": 20,
+            "rungs": [
+                {"monitor": m["id"], "params_b": m["params_b"], "recall": 0.1, **ci}
+                for m in mons
+                if m["family"] == "model"
+            ],
+        },
+        "scores_file": "artifacts/e2/scores.jsonl.gz",
+        "scores_sha256": hashlib.sha256(SCORES).hexdigest(),
+    }
+
+
+def hyp_results(prereg: str, cfg: dict[str, Any], ids: list[str]) -> dict[str, Any]:
+    outcomes = ["not_supported", "supported", "inconclusive"]
+    return {
+        "confirmatory": True,
+        "prereg": prereg,
+        "prereg_config_sha256": chainlib.sha256_obj(cfg),
+        "hypotheses": [{"id": i, "outcome": outcomes[k % 3]} for k, i in enumerate(ids)],
+    }
+
+
+@pytest.fixture(scope="module")
+def g78_base(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    repo = h.Repo.init(tmp_path_factory.mktemp("g78") / "base")
+    repo.write(P_E2, h.prereg_text(E2_CFG, pid="0003", experiment="E2"))
+    repo.write(P_E3, h.prereg_text(E3_CFG, pid="0004", experiment="E3"))
+    repo.write(P_E4, h.prereg_text(E4_CFG, pid="0005", experiment="E4"))
+    repo.commit("freeze E2 to E4")
+    repo.write_json("artifacts/e2/results.json", e2_full_results())
+    (repo.path / "artifacts" / "e2" / "scores.jsonl.gz").write_bytes(SCORES)
+    repo.write_json("artifacts/e3/results.json", hyp_results(P_E3, E3_CFG, E3_IDS))
+    repo.write_json("artifacts/e4/results.json", hyp_results(P_E4, E4_CFG, E4_IDS))
+    repo.write("docs/REPORT.md", "# Report\n\n" + "\n".join(E3_IDS + E4_IDS) + "\n")
+    repo.commit("bank E2 to E4")
+    return repo
+
+
+@pytest.fixture
+def g78(g78_base: Any, tmp_path: Path) -> Any:
+    return g78_base.copy_to(tmp_path / "repo")
+
+
+def rebank(repo: Any, rel: str, change: Callable[[dict[str, Any]], None]) -> None:
+    res = repo.read_json(rel)
+    change(res)
+    repo.write_json(rel, res)
+    repo.commit("re-bank")
+
+
+def _drop(key: str, pred: Callable[[dict[str, Any]], bool]) -> Callable[[dict[str, Any]], None]:
+    def change(res: dict[str, Any]) -> None:
+        res[key] = [r for r in res[key] if not pred(r)]
+
+    return change
+
+
+def _drop_rung(res: dict[str, Any]) -> None:
+    res["size_ladder"]["rungs"] = [
+        r for r in res["size_ladder"]["rungs"] if r["monitor"] != M_SMALL
+    ]
+
+
+def _other_method(res: dict[str, Any]) -> None:
+    res["estimates"][0]["method"] = "plugin_cp"
+
+
+def test_g7_control_passes(g78: Any, tmp_path: Path) -> None:
+    assert_pass(7, g78, tmp_path)
+
+
+G7_MUTATIONS: dict[str, tuple[Callable[[dict[str, Any]], None], str]] = {
+    "a preregistered model monitor's estimates removed": (
+        _drop("estimates", lambda r: r["monitor"] == M_LARGE),
+        M_LARGE,
+    ),
+    "a preregistered set of a monitor removed": (
+        _drop("estimates", lambda r: r["monitor"] == RULE and r["set"] == "full"),
+        f"{RULE} full",
+    ),
+    "the ensemble's breakdowns removed": (
+        _drop("breakdowns", lambda r: r["monitor"] == ENSEMBLE),
+        f"breakdown by violation_source for {ENSEMBLE}",
+    ),
+    "one breakdown group of the cascade removed": (
+        _drop("breakdowns", lambda r: r["monitor"] == CASCADE and r["by"] == "subject_model"),
+        f"breakdown by subject_model for {CASCADE}",
+    ),
+    "time to detection of a preregistered monitor removed": (
+        _drop("time_to_detection", lambda r: r["monitor"] == M_SMALL),
+        f"time to detection for {M_SMALL}",
+    ),
+    "fixed-threshold rows removed": (
+        _drop("fixed_threshold", lambda r: r["monitor"] == RULE),
+        f"fixed-threshold rows for {RULE}",
+    ),
+    "a size-ladder rung removed": (_drop_rung, f"size-ladder rung for {M_SMALL}"),
+    "an estimate made with another interval method": (_other_method, "(composite)"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(G7_MUTATIONS))
+def test_g7_fails_when_e2_omits_what_it_preregistered(case: str, g78: Any, tmp_path: Path) -> None:
+    change, needle = G7_MUTATIONS[case]
+    rebank(g78, "artifacts/e2/results.json", change)
+    assert_fail(7, g78, tmp_path, needle)
+
+
+def test_g8_control_passes(g78: Any, tmp_path: Path) -> None:
+    evidence = assert_pass(8, g78, tmp_path)
+    assert "E3 8 hypotheses" in evidence and "E4 2 hypotheses" in evidence
+
+
+@pytest.mark.parametrize(
+    ("rel", "hid"),
+    [
+        ("artifacts/e3/results.json", "H3.1-r"),
+        ("artifacts/e3/results.json", "H3.3-m1-p0.0001"),
+        ("artifacts/e4/results.json", "H4.2-p1"),
+    ],
+)
+def test_g8_fails_when_a_preregistered_hypothesis_is_missing(
+    rel: str, hid: str, g78: Any, tmp_path: Path
+) -> None:
+    """The reviewer's counterexample: a null result deleted from the results file."""
+    rebank(g78, rel, _drop("hypotheses", lambda r: r["id"] == hid))
+    assert_fail(8, g78, tmp_path, hid)
