@@ -648,20 +648,23 @@ def table_breakdown(reg: Registry, e2: dict[str, Any]) -> str:
         for g in ("violation_source", "violation_type", "subject_model")
         for v in sorted({r["value"] for r in rows_in if r["by"] == g})
     ]
+
+    def key(m: str) -> str:
+        # an ensemble id holds commas, which the select grammar splits on; there is one
+        return "family=ensemble" if m.startswith("ensemble:") else f"monitor={m}"
+
     rows = []
     for g, v in groups:
-        n_pos = next(r["n_pos"] for r in rows_in if r["by"] == g and r["value"] == v)
         vid = cid_part(v)
         n_tag = reg.tag(
             f"e2.by.{g}.{vid}.n",
             E2_SRC,
-            f"breakdowns[monitor={mons[0]},by={g},value={v}].n_pos",
+            f"breakdowns[{key(mons[0])},by={g},value={v}].n_pos",
             "{:,d}",
         )
-        del n_pos
         cells = [f"{g.replace('_', ' ')}: {name(v)}", n_tag]
         for m in mons:
-            sel = f"breakdowns[monitor={m},by={g},value={v}]"
+            sel = f"breakdowns[{key(m)},by={g},value={v}]"
             cid = cid_part(f"e2.by.{g}.{vid}.{short(m)}")
             cells.append(reg.tag(cid, E2_SRC, sel, "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"))
         rows.append(cells)

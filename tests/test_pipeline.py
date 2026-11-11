@@ -685,6 +685,22 @@ def test_time_to_detection_gives_ties_only_the_tie_fraction(
     assert "median_delay_steps" not in an.ttd(missed, 0.3, 0.5, 20, 1)
 
 
+def test_time_to_detection_counts_only_violations_the_budget_catches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """prereg/0003: delays are for violations caught at the budget (by the full-trace score)."""
+    an = _load("analyze", monkeypatch, tmp_path)
+    early_only = [{"score": 0.1, "prefix_scores": [0.9, 0.1]}]
+    out = an.ttd(early_only, 0.3, 0.5, 20, 1)
+    assert out["share_caught"] == 0.0 and "median_delay_steps" not in out
+    caught = [
+        {"score": 0.9, "prefix_scores": [0.1, 0.9]},
+        {"score": 0.1, "prefix_scores": [0.9, 0.1]},
+    ]
+    out = an.ttd(caught, 0.3, 0.5, 20, 1)
+    assert out["share_caught"] == 0.5 and out["median_delay_steps"] == 1.0
+
+
 def test_report_refuses_an_audit_of_traces_not_in_the_corpus(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

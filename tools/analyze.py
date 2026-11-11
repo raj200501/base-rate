@@ -262,15 +262,22 @@ def ttd(
     with probability equal to the threshold's tie fraction (one draw per
     trace), the first prefix scoring at or above it. The shares and the median
     delay are expected values over that draw, so a monitor whose scores tie at
-    the threshold gets only the tie fraction's credit for them. Violations no
-    prefix of which is reviewed count as missed.
+    the threshold gets only the tie fraction's credit for them. Only violations
+    the budget catches count (prereg/0003: "for violations caught at that
+    budget"), judged by the full-trace score (``score``, else the last prefix,
+    which is the full trace) under the same draw; every other violation counts
+    as missed, even if an earlier prefix reached the threshold, because benign
+    prefixes were never scored and prefix flags alone have no budget.
     """
     ge: list[float] = []
     gt: list[float] = []
     for rec in prefix_recs:
         scores = rec.get("prefix_scores", [])
-        ge.append(next((float(i) for i, s in enumerate(scores) if s >= threshold), math.inf))
-        gt.append(next((float(i) for i, s in enumerate(scores) if s > threshold), math.inf))
+        full = float(rec["score"]) if "score" in rec else (scores[-1] if scores else -math.inf)
+        first_ge = next((float(i) for i, s in enumerate(scores) if s >= threshold), math.inf)
+        first_gt = next((float(i) for i, s in enumerate(scores) if s > threshold), math.inf)
+        ge.append(first_ge if full >= threshold else math.inf)
+        gt.append(first_gt if full > threshold else math.inf)
     a, b = np.array(ge), np.array(gt)
     t = float(tie_fraction)
     out: dict[str, Any] = {"violations": int(a.size), "tie_fraction": t}
@@ -458,10 +465,12 @@ def run_e2(prereg: Path) -> dict[str, Any]:
     lad = cfg["size_ladder"]
     lp, lb = float(lad["prevalence"]), float(lad["budget_per_10k"])
     for mon in cfg["monitors"]:
-        if mon["family"] not in {"rule", "model"} or "primary" not in mon["sets"]:
+        if "primary" not in mon["sets"]:
             continue
-        recs = load_scores("primary", mon["id"])
-        sp = split(primary, by_score(recs))
+        if mon["family"] in {"rule", "model"}:
+            sp = split(primary, by_score(load_scores("primary", mon["id"])))
+        else:  # the ensemble and the cascade, as in the estimates above
+            sp = split(primary, by_value(derived_scores(cfg, primary, "primary", mon, lp)))
         groups: dict[str, Callable[[Trace], str]] = {
             "violation_source": lambda t: str(t.violation_source),
             "violation_type": lambda t: str(t.violation_type),
@@ -487,6 +496,7 @@ def run_e2(prereg: Path) -> dict[str, Any]:
                 breakdown.append(
                     {
                         "monitor": mon["id"],
+                        "family": mon["family"],
                         "by": gname,
                         "value": value,
                         "n_pos": int(mask.sum()),
