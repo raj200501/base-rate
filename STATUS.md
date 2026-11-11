@@ -33,21 +33,23 @@ sprint then revised README.md, so G12 needs a fresh review of the new commit.
 
 ## Now
 
-Raj merged the release commit into main (a merge commit, same SHAs) and made the
-repository public; this branch fast-forwarded to that merge. G14: Raj accepted the
-2026-11-11 review-run overrun (D25) with a dated waiver scoped to that day and kind
-(DECISIONS.md D26, budget_waivers.toml); make budget and G14 honor exactly that waiver,
-tests show every other overrun still fails, and caps and CAP_SHARE=0.2 are unchanged. G12
-waits for the next day's review allowance (2026-11-12 UTC). Scheduled: the G12 review at
-2026-11-12 00:05 UTC (one review run a day, logged when it starts) and a heartbeat every
-two hours. A development QA workflow is checking every change since the last SHIP review
-before that run.
+Raj merged the release commit into main and made the repository public; this branch
+fast-forwarded to that merge. G14 passes: Raj accepted the 2026-11-11 review-run overrun
+(D25) with a dated waiver (D26) that make budget and G14 honor only through an exact
+approval record in DECISIONS.md; every other overrun fails. A development QA pass over
+every change since the last SHIP review found README claims stated too broadly and gaps in
+the waiver and cap checks; all were fixed with tests (CORRECTIONS.md, D28, D29): the cap
+share is now recorded in budget.toml, Claude ledger entries must record their share, and
+`make review-start` enforces and logs the daily review cap. G12 waits for the 2026-11-12
+UTC review allowance; the review is scheduled for 00:05 UTC, and a heartbeat runs every
+two hours.
 
 ## Next three actions
 
-1. When the next day's review allowance opens (2026-11-12 UTC), run make review on the
-   release commit, fix any blocking findings, then the full make ship-check on a fresh
-   clone; on PASS 14/14 move the local tag v1.0 to that commit.
+1. When the next day's review allowance opens (2026-11-12 UTC): `make review-start`, commit
+   the ledger entry, then the reviewer subagent; fix any blocking findings (no second review
+   that day), then the full make ship-check on a fresh clone; on PASS 14/14 move the local
+   tag v1.0 to that commit.
 2. Keep logging every Claude subagent run that counts against a cap when it happens (D9,
    D25).
 3. Work the open non-blocking review issues (docs/REVIEW_LOG.md), starting with N1 (the
@@ -64,9 +66,14 @@ pull requests into main; make ci passes locally before every push (D14).
 
 ## Usage to date
 
-cash_usd = 0 (`make budget`). Local model calls only, logged per batch in
-artifacts/usage/ledger.jsonl. Claude: subagents of this session only (no headless
-children); reviewer runs will be logged against the daily review cap.
+cash_usd = 0 (`make budget`). artifacts/usage/ledger.jsonl records the local model calls
+(logged per batch) and the capped Claude runs (D27): the twenty label-audit auditors as
+single calls and the two `make review` runs of 2026-11-11, all logged after the fact; the
+second review run exceeded the day's review cap and is waived by Raj (D25, D26). Claude has
+run only as subagents of this session (no headless children); D28 lists the development
+workflows that are not logged per call. `make review-start` checks the day's review cap at
+the share in force (budget.toml records 0.2, D29) and logs the run before the reviewer
+subagent starts.
 
 ## Needs Raj
 

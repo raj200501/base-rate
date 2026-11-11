@@ -95,3 +95,9 @@ Iteration history moved out of STATUS.md. Newest last.
   ci passing. Commits are now made only when make ci passes in the same command.
 - Scheduled: the G12 review at 2026-11-12 00:05 UTC, logged in the ledger when it starts;
   a heartbeat every two hours.
+- Development QA (four agents) over every change since the last SHIP review, before the one
+  allowed make review: README claims stated too broadly were corrected (CORRECTIONS.md); the
+  waiver check now requires an exact approval record (any other field, approver, alias, or
+  wording fails), Claude ledger entries must record their share, the cap share is recorded in
+  budget.toml (D29), and make review-start enforces and logs the daily review cap (D28 notes
+  the turn cap and the development workflows). Each fix has a test that failed first.

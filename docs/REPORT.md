@@ -566,7 +566,7 @@ E4 chose each cascade's escalation rate on a training half of the source runs, u
 compute budget of half the cost of running the expensive monitor on all traffic, and
 tested it on the other half at prevalence 1e-3 and 20 reviews per
 10,000. The training estimate of every chosen cascade's recall lay inside its test
-interval (H4.1 supported for all four pairs). The cascade from the reviewer-calibrated rule
+interval (H4.1 supported for every pair). The cascade from the reviewer-calibrated rule
 to the 8B model reached test recall 0.062
 [0.041, 0.085] at 1.723 seconds of
 compute per trajectory, within its limit of 11.765, while the 8B
@@ -577,7 +577,7 @@ to the 8B model reached only 0.002 [0.000,
 0.006]. A cascade can beat its expensive stage
 alone because it reviews by the expensive score only among trajectories the cheap stage
 already ranked high, so it acts as a two-signal filter. The efficiency hypothesis (H4.2)
-was supported for all four pairs, but it compares each cascade with a second stage that
+was supported for every pair, but it compares each cascade with a second stage that
 catches almost nothing alone, so it is easy to meet here and says little.
 
 ![Figure 5: cost and recall of every escalation rate for each preregistered cascade pair](../artifacts/report/figures/cascade_fronts.svg)

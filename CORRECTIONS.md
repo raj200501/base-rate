@@ -3,6 +3,29 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-11 README claims made exact before the next review
+
+A development QA pass over the release README (commits 795ea75 to 543f7ef, public since the
+release) found claims stated more broadly than the code and artifacts support. Each was
+corrected:
+
+- The pitch gave the corpus size without its synthetic share or its independent runs; it
+  now gives both and names the synthetic sources.
+- The pitch and "What it is" said the library's intervals respect the independent runs for
+  the false-positive rate too; at a fixed budget that rate is set by the budget, and its
+  printed interval is tighter than the benign runs certify (open issue N1). Both now scope
+  the claim to recall and precision.
+- "Checks whether thresholds transfer" was listed as a library feature; transfer is tested
+  by the E3 analysis, not by a library function, and the README now says so.
+- "No number ... is typed by hand" ignored the allowance tags; it now says no result number
+  is, and that every other number carries an auditable allowance. Counts written as words in
+  the E4 result ("all four pairs") now read "every pair".
+- The Status section said E0 to E4 "ran as preregistered", that all five first-review issues
+  were recorded in CORRECTIONS.md, and that `make reproduce` rebuilds every result. It now
+  cites the reported deviations, says which fixes changed published claims, scopes
+  `make reproduce` to E2 to E4 and the documents, and leaves the live gate state to
+  STATUS.md instead of a statement that would turn false after the next review.
+
 ## 2026-11-11 The 14/14 ship-check at 19dbd5a passed on an incomplete usage ledger
 
 What was claimed: README.md's Status section (commit 795ea75) said that at commit 19dbd5a

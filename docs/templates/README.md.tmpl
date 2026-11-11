@@ -2,12 +2,14 @@
 
 **What is an AI agent monitor worth when violations are rare and humans can review only a
 few trajectories?** base-rate is an open Python library and a preregistered study for that
-question. The library estimates a monitor's recall, precision, and false-positive rate at a
-fixed human-review budget and a stated violation prevalence, with intervals that respect how
-few independent runs stand behind them; it sizes the labeled samples a claim needs, checks
-whether thresholds transfer, and optimizes cheap-to-expensive cascades. The study applies it
-to {{claim:corpus.total.traces}} labeled agent trajectories in mock-tool domains and to rule
-and model monitors, with every result number in this README rendered from a committed artifact.
+question. The library estimates a monitor's recall and precision at a fixed human-review
+budget and a stated violation prevalence, with intervals that count independent runs (at a
+fixed budget the false-positive rate is set by the budget itself); it sizes the labeled
+samples a claim needs and optimizes cheap-to-expensive cascades. The study applies it to
+{{claim:corpus.total.traces}} labeled trajectories from {{claim:corpus.total.runs}} independent
+agent runs in mock-tool domains (synthetic share {{claim:corpus.total.synthetic}}: procedural
+variants, inserted violations, and Armour's generated records), scored by rule and model
+monitors. Every result number in this README is a claim over a committed artifact.
 
 **At a human-review budget of {{param:20}} per {{param:10,000}} trajectories and a
 violation prevalence of {{param:1e-3}}, no single monitor in this preregistered study (three
@@ -51,10 +53,11 @@ uv run baserate eval examples/fixtures/monitor_scores.csv --prevalence {{param:1
 base-rate is a library and a study for one question: if violations are rare and humans
 can review only a fixed share of agent trajectories, what is a monitor worth? It estimates
 recall, precision, and the false-positive rate of a monitor at a review budget and a
-deployment prevalence, with intervals that respect how few independent runs stand behind
-them; it sizes the labeled samples a claim needs; it checks whether thresholds transfer;
-and it optimizes cheap-to-expensive cascades. The study applies it to a labeled corpus of
-agent trajectories in eight mock-tool domains and to four monitor families.
+deployment prevalence, with recall and precision intervals that count independent runs; it
+sizes the labeled samples a claim needs; and it optimizes cheap-to-expensive cascades. The
+study applies it to a labeled corpus of agent trajectories in eight mock-tool domains and to
+four monitor families, and also tests whether thresholds transfer between domains and
+prevalences (E3).
 
 It is not a benchmark of frontier models, not an attack on monitors, and not a safety
 case. Every trajectory is from simulated tools with abstract violations; the subject
@@ -66,9 +69,9 @@ numbers do not.
 
 - **The library** (`src/baserate`, MIT): recall, precision, and false-positive rate at a
   review budget and prevalence, with cluster-aware intervals; `baserate certify` (how many
-  independent runs a claim needs); threshold-transfer checks; cascade sweeps and a
-  budget-constrained optimizer; a monitor report card; an Armour trace adapter; a CLI and
-  three offline examples. It is covered by a test suite that `make test` runs offline.
+  independent runs a claim needs); cascade sweeps and a budget-constrained optimizer; a
+  monitor report card; an Armour trace adapter; a CLI and three offline examples. It is
+  covered by a test suite that `make test` runs offline.
 - **Validated before use:** E0, a preregistered simulation study, checked the coverage of
   the budget-recall and fixed-threshold interval methods against exact truth on a grid of
   score distributions, sample sizes, prevalences, and budgets. Cells where a method
@@ -77,10 +80,14 @@ numbers do not.
   (docs/DATA.md), a blind label audit, and a canary string in every record.
 - **The integrity checks:** every experiment was preregistered under prereg/ and
   `make prereg-verify` checks from git history that each result came after its plan; no
-  number in README.md, docs/REPORT.md, or docs/DATA.md is typed by hand (`make claimcheck`,
-  `make freshness`, docs/CLAIMS.md); `make reproduce` rebuilds every result from the banked
-  artifacts; `make ship-check` runs the project's definition-of-done gates on a fresh
-  clone; and an independent review (`make review`) must end in SHIP.
+  result number in README.md, docs/REPORT.md, or docs/DATA.md is typed by hand: each is a
+  registered claim over a banked artifact, and every other number carries an allowance tag
+  a reviewer can audit (`make claimcheck`, `make freshness`, docs/CLAIMS.md); `make
+  reproduce` re-runs the E2 to E4 analyses and rebuilds every figure, table, and document
+  from the banked artifacts (E0 and the corpus build have their own scripts); `make
+  ship-check` runs the project's definition-of-done gates on a fresh clone; and a review by
+  a separate Claude reviewer subagent of the build session (`make review`) must end in
+  SHIP.
 
 ## Key results
 
@@ -145,8 +152,8 @@ same prominence as the rest.
   while the {{name:8B}} alone reached {{claim:e4.p2.alone}} [{{claim:e4.p2.alone.lo}},
   {{claim:e4.p2.alone.hi}}]. Not every cascade did: from the {{name:1.7B}} to the {{name:8B}},
   test recall was {{claim:e4.p4.recall}}. Every cascade's training estimate held on the
-  test half (H4.1 supported for all four pairs); the efficiency hypothesis H4.2 held for
-  all four too, which says little when the second stage alone catches almost nothing.
+  test half (H4.1 supported for every pair); the efficiency hypothesis H4.2 held for every
+  pair too, which says little when the second stage alone catches almost nothing.
 - **The corpus and its blind label audit** ([corpus manifest](artifacts/corpus/manifest.json), [label audit](artifacts/corpus/label_audit.json), [prereg/0002](prereg/0002-e1-corpus.md)).
   {{claim:corpus.total.traces}} trajectories from {{claim:corpus.total.runs}} independent
   source runs (synthetic share {{claim:corpus.total.synthetic}}), with every planned
@@ -164,23 +171,25 @@ same prominence as the rest.
 
 ## Status
 
-- **Complete:** experiments E0 to E4 ran as preregistered and are banked under artifacts/;
-  every result above comes from them, and none comes from an unfinished experiment.
-- **Gates:** at commit `19dbd5a`, `make ship-check` printed
-  `{{brief:SHIP-CHECK: PASS 14/14}}` on a fresh clone, after the second independent review
-  returned SHIP with no blocking issues (artifacts/review/latest.json). The first review had
-  blocked the release on five issues, all fixed and recorded in CORRECTIONS.md. That pass
-  is qualified: the usage ledger then omitted the session's two `make review` runs, and once
-  logged they exceed the project's share of one review run a day. Raj accepted that one
-  overrun with a dated waiver scoped to that day (DECISIONS.md D25 and D26,
-  budget_waivers.toml); `make budget` reports it as waived, caps are unchanged, and any
-  other overrun still fails. This page was also revised after that commit, so the review
-  gate (G12) needs a fresh `make review`, which waits for the next day's review allowance.
+- **Experiments:** E0 to E4 ran under their preregistrations, with the deviations
+  docs/REPORT.md section 6 reports (the E1 amendments prereg/0006 and prereg/0007, and the
+  double commit of prereg/0003), and are banked under artifacts/. Every result above comes
+  from them; none comes from an unfinished experiment.
+- **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
+  and `make review` the review; STATUS.md records the latest result of each, and every review
+  is kept in artifacts/review/. The first review blocked the release, and every blocking
+  issue was fixed: those that changed published claims are recorded in CORRECTIONS.md, and
+  the others were gates that could pass with results missing. The usage ledger records a cap
+  overrun on {{date:2026-11-11}}, a `make review` run beyond the project's share of review runs for
+  that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
+  (DECISIONS.md D25 and D26, budget_waivers.toml). Caps are unchanged, and any other overrun
+  fails `make budget`.
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
-  certify and that the three Armour rule configurations score this corpus identically; no
-  Claude model has been run as a subject or a monitor (DECISIONS.md D2); and the stretch
-  goals (adapters for real agent transcripts, streaming monitors) have not started.
+  certify, and that the Armour rule configurations score every primary-set trace
+  identically, so their rows differ only by bootstrap noise; no Claude model has been run as
+  a subject or a monitor (DECISIONS.md D2); and the stretch goals of the build brief
+  (section 7) have not started.
 
 ## How it works
 
