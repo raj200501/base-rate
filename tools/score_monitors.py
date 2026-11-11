@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         server = start_server(
             entry, args.port, args.concurrency, args.threads, work / f"{safe}.server.log"
         )
-        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]
+        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]  # Popen.args is the list start_server passed
         mon = model_mon.ModelMonitor(args.monitor, client)
         meta.update(
             {

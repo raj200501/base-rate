@@ -299,7 +299,7 @@ def _run(
 ) -> int:
     """Run the planned jobs against a started server; the caller stops the server."""
     if server is not None:
-        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]
+        meta["server_command"] = [str(a) for a in server.args]  # type: ignore[union-attr]  # Popen.args is the list start_server passed
         (args.out / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
     client = ModelClient(spec, ROOT, purpose="agent-runs" if not args.insert else "insertions")
     lock = threading.Lock()

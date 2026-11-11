@@ -144,6 +144,11 @@ def split(traces: Sequence[Trace], score_of: Callable[[Trace], float]) -> Split:
     )
 
 
+def independent_runs(sp: Split) -> int:
+    """Distinct source runs behind both classes (an inserted violation shares its source run)."""
+    return len(set(sp.neg_clusters.tolist()) | set(sp.pos_clusters.tolist()))
+
+
 def composition(traces: Sequence[Trace]) -> dict[str, Any]:
     """Size, synthetic share, and independent source runs of a set."""
     n = len(traces)
@@ -357,7 +362,7 @@ def run_e2(prereg: Path) -> dict[str, Any]:
                         "n_pos": est.n_pos,
                         "n_neg_clusters": est.n_neg_clusters,
                         "n_pos_clusters": est.n_pos_clusters,
-                        "n_independent_runs": est.n_neg_clusters + est.n_pos_clusters,
+                        "n_independent_runs": independent_runs(sp),
                         "clustered": clustered,
                         "headline": headline,
                         "e0_cells": cells,

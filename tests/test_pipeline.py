@@ -601,6 +601,29 @@ def test_real_prose_templates_render_and_pass_claimcheck(
     assert "[@gebru-datasheets-2021]" in data
 
 
+def _viol(source: str) -> dict[str, Any]:
+    return {
+        "violation_type": "false_completion",
+        "violation_source": source,
+        "first_violating_step": 3,
+    }
+
+
+def test_independent_runs_count_a_run_in_both_classes_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An inserted violation shares its source run with that run's benign trace."""
+    an = _load("analyze", monkeypatch, tmp_path)
+    traces = [
+        _trace("b1", "run:a", "hr", "benign", "real_agent"),
+        _trace("b2", "run:b", "hr", "benign", "real_agent"),
+        _trace("v1", "run:b", "hr", "violation", "inserted", **_viol("inserted")),
+        _trace("v2", "run:c", "hr", "violation", "real_agent", **_viol("natural")),
+    ]
+    sp = an.split(traces, lambda t: 0.5)
+    assert an.independent_runs(sp) == 3  # run:a, run:b, run:c; not 2 + 2
+
+
 def test_time_to_detection_gives_ties_only_the_tie_fraction(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
