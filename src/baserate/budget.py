@@ -24,7 +24,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -228,6 +228,15 @@ def read_ledger(path: Path) -> list[LedgerEntry]:
     return entries
 
 
+def utc_day(ts: datetime) -> str:
+    """The UTC calendar day of a ledger timestamp (a naive timestamp is taken as UTC).
+
+    Daily caps count UTC days, so an entry written with another offset cannot move
+    to a neighbouring day's cap.
+    """
+    aware = ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
+    return aware.astimezone(UTC).date().isoformat()
+
 @dataclass(frozen=True)
 class Waiver:
     """One past cap overrun that Raj accepted (recorded in DECISIONS.md).
@@ -350,7 +359,7 @@ def check_ledger(
     counts: Counter[tuple[str, str]] = Counter()
     min_share: dict[str, float] = {}
     for e in items:
-        day = e.ts.date().isoformat()
+        day = utc_day(e.ts)
         min_share[day] = min(min_share.get(day, 1.0), e.cap_share)
         if e.kind in DAILY_CAP_FOR_KIND:
             counts[(day, e.kind)] += 1
@@ -419,7 +428,7 @@ def calls_remaining(
     """
     if kind not in DAILY_CAP_FOR_KIND:
         raise BudgetError(f"kind {kind!r} has no per-day cap")
-    used = sum(1 for e in entries if e.kind == kind and e.ts.date().isoformat() == day)
+    used = sum(1 for e in entries if e.kind == kind and utc_day(e.ts) == day)
     cap = effective_cap(budget, DAILY_CAP_FOR_KIND[kind], cap_share)
     return max(int(cap) - used, 0)
 

@@ -363,3 +363,24 @@ def test_cli_reports_the_waiver(tmp_path: Path, capsys: pytest.CaptureFixture[st
     assert any(line.startswith("WAIVED 2026-11-11: 2 claude_review_run") for line in out)
     w.unlink()  # without the waiver the same ledger fails
     assert budget.main(["--budget", str(b), "--ledger", str(led), "--waivers", str(w)]) == 1
+
+
+def test_days_are_utc_days_whatever_the_offset() -> None:
+    """A run stamped in another offset counts toward its UTC day's cap."""
+    caps = budget.parse_budget(_defaults())
+    entries = [
+        budget.LedgerEntry(
+            ts=budget.datetime.fromisoformat("2026-11-13T20:00:00+00:00"),
+            kind="claude_review_run",
+            cap_share=0.2,
+        ),
+        budget.LedgerEntry(  # 2026-11-13T20:30Z, written with a +05:00 offset
+            ts=budget.datetime.fromisoformat("2026-11-14T01:30:00+05:00"),
+            kind="claude_review_run",
+            cap_share=0.2,
+        ),
+    ]
+    report = budget.check_ledger(caps, entries)
+    assert report.daily_counts == {("2026-11-13", "claude_review_run"): 2}
+    assert any("2026-11-13: 2 claude_review_run entries > cap 1" in v for v in report.violations)
+    assert budget.calls_remaining(caps, entries, "claude_review_run", "2026-11-13", 0.2) == 0

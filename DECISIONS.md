@@ -357,3 +357,17 @@ excuses nothing; every other overrun still fails (tests/test_budget.py). Ship-ch
 also requires each applied waiver to be tracked and to cite a DECISIONS.md entry that
 records Raj's approval for that day and kind (tests/test_gate_mutations.py). The overrun
 stays disclosed in README.md, CORRECTIONS.md, and STATUS.md.
+
+## D27 (2026-11-11) Which Claude runs the usage ledger records
+
+The caps in brief section 8 bind three kinds of Claude use, each named by its comment
+there: `claude_agent_runs_per_day` (multi-turn headless runs used as test subjects),
+`claude_single_calls_per_day` (short single-turn calls for labeling, judging, or
+extraction), and `claude_review_runs_per_day` (`make review`). The ledger records every run
+of those kinds: the label-audit auditors as single calls, and every `make review` run by the
+`reviewer` subagent as a review run (D9), logged when the run starts, in the commit the
+review then covers, so the entry is part of what is reviewed. The session's own development
+subagents (parallel builders under D10, the review-and-skeptic workflows of D21, the
+citation checker, verification agents) are the session's work rather than one of those
+kinds, as they have been throughout, and are not logged per call. No Claude model has run
+as a subject or a monitor (D2).
