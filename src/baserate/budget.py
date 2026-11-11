@@ -237,6 +237,7 @@ def utc_day(ts: datetime) -> str:
     aware = ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
     return aware.astimezone(UTC).date().isoformat()
 
+
 @dataclass(frozen=True)
 class Waiver:
     """One past cap overrun that Raj accepted (recorded in DECISIONS.md).
