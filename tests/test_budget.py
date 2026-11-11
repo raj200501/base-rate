@@ -227,3 +227,139 @@ def test_cli_version(capsys: pytest.CaptureFixture[str]) -> None:
         cli.main(["--version"])
     assert exc.value.code == 0
     assert "baserate" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- waivers (D26)
+
+D26 = """\
+[[waiver]]
+decision = "D26"
+day = "2026-11-11"
+kind = "claude_review_run"
+max_entries = 2
+approved_by = "Raj Kashikar"
+approved_on = "2026-11-11"
+"""
+
+
+def _runs(kind: str, day: str, n: int, share: float = 0.2) -> list[budget.LedgerEntry]:
+    return [
+        budget.LedgerEntry(
+            ts=budget.datetime.fromisoformat(f"{day}T0{i % 10}:00:00+00:00"),
+            kind=kind,
+            cap_share=share,
+        )
+        for i in range(n)
+    ]
+
+
+def _waivers(text: str = D26) -> list[budget.Waiver]:
+    return budget.parse_waivers(budget.tomllib.loads(text))
+
+
+def test_waiver_excuses_exactly_its_overrun() -> None:
+    caps = budget.parse_budget(_defaults())
+    entries = _runs("claude_review_run", "2026-11-11", 2)
+    assert not budget.check_ledger(caps, entries).ok  # one review run a day at share 0.2
+    report = budget.check_ledger(caps, entries, _waivers())
+    assert report.ok and report.violations == []
+    assert report.waived == [
+        "2026-11-11: 2 claude_review_run entries > cap 1, waived by D26 "
+        "(approved by Raj Kashikar on 2026-11-11)"
+    ]
+    lines = budget.format_report(caps, report)
+    assert lines[-1] == "caps: respected except waived overruns (D26)"
+    assert "caps: all respected" not in lines
+
+
+@pytest.mark.parametrize(
+    ("entries", "needle"),
+    [
+        (_runs("claude_review_run", "2026-11-11", 3), "beyond waiver D26"),
+        (
+            _runs("claude_review_run", "2026-11-11", 2)
+            + _runs("claude_review_run", "2026-11-12", 2),
+            "2026-11-12: 2 claude_review_run entries > cap 1",
+        ),
+        (
+            _runs("claude_review_run", "2026-11-11", 2)
+            + _runs("claude_single_call", "2026-11-11", 61),
+            "2026-11-11: 61 claude_single_call entries > cap 60",
+        ),
+    ],
+    ids=["third-run-that-day", "another-day", "another-kind"],
+)
+def test_any_other_overrun_still_fails(entries: list[budget.LedgerEntry], needle: str) -> None:
+    caps = budget.parse_budget(_defaults())
+    report = budget.check_ledger(caps, entries, _waivers())
+    assert not report.ok
+    assert any(needle in v for v in report.violations), report.violations
+
+
+def test_a_waiver_that_excuses_nothing_fails() -> None:
+    caps = budget.parse_budget(_defaults())
+    report = budget.check_ledger(caps, _runs("claude_review_run", "2026-11-11", 1), _waivers())
+    assert not report.ok
+    assert any("waiver D26 excuses no overrun" in v for v in report.violations)
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        (D26.replace('approved_on = "2026-11-11"', 'approved_on = "2026-11-10"'), "before"),
+        (D26.replace("claude_review_run", "local_call"), "no daily cap"),
+        (D26.replace("max_entries = 2", "max_entries = 0"), "max_entries"),
+        (D26.replace("max_entries = 2", "max_entries = true"), "max_entries"),
+        (D26 + 'note = "x"\n', "unknown"),
+        (D26.replace('decision = "D26"\n', ""), "missing"),
+        (D26.replace('day = "2026-11-11"', 'day = "2026-13-11"'), "date"),
+        (D26 + "\n" + D26, "duplicate"),
+        ("extra = 1\n" + D26, "unknown"),
+    ],
+    ids=[
+        "preauthorized",
+        "uncapped-kind",
+        "zero-entries",
+        "bool-entries",
+        "extra-key",
+        "missing-key",
+        "bad-date",
+        "duplicate",
+        "extra-table",
+    ],
+)
+def test_invalid_waivers_are_refused(text: str, message: str) -> None:
+    with pytest.raises(budget.BudgetError, match=message):
+        _waivers(text)
+
+
+def test_repository_waivers_match_the_repository_ledger() -> None:
+    root = Path(__file__).resolve().parents[1]
+    caps = budget.load_budget(root / "budget.toml")
+    waivers = budget.load_waivers(root / "budget_waivers.toml")
+    assert [(w.decision, w.day, w.kind) for w in waivers] == [
+        ("D26", "2026-11-11", "claude_review_run")
+    ]
+    report = budget.check_ledger(
+        caps, budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl"), waivers
+    )
+    assert report.ok and len(report.waived) == 1 and report.waived[0].startswith("2026-11-11:")
+
+
+def test_cli_reports_the_waiver(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    b, led = _write(
+        tmp_path,
+        DEFAULT_TOML,
+        [
+            {"ts": f"2026-11-11T0{i}:00:00+00:00", "kind": "claude_review_run", "cap_share": 0.2}
+            for i in range(2)
+        ],
+    )
+    w = tmp_path / "budget_waivers.toml"
+    w.write_text(D26)
+    assert budget.main(["--budget", str(b), "--ledger", str(led), "--waivers", str(w)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[-1] == "caps: respected except waived overruns (D26)"
+    assert any(line.startswith("WAIVED 2026-11-11: 2 claude_review_run") for line in out)
+    w.unlink()  # without the waiver the same ledger fails
+    assert budget.main(["--budget", str(b), "--ledger", str(led), "--waivers", str(w)]) == 1

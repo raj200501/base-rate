@@ -1555,13 +1555,52 @@ def g14(ctx: Ctx) -> str:
         problems.append(f"secrets-scan: {scan.tail()}")
     bud = ctx.make("budget", timeout=300)
     lines = [ln.strip() for ln in bud.out.splitlines()]
-    if not (bud.ok and "cash_usd = 0" in lines and "caps: all respected" in lines):
-        problems.append(f"make budget: {bud.tail()}")
+    caps_line = bud.status("caps:")
+    waived = re.fullmatch(r"caps: respected except waived overruns \(([^)]+)\)", caps_line)
+    if not (bud.ok and "cash_usd = 0" in lines and (caps_line == "caps: all respected" or waived)):
+        problems.append(f"make budget: {caps_line or bud.tail()}")
+    ids = waived.group(1).split(", ") if waived else []
+    if waived:
+        problems.extend(waiver_problems(ctx, ids))
     need(not problems, "; ".join(problems))
-    return (
-        "secrets-scan clean; cash_usd = 0, caps respected; "
-        "private/ untracked; files present; tree clean"
+    caps = (
+        f"caps respected except waived overruns ({', '.join(ids)}, approved by Raj in DECISIONS.md)"
+        if ids
+        else "caps respected"
     )
+    return (
+        f"secrets-scan clean; cash_usd = 0, {caps}; private/ untracked; files present; tree clean"
+    )
+
+
+def waiver_problems(ctx: Ctx, ids: list[str]) -> list[str]:
+    """Problems with the waivers ``make budget`` applied (G14).
+
+    Each waiver must be tracked in budget_waivers.toml and cite a DECISIONS.md
+    entry (``## <id> (...)``) that records Raj's approval on the waiver's
+    approval date for that day and kind. ``make budget`` already checks that a
+    waiver excuses exactly its one overrun and nothing else.
+    """
+    problems: list[str] = []
+    if not tracked(ctx, "budget_waivers.toml"):
+        return ["make budget applied waivers but budget_waivers.toml is not tracked"]
+    data = tomllib.loads(rel(ctx, "budget_waivers.toml").read_text(encoding="utf-8"))
+    waivers = {str(w.get("decision")): w for w in data.get("waiver", [])}
+    decisions = rel(ctx, "DECISIONS.md")
+    text = decisions.read_text(encoding="utf-8") if decisions.is_file() else ""
+    for wid in ids:
+        w = waivers.get(wid)
+        if w is None:
+            problems.append(f"waiver {wid} is not in budget_waivers.toml")
+            continue
+        m = re.search(rf"^## {re.escape(wid)} \(.*?(?=^## |\Z)", text, re.M | re.S)
+        body = m.group(0) if m else ""
+        approved = re.search(
+            rf"approved by raj on {re.escape(str(w.get('approved_on')))}", body.lower()
+        )
+        if not (approved and str(w.get("day")) in body and str(w.get("kind")) in body):
+            problems.append(f"waiver {wid} has no DECISIONS.md entry approved by Raj")
+    return problems
 
 
 GATE_FUNCS: dict[int, Callable[[Ctx], str]] = {

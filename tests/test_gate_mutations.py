@@ -742,6 +742,71 @@ G14_CASES: list[tuple[str, Callable[[Any], None], Needle]] = [
 ]
 
 
+OVERRUN = "".join(
+    json.dumps(
+        {"ts": f"2026-11-11T0{i}:00:00+00:00", "kind": "claude_review_run", "cap_share": 0.2}
+    )
+    + "\n"
+    for i in range(2)
+)
+WAIVER = """[[waiver]]
+decision = "D26"
+day = "2026-11-11"
+kind = "claude_review_run"
+max_entries = 2
+approved_by = "Raj Kashikar"
+approved_on = "2026-11-11"
+"""
+APPROVAL = (
+    "# Decisions\n\n## D26 (2026-11-11) Waiver: the 2026-11-11 claude_review_run overrun\n\n"
+    "Approved by Raj on 2026-11-11, for that one day and that one overrun.\n"
+)
+
+
+def _overrun(r: Any, waiver: bool, approval: str | None) -> None:
+    r.write("artifacts/usage/ledger.jsonl", OVERRUN)
+    if waiver:
+        r.write("budget_waivers.toml", WAIVER)
+    if approval is not None:
+        r.write("DECISIONS.md", approval)
+    r.commit("usage")
+
+
+def test_g14_honors_a_waiver_raj_approved(g14: Any, tmp_path: Path) -> None:
+    _overrun(g14, waiver=True, approval=APPROVAL)
+    evidence = assert_pass(14, g14, tmp_path)
+    assert "caps respected except waived overruns (D26" in evidence
+
+
+G14_CASES += [
+    (
+        "overrun-without-waiver",
+        lambda r: _overrun(r, waiver=False, approval=None),
+        "make budget: caps: VIOLATED",
+    ),
+    (
+        "waiver-without-approval",
+        lambda r: _overrun(r, waiver=True, approval="# Decisions\n"),
+        "waiver D26 has no DECISIONS.md entry approved by Raj",
+    ),
+    (
+        "waiver-approval-not-by-raj",
+        lambda r: _overrun(r, waiver=True, approval=APPROVAL.replace("Approved by Raj", "Noted")),
+        "waiver D26 has no DECISIONS.md entry approved by Raj",
+    ),
+    (
+        "waiver-untracked",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", OVERRUN),
+            r.write("DECISIONS.md", APPROVAL),
+            r.commit("usage"),
+            r.write("budget_waivers.toml", WAIVER),
+        ),
+        "working tree dirty",
+    ),
+]
+
+
 @pytest.mark.parametrize(
     ("mutate", "needle"), [c[1:] for c in G14_CASES], ids=[c[0] for c in G14_CASES]
 )

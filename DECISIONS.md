@@ -343,3 +343,17 @@ added to artifacts/usage/ledger.jsonl during the release sprint. `make budget` t
 reports a violation for that day, and G14 fails on it. The overrun is not hidden or offset:
 caps are lowered only, and how the project treats a past overrun is Raj's decision
 (STATUS.md, "Needs Raj"). No further review runs happen on 2026-11-11.
+
+## D26 (2026-11-11) Waiver: the 2026-11-11 claude_review_run overrun (D25)
+
+Approved by Raj on 2026-11-11, in his message of that day: he accepts the overrun D25
+records, the second `make review` run (claude_review_run) on 2026-11-11 against the
+effective cap of one review run a day at CAP_SHARE=0.2. The waiver is scoped to that one
+day and that one overrun: budget_waivers.toml excuses at most two claude_review_run
+entries on 2026-11-11 and nothing else. Caps are unchanged (budget.toml, CAP_SHARE=0.2).
+`make budget` honors only waivers that match an overrun exactly (same UTC day and kind,
+within max_entries), refuses a waiver dated before its overrun, and fails on a waiver that
+excuses nothing; every other overrun still fails (tests/test_budget.py). Ship-check G14
+also requires each applied waiver to be tracked and to cite a DECISIONS.md entry that
+records Raj's approval for that day and kind (tests/test_gate_mutations.py). The overrun
+stays disclosed in README.md, CORRECTIONS.md, and STATUS.md.

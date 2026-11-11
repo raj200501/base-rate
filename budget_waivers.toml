@@ -1,0 +1,14 @@
+# Past cap overruns that Raj accepted after the fact. A waiver never changes a cap
+# (budget.toml): it excuses exactly one overrun, one ledger kind on one UTC day, up to
+# max_entries entries of that kind that day. It may not be dated before the overrun, a
+# waiver that excuses nothing fails `make budget`, and every other overrun still fails.
+# Each waiver cites the DECISIONS.md entry that records Raj's approval; ship-check G14
+# checks that entry.
+
+[[waiver]]
+decision = "D26"
+day = "2026-11-11"
+kind = "claude_review_run"
+max_entries = 2
+approved_by = "Raj Kashikar"
+approved_on = "2026-11-11"

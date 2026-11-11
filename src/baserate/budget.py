@@ -6,6 +6,12 @@
 was exceeded and that no cash was spent. ``plan_equivalent_usd`` (the API-price
 estimate that headless Claude reports) is tracked separately and never counts
 as cash.
+
+``budget_waivers.toml`` lists past overruns that Raj accepted after the fact,
+each recorded in DECISIONS.md. A waiver never changes a cap: it excuses exactly
+one overrun (one ledger kind on one UTC day, up to a stated number of
+entries), it may not be dated before that overrun, and a waiver that excuses
+nothing is itself an error. Every other overrun still fails.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +85,8 @@ class BudgetReport:
     entries: int
     daily_counts: dict[tuple[str, str], int] = field(default_factory=dict)
     violations: list[str] = field(default_factory=list)
+    waived: list[str] = field(default_factory=list)
+    waived_by: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -220,18 +228,118 @@ def read_ledger(path: Path) -> list[LedgerEntry]:
     return entries
 
 
-def check_ledger(budget: Budget, entries: Iterable[LedgerEntry]) -> BudgetReport:
+@dataclass(frozen=True)
+class Waiver:
+    """One past cap overrun that Raj accepted (recorded in DECISIONS.md).
+
+    Attributes:
+        decision: The DECISIONS.md entry that records the approval (``D26``).
+        day: The UTC day of the overrun (ISO date).
+        kind: The ledger kind whose per-day cap was exceeded.
+        max_entries: The most entries of ``kind`` on ``day`` the waiver excuses.
+        approved_by: Who approved it.
+        approved_on: When (ISO date, on or after ``day``).
+    """
+
+    decision: str
+    day: str
+    kind: str
+    max_entries: int
+    approved_by: str
+    approved_on: str
+
+
+WAIVER_KEYS: frozenset[str] = frozenset(
+    {"decision", "day", "kind", "max_entries", "approved_by", "approved_on"}
+)
+
+
+def _iso_day(value: Any, what: str) -> date:
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError as exc:
+        raise BudgetError(f"{what} is not an ISO date: {value!r}") from exc
+
+
+def parse_waivers(data: Mapping[str, Any]) -> list[Waiver]:
+    """Validate the ``[[waiver]]`` tables of ``budget_waivers.toml``.
+
+    Raises:
+        BudgetError: On an unknown or missing field, a kind without a daily cap,
+            a non-positive entry count, an invalid date, a waiver dated before its
+            overrun (waivers accept past overruns only), or a repeated day and kind.
+    """
+    unknown = sorted(set(data) - {"waiver"})
+    if unknown:
+        raise BudgetError(f"unknown keys in budget_waivers.toml: {unknown}")
+    raw = data.get("waiver", [])
+    if not isinstance(raw, list):
+        raise BudgetError("waivers must be [[waiver]] tables")
+    out: list[Waiver] = []
+    seen: set[tuple[str, str]] = set()
+    for item in raw:
+        if not isinstance(item, Mapping):
+            raise BudgetError("each waiver must be a table")
+        extra = sorted(set(item) - WAIVER_KEYS)
+        if extra:
+            raise BudgetError(f"unknown waiver keys: {extra}")
+        missing = sorted(WAIVER_KEYS - set(item))
+        if missing:
+            raise BudgetError(f"waiver missing keys: {missing}")
+        decision = str(item["decision"])
+        day = _iso_day(item["day"], f"waiver {decision} day")
+        approved_on = _iso_day(item["approved_on"], f"waiver {decision} approved_on")
+        if approved_on < day:
+            raise BudgetError(
+                f"waiver {decision} is approved before its overrun day {day}; "
+                "a waiver may only accept a past overrun"
+            )
+        kind = str(item["kind"])
+        if kind not in DAILY_CAP_FOR_KIND:
+            raise BudgetError(f"waiver {decision} names kind {kind!r}, which has no daily cap")
+        n = item["max_entries"]
+        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+            raise BudgetError(f"waiver {decision} max_entries must be a positive integer")
+        who = str(item["approved_by"]).strip()
+        if not who:
+            raise BudgetError(f"waiver {decision} needs approved_by")
+        key = (day.isoformat(), kind)
+        if key in seen:
+            raise BudgetError(f"duplicate waiver for {key[0]} {kind}")
+        seen.add(key)
+        out.append(Waiver(decision, day.isoformat(), kind, n, who, approved_on.isoformat()))
+    return out
+
+
+def load_waivers(path: Path) -> list[Waiver]:
+    """Read ``budget_waivers.toml``; a missing file means no waivers."""
+    if not path.exists():
+        return []
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise BudgetError(f"cannot read {path}: {exc}") from exc
+    return parse_waivers(data)
+
+
+def check_ledger(
+    budget: Budget, entries: Iterable[LedgerEntry], waivers: Sequence[Waiver] = ()
+) -> BudgetReport:
     """Check logged usage against the caps.
 
     A day's cap is the cap scaled by the smallest ``cap_share`` recorded that
-    day, so a lowered share is never escaped by mixing entries.
+    day, so a lowered share is never escaped by mixing entries. A per-day
+    overrun is excused only by a waiver for that exact day and kind, and only up
+    to the waiver's ``max_entries``; a waiver that excuses no overrun is a
+    violation, so a waiver cannot sit unused or be stretched.
 
     Args:
         budget: The validated budget.
         entries: Ledger entries.
+        waivers: Accepted past overruns (``budget_waivers.toml``).
 
     Returns:
-        Totals, per-day counts, and every violation found.
+        Totals, per-day counts, every violation found, and every waived overrun.
     """
     items = list(entries)
     report = BudgetReport(
@@ -260,10 +368,29 @@ def check_ledger(budget: Budget, entries: Iterable[LedgerEntry]) -> BudgetReport
                 report.violations.append(
                     f"{e.ts.isoformat()}: local model {e.params_b:g}B > cap {cap:g}B"
                 )
+    by_key = {(w.day, w.kind): w for w in waivers}
+    used: set[tuple[str, str]] = set()
     for (day, kind), n in sorted(counts.items()):
         cap = effective_cap(budget, DAILY_CAP_FOR_KIND[kind], min_share[day])
-        if n > cap:
-            report.violations.append(f"{day}: {n} {kind} entries > cap {cap:g}")
+        if n <= cap:
+            continue
+        overrun = f"{day}: {n} {kind} entries > cap {cap:g}"
+        w = by_key.get((day, kind))
+        if w is None:
+            report.violations.append(overrun)
+        elif n > w.max_entries:
+            used.add((day, kind))
+            report.violations.append(
+                f"{overrun}, beyond waiver {w.decision}, which excuses at most {w.max_entries}"
+            )
+        else:
+            used.add((day, kind))
+            approval = f"approved by {w.approved_by} on {w.approved_on}"
+            report.waived.append(f"{overrun}, waived by {w.decision} ({approval})")
+            report.waived_by.append(w.decision)
+    for key, w in sorted(by_key.items()):
+        if key not in used:
+            report.violations.append(f"waiver {w.decision} excuses no overrun ({key[0]} {key[1]})")
     report.daily_counts = dict(counts)
     return report
 
@@ -317,11 +444,14 @@ def format_report(budget: Budget, report: BudgetReport) -> list[str]:
     lines.extend(
         f"used {day} {kind} = {n}" for (day, kind), n in sorted(report.daily_counts.items())
     )
-    if report.ok:
-        lines.append("caps: all respected")
-    else:
+    lines.extend(f"WAIVED {w}" for w in report.waived)
+    if not report.ok:
         lines.extend(f"VIOLATION {v}" for v in report.violations)
         lines.append("caps: VIOLATED")
+    elif report.waived:
+        lines.append(f"caps: respected except waived overruns ({', '.join(report.waived_by)})")
+    else:
+        lines.append("caps: all respected")
     return lines
 
 
@@ -330,10 +460,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="baserate budget", description=__doc__)
     parser.add_argument("--budget", type=Path, default=Path("budget.toml"))
     parser.add_argument("--ledger", type=Path, default=Path("artifacts/usage/ledger.jsonl"))
+    parser.add_argument(
+        "--waivers",
+        type=Path,
+        default=None,
+        help="accepted past overruns (default: budget_waivers.toml beside --budget)",
+    )
     args = parser.parse_args(argv)
+    waivers_path = args.waivers or args.budget.parent / "budget_waivers.toml"
     try:
         budget = load_budget(args.budget)
-        report = check_ledger(budget, read_ledger(args.ledger))
+        report = check_ledger(budget, read_ledger(args.ledger), load_waivers(waivers_path))
     except BudgetError as exc:
         print(f"budget error: {exc}")
         print("caps: VIOLATED")
