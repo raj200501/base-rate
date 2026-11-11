@@ -79,6 +79,16 @@ def test_canonical_hash_is_key_order_independent() -> None:
     )
 
 
+def test_md_sections_keep_a_code_block_that_opens_a_section() -> None:
+    """The heading match must not run on through a blanked code block (G13's diagram check)."""
+    text = (
+        "# T\n\n## How it works\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n"
+        "Prose.\n\n## Next\nx\n"
+    )
+    body = dict(ship_check.md_sections(text))["How it works"]
+    assert "```mermaid" in body and "Prose." in body
+
+
 def test_md_sections_ignore_code_blocks() -> None:
     text = "# T\n\n## One\nbody\n```\n## not a heading\n```\n## Two\nmore\n"
     heads = [h for h, _ in ship_check.md_sections(text)]

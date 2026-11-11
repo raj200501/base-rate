@@ -513,7 +513,7 @@ def offline_env() -> dict[str, str]:
 
 def md_sections(text: str, level: int = 2) -> list[tuple[str, str]]:
     """Split markdown into (heading, body) pairs at the given heading level."""
-    pattern = re.compile(rf"^{'#' * level}\s+(.+?)\s*$", re.M)
+    pattern = re.compile(rf"^{'#' * level}[ \t]+(.+?)[ \t]*$", re.M)
     marks = list(pattern.finditer(_strip_code(text)))
     return [
         (m.group(1).strip(), text[m.end() : marks[i + 1].start() if i + 1 < len(marks) else None])
