@@ -266,6 +266,8 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                         if mon["id"] == "model:qwen3-0.6b-q8_0"
                         else 0.001
                         if mon["family"] == "rule"
+                        else 1.0
+                        if mon["id"] == "model:qwen3-1.7b-q8_0"
                         else 3.0
                     ),
                 }
@@ -376,6 +378,8 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                 "stage1": "rule:armour-reviewer-calibrated",
                 "stage2": "model:qwen3-8b-q4_k_m",
             },
+            {"index": "p3", "stage1": "model:qwen3-0.6b-q8_0", "stage2": "model:qwen3-4b-q4_k_m"},
+            {"index": "p4", "stage1": "model:qwen3-1.7b-q8_0", "stage2": "model:qwen3-8b-q4_k_m"},
         ],
         "prevalence": 0.001,
         "budget_per_10k": 20,
@@ -431,7 +435,9 @@ def test_analyses_and_report_run_end_to_end(root: Path, monkeypatch: pytest.Monk
     )
     e4 = an.run_e4(root / "prereg" / "0005-e4.md")
     an.write("e4", e4)
-    assert [h["id"] for h in e4["hypotheses"]] == ["H4.1-p1", "H4.2-p1", "H4.1-p2", "H4.2-p2"]
+    assert [h["id"] for h in e4["hypotheses"]] == [
+        f"H4.{k}-p{i}" for i in range(1, 5) for k in (1, 2)
+    ]
     pr = e4["pairs"][0]
     assert pr["test_recall_ci"][0] <= pr["test_recall"] <= pr["test_recall_ci"][1]
     # the held-out half's own composition, not the whole primary set's
