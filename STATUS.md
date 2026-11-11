@@ -10,7 +10,9 @@ Updated 2026-11-11 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.
 Final sequence outcome (brief 10.6, recorded at the start of this iteration): at commit
 19dbd5a the full `make ship-check` printed SHIP-CHECK: PASS 14/14, the latest `make review`
 ended REVIEW: SHIP, and the local tag v1.0 points there (not pushed; tags are never pushed).
-The release sprint then revised README.md, so G12 needs a fresh review of the new commit.
+That pass is qualified: G14 passed on a ledger that omitted the day's two review runs, which
+exceed the review-run cap (D25). The release sprint then revised README.md, so G12 also
+needs a fresh review of the new commit.
 
 | Gate | State | What is left |
 |---|---|---|
@@ -25,9 +27,9 @@ The release sprint then revised README.md, so G12 needs a fresh review of the ne
 | G9 Usable by others | passes | |
 | G10 Claim integrity | passes (claimcheck, freshness, reproduce) | |
 | G11 Preregistration integrity | passes | |
-| G12 Independent review | SHIP for c433208 | fresh make review of the release commit |
+| G12 Independent review | SHIP for c433208 | fresh make review of the release commit (next day's allowance) |
 | G13 Documentation | passes | |
-| G14 Hygiene | passes | |
+| G14 Hygiene | FAILS: make budget reports the 2026-11-11 review-run overrun (D25) | Raj's decision (Needs Raj) |
 
 ## Now
 
@@ -35,15 +37,18 @@ Release sprint for Raj (2026-11-11): the branch is safe to publish (secrets-scan
 nothing under private/ tracked, third-party material licensed and attributed, no personal
 data beyond Raj's name and GitHub noreply address); make lint, typecheck, test, and demo
 pass; README.md gained a one-paragraph pitch, a section on what is built and validated,
-and a Status section that states the gate results as of 19dbd5a and what is open. No
-experiment ran during the sprint.
+and a Status section that states the gate results as of 19dbd5a and what is open. Logging
+the session's Claude subagent runs afterwards showed the review-run cap exceeded on
+2026-11-11 (D25); README, CORRECTIONS.md, and Needs Raj say so. No experiment ran during
+the sprint.
 
 ## Next three actions
 
-1. Run make review on the release commit, then the full make ship-check; on PASS 14/14 move
-   the local tag v1.0 to that commit.
-2. Log this session's Claude subagent runs in the usage ledger (two make review runs and
-   the twenty label-audit auditors), which are not yet recorded there.
+1. After Raj decides on the review-run overrun (Needs Raj), and no earlier than the next
+   day's review allowance, run make review on the release commit, then the full make
+   ship-check; on PASS 14/14 move the local tag v1.0 to that commit.
+2. Keep logging every Claude subagent run that counts against a cap when it happens (D9,
+   D25).
 3. Work the open non-blocking review issues (docs/REVIEW_LOG.md), starting with N1 (the
    false-positive-rate interval printed tighter than the benign runs can certify), then the
    Stretch Ladder.
@@ -64,7 +69,14 @@ children); reviewer runs will be logged against the daily review cap.
 
 ## Needs Raj
 
-None of these blocks the Definition of Done.
+1. **Decide on the review-run overrun (D25).** On 2026-11-11 the session ran `make review`
+   twice against an effective cap of one a day (CAP_SHARE=0.2). Both runs are now in the
+   usage ledger, so `make budget` and ship-check G14 fail on that day. Caps are never
+   raised. Tell the session how to treat a past overrun (for example, accept it with a
+   dated waiver that the budget check honors, a gate change only you can approve); until
+   then G14 fails.
+
+The items below do not block the Definition of Done.
 
 1. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
    agents for misalignment"

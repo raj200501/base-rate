@@ -3,6 +3,17 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-11 The 14/14 ship-check at 19dbd5a passed on an incomplete usage ledger
+
+What was claimed: README.md's Status section (commit 795ea75) said that at commit 19dbd5a
+`make ship-check` printed PASS 14/14. That is what it printed, but G14's property ("every
+cap respected") was false at the time: the session had run `make review` twice that day,
+against an effective cap of one review run a day at the project's cap share of 0.2
+(DECISIONS.md D9), and neither run had been logged. Logging both (artifacts/usage/ledger.jsonl)
+makes `make budget`, and so G14, report the overrun. What changed: the Status section now
+says so, DECISIONS.md D25 records the overrun, and STATUS.md asks Raj how to treat it. Caps
+are never raised, so the gate stays failing on that day's record until he decides.
+
 ## 2026-11-11 Results claims corrected after the first `make review`
 
 The first rendering of README.md and docs/REPORT.md (commits 238b99d to e403a4e, not yet

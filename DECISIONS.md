@@ -332,3 +332,14 @@ command. The keep-alive waiter also matched its own command line with
 `pgrep -f`, so it reported the pipeline as running for about 80 minutes after
 it had stopped; waiters now match the pipeline's exact command line
 (`pgrep -fx`).
+
+## D25 (2026-11-11) Review-run cap exceeded; logged after the fact
+
+On 2026-11-11 the session ran `make review` twice (the reviewer subagent at 05:12 and
+05:25 UTC) to clear a BLOCK during the final sequence, against D9's effective cap of one
+review run a day at CAP_SHARE=0.2, and logged neither at the time, as D9 requires. Both
+runs, and the twenty label-audit auditors (single labeling calls, within their cap), were
+added to artifacts/usage/ledger.jsonl during the release sprint. `make budget` therefore
+reports a violation for that day, and G14 fails on it. The overrun is not hidden or offset:
+caps are lowered only, and how the project treats a past overrun is Raj's decision
+(STATUS.md, "Needs Raj"). No further review runs happen on 2026-11-11.
