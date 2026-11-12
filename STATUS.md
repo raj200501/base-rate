@@ -1,9 +1,9 @@
-goal_turn: 5
+goal_turn: 6
 STATE: ACTIVE
 
 # Status
 
-Updated 2026-11-11 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
+Updated 2026-11-12 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
 
 ## Gates
 
@@ -33,16 +33,12 @@ sprint then revised README.md, so G12 needs a fresh review of the new commit.
 
 ## Now
 
-Raj merged the release commit into main and made the repository public; this branch
-fast-forwarded to that merge. G14 passes: Raj accepted the 2026-11-11 review-run overrun
-(D25) with a dated waiver (D26) that make budget and G14 honor only through an exact
-approval record in DECISIONS.md; every other overrun fails. A development QA pass over
-every change since the last SHIP review found README claims stated too broadly and gaps in
-the waiver and cap checks; all were fixed with tests (CORRECTIONS.md, D28, D29): the cap
-share is now recorded in budget.toml, Claude ledger entries must record their share, and
-`make review-start` enforces and logs the daily review cap. G12 waits for the 2026-11-12
-UTC review allowance; the review is scheduled for 00:05 UTC, and a heartbeat runs every
-two hours.
+Final sequence (brief 10.6), 2026-11-12: the day's review allowance opened at 00:00 UTC;
+`make review-start` logged review run 1 of 1 for the day (CAP_SHARE 0.2 from budget.toml,
+D29), and the reviewer subagent reviews this commit (main and this branch were at 8c5f3d8,
+fast check 13/14 with only G12 failing). On SHIP: commit only artifacts/review/, then the
+full make ship-check, the release procedure, and the local tag v1.0. On BLOCK: fix with
+tests, and the next review waits for 2026-11-13.
 
 ## Next three actions
 
