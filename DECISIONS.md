@@ -522,3 +522,32 @@ a turn count within claude_agent_max_turns (8 at the 0.2 share), which a QA agen
 Raj may overrule D28 point 3 (STATUS.md, Needs Raj); until then every such workflow is
 recorded here before it runs. The agents edit nothing; the session verifies each finding
 before acting on it.
+
+## D35 (2026-11-12) Acting on the pre-review QA (D34)
+
+Recorded before acting. The QA of D34 found five issues a reviewer could block on and about
+twenty-five smaller ones; each blocking one was reproduced. Changes:
+
+1. Review runs (amends D32 points 1 to 3). A review's run must be logged within six hours
+   before it (a review run lasts minutes; the headless path is held to the turn cap), after
+   the review banked before it. With the ledger's own daily cap this bounds the reviews of
+   each run-start day, so D32's separate count of reviews per banked day is dropped: it
+   failed a legitimate run that banks after midnight followed by the next day's run, and no
+   waiver could clear it. G14 reads every version of artifacts/review/latest.json and
+   artifacts/review/history/*.json and of the usage ledger in HEAD's ancestry (every commit,
+   merges and side branches included, paths read without quoting), and counts every
+   review-run entry ever committed, so deleting an entry cannot hide a run. A banked review
+   whose content changed under the same reviewed commit and time fails. G12 also requires
+   latest.json to be newer than every review run ever logged, and its drift check lists
+   renamed files under both names. The limit of D32 point 4 stands.
+2. An advance waiver (D31) is committed together with the entry of the run it covers; until
+   that run is logged, `make budget` reports that the waiver excuses no overrun.
+3. Documentation. A fork subagent of this session, development work under D28 point 3 like
+   the fix forks of 2026-11-11, corrects the README, REPORT, and DATA claims the QA found
+   mislabeled or overstated (synthetic labels on E4 and on the corpus, scoped interval
+   claims, wording that would go stale once the next review lands) and records them in
+   CORRECTIONS.md. The session reviews its diff before committing.
+4. The QA findings left open are logged in docs/REVIEW_LOG.md as N30 and later, marked as
+   found by the pre-review QA, so the next review can reuse their ids. Under brief 10.1
+   step 8 a reviewed commit may differ from HEAD only in artifacts/review/, STATUS.md, and
+   docs/LOG.md, so a review that raises new ids cannot pass G12 the same day.
