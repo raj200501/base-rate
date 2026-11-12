@@ -1,4 +1,4 @@
-goal_turn: 9
+goal_turn: 10
 STATE: ACTIVE
 
 # Status
@@ -34,6 +34,9 @@ both were fixed in 7d1e31e, and main was updated once at the end of Raj's sprint
 read-only pre-review QA workflow (D34) then found three more gate defects and two mislabeled
 claims a reviewer could block on, and about twenty-five smaller issues; they are fixed or
 logged as N30 to N58 in docs/REVIEW_LOG.md (D35), so the next review can reuse their ids.
+Heartbeat of 04:19 UTC: with no review allowed until 2026-11-13, the full-check-only parts
+of G10 were run on a fresh clone of 8a0c390 (`make reproduce`: REPRODUCE: PASS 4 checks, no
+file changed; freshness passed), so the re-rendered claims hold for the full ship-check.
 
 ## Next three actions
 
