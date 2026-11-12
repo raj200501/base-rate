@@ -1,7 +1,8 @@
-# Past cap overruns that Raj accepted after the fact. A waiver never changes a cap
-# (budget.toml): it excuses exactly one overrun, one ledger kind on one UTC day, up to
-# max_entries entries of that kind that day. It may not be dated before the overrun, a
-# waiver that excuses nothing fails `make budget`, and every other overrun still fails.
+# Cap overruns that Raj accepted: after the fact (D26), or on the day itself for a stated
+# extra run (D31, D32). A waiver never changes a cap (budget.toml): it excuses exactly one
+# overrun, one ledger kind on one UTC day, up to max_entries entries of that kind that day.
+# It may not be dated before that day, a waiver that excuses nothing fails `make budget`,
+# and every other overrun still fails.
 # Each waiver cites the DECISIONS.md entry that records Raj's approval; ship-check G14
 # checks that entry.
 

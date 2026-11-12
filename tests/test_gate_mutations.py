@@ -908,6 +908,12 @@ ONE_RUN = (
 )
 
 
+ORPHAN_THEN_ONE_RUN = "".join(
+    json.dumps({"ts": ts, "kind": "claude_review_run", "cap_share": 0.2}) + "\n"
+    for ts in ("2026-11-20T10:00:00+00:00", "2026-11-21T09:00:00+00:00")
+)
+
+
 def _review_file(commit: str, at: str) -> str:
     return json.dumps({"reviewed_commit": commit, "reviewed_at": at}) + "\n"
 
@@ -940,6 +946,48 @@ G14_CASES += [
             r.commit("first review"),
             r.write("artifacts/review/latest.json", _review_file("c" * 40, "2026-11-12T03:00:00Z")),
             r.commit("second review overwrites the first, no history file"),
+        ),
+        "has no claude_review_run entry",
+    ),
+    (
+        # review B6, second round: the 2026-11-20 run banked nothing; on 2026-11-21 one
+        # logged review, then a second review without make review-start
+        "orphan-run-covers-a-second-review",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ORPHAN_THEN_ONE_RUN),
+            r.write(
+                "artifacts/review/history/h.json", _review_file("a" * 40, "2026-11-21T09:30:00Z")
+            ),
+            r.write("artifacts/review/latest.json", _review_file("b" * 40, "2026-11-21T12:00:00Z")),
+            r.commit("two reviews on 2026-11-21, one logged that day"),
+        ),
+        "has no claude_review_run entry",
+    ),
+    (
+        # the same, with the unlogged review first: it pairs with the orphan, so only the
+        # day's review count shows the second run
+        "orphan-run-covers-the-next-review",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ORPHAN_THEN_ONE_RUN),
+            r.write(
+                "artifacts/review/history/h.json", _review_file("b" * 40, "2026-11-21T08:20:00Z")
+            ),
+            r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-21T09:30:00Z")),
+            r.commit("two reviews on 2026-11-21, one logged that day"),
+        ),
+        "2 banked reviews > 1 review run allowed that day",
+    ),
+    (
+        "unlogged-review-deleted-from-history",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ONE_RUN),
+            r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-12T00:29:00Z")),
+            r.write(
+                "artifacts/review/history/h.json", _review_file("b" * 40, "2026-11-12T03:00:00Z")
+            ),
+            r.commit("a logged review and an unlogged one"),
+            r.git("rm", "-q", "artifacts/review/history/h.json"),
+            r.commit("drop the unlogged review"),
         ),
         "has no claude_review_run entry",
     ),
@@ -1041,6 +1089,24 @@ G12_CASES: list[tuple[str, Callable[[Any], None], str]] = [
         "review-missing",
         lambda r: (r.git("rm", "-q", LATEST), r.commit("drop review")),
         "latest.json missing",
+    ),
+    (
+        # review N27: an older SHIP restored as latest.json over a newer BLOCK
+        "older-review-restored-over-a-newer-one",
+        lambda r: (
+            r.write_json(
+                "artifacts/review/history/newer.json",
+                review(
+                    r.read_json(LATEST)["reviewed_commit"],
+                    reviewed_at="2026-10-24T00:00:00Z",
+                    verdict="BLOCK",
+                    blocking=[BLOCKER],
+                    final_line="REVIEW: BLOCK",
+                ),
+            ),
+            r.commit("a newer review sits in history"),
+        ),
+        "latest.json is not the newest banked review",
     ),
 ]
 

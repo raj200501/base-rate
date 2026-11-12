@@ -1389,6 +1389,18 @@ def g12(ctx: Ctx) -> str:
     review = load_json(rel(ctx, "artifacts/review/latest.json"))
     need(review.get("verdict") == "SHIP", f"latest review verdict {review.get('verdict')}")
     need(review.get("blocking") == [], "latest review has open blocking issues")
+    bm = _budget_module()
+    try:
+        mine = bm.parse_banked_review(review, "artifacts/review/latest.json")
+        newer = [r for r in banked_review_versions(ctx) if r.reviewed_at > mine.reviewed_at]
+    except (bm.BudgetError, ValueError, subprocess.CalledProcessError) as exc:
+        raise GateError(f"banked reviews unreadable: {exc}") from exc
+    need(
+        not newer,
+        "latest.json is not the newest banked review: "
+        + ", ".join(f"{r.reviewed_commit[:12]} at {r.reviewed_at.isoformat()}" for r in newer[:3])
+        + " is newer",
+    )
     reviewed = str(review.get("reviewed_commit", ""))
     head = git(ctx.clone, "rev-parse", "HEAD")
     need(
@@ -1594,34 +1606,55 @@ def _budget_module() -> ModuleType:
     return module
 
 
+def banked_review_versions(ctx: Ctx) -> list[Any]:
+    """Every review ever banked: each committed version of each file under artifacts/review/.
+
+    A review overwritten in place, moved, or deleted still counts (review B6), and so do
+    the files at HEAD. A review that appears more than once counts once.
+    """
+    bm = _budget_module()
+    reviews: dict[tuple[str, Any], Any] = {}
+    out = git(ctx.clone, "log", "--format=@%H", "--name-only", "--", "artifacts/review")
+    sha = ""
+    for line in out.splitlines():
+        if line.startswith("@"):
+            sha = line[1:]
+            continue
+        path = line.strip()
+        if not path.endswith(".json"):
+            continue
+        try:
+            text = git(ctx.clone, "show", f"{sha}:{path}")
+        except subprocess.CalledProcessError:
+            continue  # this commit deleted the file
+        r = bm.parse_banked_review(json.loads(text), f"{path}@{sha[:12]}")
+        reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
+    for r in bm.read_banked_reviews(rel(ctx, "artifacts/review")):
+        reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
+    return sorted(reviews.values(), key=lambda r: r.reviewed_at)
+
+
 def unlogged_review_problems(ctx: Ctx) -> list[str]:
     """Banked reviews that lack their own claude_review_run ledger entry (G14, review B6).
 
-    The reviews are every committed version of artifacts/review/latest.json (so a review
-    overwritten in place still counts) and every file in artifacts/review/history/ at HEAD.
-    The budget module matches each to a distinct ledger entry logged at or before it, on
-    the same or the previous UTC day.
+    The reviews are every version of every file ever committed under artifacts/review/
+    (banked_review_versions). The budget module matches each to an entry logged after the
+    review before it and at or before its own time, and holds each UTC day's reviews to
+    that day's review-run cap or waiver.
     """
     bm = _budget_module()
-    latest = "artifacts/review/latest.json"
-    reviews: dict[tuple[str, Any], Any] = {}
-    problems: list[str] = []
     try:
-        shas = git(ctx.clone, "log", "--format=%H", "--", latest).split()
-        for sha in shas:
-            try:
-                text = git(ctx.clone, "show", f"{sha}:{latest}")
-            except subprocess.CalledProcessError:
-                continue  # the commit deleted the file
-            r = bm.parse_banked_review(json.loads(text), f"{latest}@{sha[:12]}")
-            reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
-        for r in bm.read_banked_reviews(rel(ctx, "artifacts/review")):
-            reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
+        reviews = banked_review_versions(ctx)
         entries = bm.read_ledger(rel(ctx, "artifacts/usage/ledger.jsonl"))
+        caps = bm.load_budget(rel(ctx, "budget.toml"))
+        share = bm.share_in_force(caps, os.environ.get("CAP_SHARE"))
+        waivers = bm.load_waivers(rel(ctx, "budget_waivers.toml"))
     except (bm.BudgetError, ValueError, subprocess.CalledProcessError) as exc:
         return [f"banked reviews unreadable: {exc}"]
-    problems.extend(bm.unlogged_reviews(reviews.values(), entries))
-    return problems
+    return [
+        *bm.unlogged_reviews(reviews, entries),
+        *bm.reviews_over_daily_cap(caps, reviews, entries, share, waivers),
+    ]
 
 
 def waiver_problems(ctx: Ctx, ids: list[str]) -> tuple[list[str], list[str]]:

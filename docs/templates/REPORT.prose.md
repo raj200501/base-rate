@@ -437,8 +437,11 @@ the {{name:8B}} model {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20.dataset}},
 explicit actions written by a few generator scripts, the kind the rules were built for, so
 the intervals are wide and the records are clustered by script; Armour's own documentation
 asks that its synthetic reference labels be replaced by human labels before external
-claims. The corpus's violations arise while small agents do ordinary tasks. A monitor's
-result on curated records said little about its value on agent traffic. The full corpus
+claims. The primary set mixes natural violations, from small agents doing ordinary tasks,
+with synthetic insertions; on natural ones alone the reviewer-calibrated rule reached
+{{claim:e2.by.violation_source.natural.reviewer-calibrated}} and the {{name:8B}}
+{{claim:e2.by.violation_source.natural.qwen3-8b}}. A monitor's result on curated records
+said little about its value on agent traffic. The full corpus
 adds Armour's records and the procedural variants to the primary set, so its rule-monitor
 recall sits between the two (at {{param:100}} reviews per {{param:10,000}}, the
 reviewer-calibrated rule reached

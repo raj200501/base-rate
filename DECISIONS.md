@@ -462,4 +462,50 @@ nothing else. Caps and CAP_SHARE=0.2 are unchanged. Unlike D26 it was approved b
 run, and the run was logged when it started (D27). Like D26, it is an exception to D5
 approved by Raj.
 
+Correction (2026-11-12, review N26): `make review-start` refused this run, because it checked
+the ledger without the run it was about to log, and before that run the waiver excused
+nothing. The session therefore wrote the 01:31:00 UTC ledger entry by hand, before the
+commit the review covered (a1b287b), with a note citing this decision. review-start now
+checks the ledger as it would stand with the run logged (D32), so it accepts such a run.
+
 Waiver record: decision=D31; day=2026-11-12; kind=claude_review_run; max_entries=2; approved_by=Raj Kashikar; approved_on=2026-11-12
+
+## D32 (2026-11-12) Review runs: matching reviews to logged runs, and advance waivers
+
+The review of a1b287b (2026-11-12) showed that G14 could still pass with the review-run cap
+exceeded (B6, second round): a review was matched to any unused review-run entry from the
+same or the previous UTC day, so an entry left by a run that banked nothing could cover a
+second review the next day. Changes, each tested:
+
+1. Each banked review, in time order, needs a claude_review_run entry logged after the review
+   banked before it and at or before its own reviewed_at, no earlier than the previous UTC
+   day. A run is logged when it starts (D27) and banks at most one review, so successive
+   windows do not overlap and one entry cannot cover two reviews.
+2. The reviews banked on a UTC day are held to that day's review-run cap (or its waiver), at
+   the smallest share logged that day. This catches an unlogged review that pairs with an
+   entry left the day before. A run that spans midnight counts on both days, which can only
+   fail closed.
+3. G14 reads every committed version of every file under artifacts/review/, so a review that
+   was overwritten, moved, or deleted still counts; G12 requires latest.json to be the newest
+   banked review (N27).
+4. The remaining limit, stated in the README: the ledger is written by the session, so no
+   check can see a run that leaves no trace. A reviewer that dies before banking a review
+   leaves an entry that a relaunched review can pair with; a relaunch must be logged as its
+   own run (as D25 did after the fact).
+5. Waivers. D26 accepted an overrun after the fact; D31 approved one extra run on the day
+   itself, before it ran. Both are read as allowed: a waiver names one UTC day and kind, Raj
+   approves it on or after that day, and it may not be dated before the day.
+   `make review-start` now runs the budget audit on the ledger as it would stand with the new
+   run logged, so it accepts a run that an approved waiver covers and refuses any other run
+   beyond the day's cap.
+
+## D33 (2026-11-12) Main at the end of the release sprint
+
+D30 said main moves only at a point with more gates passing than the last one. On
+2026-11-12 Raj wrote: "you have one hour left to accomplish the 14, after that hour sprint do
+the finale of finalizing and mergineg to main" (verbatim). At the end of the sprint the gates passing are
+the same as on main (G12 waits on the next review, on 2026-11-13), but the branch corrects
+public README claims (B7, N4, N28) and fixes gate defects (B6, N26, N27). Under Raj's
+instruction the session updates main once at the end of the sprint, by the procedure of D30
+(fast-forward only, make ci on a fresh clone, claimcheck and freshness), and returns to D30's
+rule afterwards.

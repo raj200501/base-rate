@@ -50,20 +50,27 @@ uv run baserate eval examples/fixtures/monitor_scores.csv --prevalence 1e-4 --bu
 
 ## Highlights
 
-- **The base-rate effect, measured.** The reviewer-calibrated rule caught
+- **The base-rate effect, measured.** At the same prevalence and review budget, the
+  reviewer-calibrated rule caught
   0.930 [0.436, 1.000] of the violations in
-  Armour's curated reference records, and
-  0.002 [0.000, 0.013] of those that arose while small
-  agents did ordinary tasks, at the same prevalence and review budget: a monitor's score on
-  curated data said little about its value on agent traffic.
+  Armour's curated reference records (explicit actions from a few generator scripts, the
+  kind the rules were built for, hence the wide interval) and
+  0.00 [0.00, 0.02] of the natural violations,
+  those that arose while small agents did ordinary tasks. A monitor's score on curated data
+  said little about its value on agent traffic.
 - **What helped: combining weak signals.** A rule filter in front of the 8B model
   reached held-out recall 0.062 at 1.723 seconds of compute per
-  trajectory, against 0.004 for the 8B alone; most of the combined
-  monitors' gain was on synthetic inserted violations, which the results say plainly.
+  trajectory, against 0.004 for the 8B alone (E4, on held-out
+  primary-set runs, whose violations mix natural and synthetic inserted ones; E4 reports no
+  split by source). In the main study, the rank-mean ensemble of the rule and the
+  8B caught 0.11 [0.06, 0.15] of the
+  synthetic inserted violations but only
+  0.01 [0.00, 0.05] of the natural ones.
 - **Evidence you can audit.** Every experiment was preregistered and checked against git
-  history; no result number is typed by hand; the interval methods were validated by
-  simulation before use; `make ship-check` runs the definition-of-done gates on a fresh
-  clone; and every review, the blocking ones included, is public with its fixes
+  history; no result number is typed by hand; the budget-recall and fixed-threshold
+  interval methods were checked by preregistered simulation (E0) before use, and the other
+  intervals were not; `make ship-check` runs the definition-of-done gates on a fresh clone;
+  and every review, the blocking ones included, is public with its fixes
   (artifacts/review/, CORRECTIONS.md).
 - **Reusable tools.** `baserate eval`, `baserate certify` (how many independent runs a claim
   needs), cascade optimization, and a monitor report card, with three offline examples.
@@ -137,9 +144,11 @@ same prominence as the rest.
   reviewer-calibrated rule reached recall
   0.930 [0.436, 1.000] and the 8B
   model 1.000 [0.535, 1.000]. Those records are
-  explicit violating actions from a few generator scripts (hence the wide intervals); the
-  corpus's violations arise while small agents do ordinary tasks. A monitor's result on
-  curated records said little about its value on agent traffic.
+  explicit violating actions from a few generator scripts (hence the wide intervals). On the
+  natural violations, those that arose while small agents did ordinary tasks, the same rule
+  reached 0.00 [0.00, 0.02] and the 8B
+  model 0.00 [0.00, 0.02]. A monitor's result on curated
+  records said little about its value on agent traffic.
 - **Why: a decent detector at its own threshold is uninformative at the top of the benign tail** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   At its native threshold the reviewer-calibrated rule caught
   0.143 [0.122, 0.165] of violations but flagged
@@ -184,7 +193,7 @@ same prominence as the rest.
   summary). A blind audit of
   200 sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on 0.930
   [0.885, 0.961] of them (docs/DATA.md).
-- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
+- **The budget-recall and fixed-threshold intervals were checked before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
   fixed-threshold interval methods were checked by preregistered simulation against exact
   truth; cells where a method undercovers are
   listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
@@ -199,15 +208,20 @@ same prominence as the rest.
   them; none comes from an unfinished experiment.
 - **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
   and `make review` the review; STATUS.md records the latest result of each, and every review
-  is kept in artifacts/review/. The first review blocked the release, and every blocking
-  issue was fixed: those that changed published claims are recorded in CORRECTIONS.md, and
-  the others were gates that could pass with results missing. The usage ledger records a cap
+  is kept in artifacts/review/. Reviews have blocked the release more than once, and every
+  blocking issue was fixed: those that changed published claims are recorded in
+  CORRECTIONS.md, and the others were gates that could pass while their property was false.
+  The latest review blocked; its fixes are in later commits and await the next review
+  (2026-11-13). The usage ledger records a cap
   overrun on 2026-11-11, a `make review` run beyond the project's share of review runs for
   that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
   (DECISIONS.md D25 and D26, budget_waivers.toml). A second review run on 2026-11-12,
   after that day's review blocked on an issue since fixed, Raj approved in advance by the same
-  kind of scoped waiver (D31). Caps are unchanged; any other overrun,
-  whether logged or a banked review without its own logged run, fails `make budget` and G14.
+  kind of scoped waiver (D31). Caps are unchanged. Any other logged overrun fails
+  `make budget` and G14, and so does a banked review with no run logged since the review
+  before it, or a day that banks more reviews than its review cap. The check cannot see a
+  run that leaves no trace: a reviewer that dies before banking a review leaves an entry that
+  a relaunched review can pair with, so a relaunch must be logged as its own run (D25, D32).
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify, and that the Armour rule configurations score every primary-set trace

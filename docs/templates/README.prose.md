@@ -38,20 +38,27 @@ uv run baserate eval examples/fixtures/monitor_scores.csv --prevalence {{param:1
 
 ## Highlights
 
-- **The base-rate effect, measured.** The reviewer-calibrated rule caught
+- **The base-rate effect, measured.** At the same prevalence and review budget, the
+  reviewer-calibrated rule caught
   {{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20.dataset}} of the violations in
-  Armour's curated reference records, and
-  {{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20}} of those that arose while small
-  agents did ordinary tasks, at the same prevalence and review budget: a monitor's score on
-  curated data said little about its value on agent traffic.
+  Armour's curated reference records (explicit actions from a few generator scripts, the
+  kind the rules were built for, hence the wide interval) and
+  {{claim:e2.by.violation_source.natural.reviewer-calibrated}} of the natural violations,
+  those that arose while small agents did ordinary tasks. A monitor's score on curated data
+  said little about its value on agent traffic.
 - **What helped: combining weak signals.** A rule filter in front of the {{name:8B}} model
   reached held-out recall {{claim:e4.p2.recall}} at {{claim:e4.p2.cost}} seconds of compute per
-  trajectory, against {{claim:e4.p2.alone}} for the {{name:8B}} alone; most of the combined
-  monitors' gain was on synthetic inserted violations, which the results say plainly.
+  trajectory, against {{claim:e4.p2.alone}} for the {{name:8B}} alone (E4, on held-out
+  primary-set runs, whose violations mix natural and synthetic inserted ones; E4 reports no
+  split by source). In the main study, the rank-mean ensemble of the rule and the
+  {{name:8B}} caught {{claim:e2.by.violation_source.inserted.ensemble--rank-mean-}} of the
+  synthetic inserted violations but only
+  {{claim:e2.by.violation_source.natural.ensemble--rank-mean-}} of the natural ones.
 - **Evidence you can audit.** Every experiment was preregistered and checked against git
-  history; no result number is typed by hand; the interval methods were validated by
-  simulation before use; `make ship-check` runs the definition-of-done gates on a fresh
-  clone; and every review, the blocking ones included, is public with its fixes
+  history; no result number is typed by hand; the budget-recall and fixed-threshold
+  interval methods were checked by preregistered simulation (E0) before use, and the other
+  intervals were not; `make ship-check` runs the definition-of-done gates on a fresh clone;
+  and every review, the blocking ones included, is public with its fixes
   (artifacts/review/, CORRECTIONS.md).
 - **Reusable tools.** `baserate eval`, `baserate certify` (how many independent runs a claim
   needs), cascade optimization, and a monitor report card, with three offline examples.
@@ -125,9 +132,11 @@ same prominence as the rest.
   reviewer-calibrated rule reached recall
   {{claim:e2.reviewer-calibrated.recall_at_budget.p0.001.b20.dataset}} and the {{name:8B}}
   model {{claim:e2.qwen3-8b.recall_at_budget.p0.001.b20.dataset}}. Those records are
-  explicit violating actions from a few generator scripts (hence the wide intervals); the
-  corpus's violations arise while small agents do ordinary tasks. A monitor's result on
-  curated records said little about its value on agent traffic.
+  explicit violating actions from a few generator scripts (hence the wide intervals). On the
+  natural violations, those that arose while small agents did ordinary tasks, the same rule
+  reached {{claim:e2.by.violation_source.natural.reviewer-calibrated}} and the {{name:8B}}
+  model {{claim:e2.by.violation_source.natural.qwen3-8b}}. A monitor's result on curated
+  records said little about its value on agent traffic.
 - **Why: a decent detector at its own threshold is uninformative at the top of the benign tail** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   At its native threshold the reviewer-calibrated rule caught
   {{claim:e2.fixed.reviewer-calibrated.recall}} of violations but flagged
@@ -172,7 +181,7 @@ same prominence as the rest.
   summary). A blind audit of
   {{claim:audit.n}} sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on {{claim:audit.agreement}}
   [{{claim:audit.agreement.lo}}, {{claim:audit.agreement.hi}}] of them (docs/DATA.md).
-- **The interval methods were validated before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
+- **The budget-recall and fixed-threshold intervals were checked before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
   fixed-threshold interval methods were checked by preregistered simulation against exact
   truth; cells where a method undercovers are
   listed in docs/UNSUPPORTED.md, the library warns there, and E2 marks estimates that rely
@@ -187,15 +196,20 @@ same prominence as the rest.
   them; none comes from an unfinished experiment.
 - **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
   and `make review` the review; STATUS.md records the latest result of each, and every review
-  is kept in artifacts/review/. The first review blocked the release, and every blocking
-  issue was fixed: those that changed published claims are recorded in CORRECTIONS.md, and
-  the others were gates that could pass with results missing. The usage ledger records a cap
+  is kept in artifacts/review/. Reviews have blocked the release more than once, and every
+  blocking issue was fixed: those that changed published claims are recorded in
+  CORRECTIONS.md, and the others were gates that could pass while their property was false.
+  The latest review blocked; its fixes are in later commits and await the next review
+  ({{date:2026-11-13}}). The usage ledger records a cap
   overrun on {{date:2026-11-11}}, a `make review` run beyond the project's share of review runs for
   that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
   (DECISIONS.md D25 and D26, budget_waivers.toml). A second review run on {{date:2026-11-12}},
   after that day's review blocked on an issue since fixed, Raj approved in advance by the same
-  kind of scoped waiver (D31). Caps are unchanged; any other overrun,
-  whether logged or a banked review without its own logged run, fails `make budget` and G14.
+  kind of scoped waiver (D31). Caps are unchanged. Any other logged overrun fails
+  `make budget` and G14, and so does a banked review with no run logged since the review
+  before it, or a day that banks more reviews than its review cap. The check cannot see a
+  run that leaves no trace: a reviewer that dies before banking a review leaves an entry that
+  a relaunched review can pair with, so a relaunch must be logged as its own run (D25, D32).
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify, and that the Armour rule configurations score every primary-set trace

@@ -1,4 +1,4 @@
-goal_turn: 7
+goal_turn: 8
 STATE: ACTIVE
 
 # Status
@@ -27,26 +27,27 @@ sprint then revised README.md, so G12 needs a fresh review of the new commit.
 | G9 Usable by others | passes | |
 | G10 Claim integrity | passes (claimcheck, freshness, reproduce) | |
 | G11 Preregistration integrity | passes | |
-| G12 Independent review | SHIP for c433208 | fresh make review of the release commit (next day's allowance) |
+| G12 Independent review | fails: the review of a1b287b (2026-11-12) is BLOCK (B6, B7), both fixed since | next make review, 2026-11-13 00:05 UTC (the two runs D31 allows today are used) |
 | G13 Documentation | passes | |
 | G14 Hygiene | passes; review-run overruns waived by Raj: 2026-11-11 (D25, D26) and 2026-11-12 (D31) | |
 
 ## Now
 
-Raj asked for all fourteen gates within the hour and approved one extra review run on
-2026-11-12 (D31, a dated waiver scoped to that day and run, logged when the run starts).
-The README gained a Highlights section. The second review of the day covers this commit;
-on SHIP: commit only artifacts/review/, run the full make ship-check on a fresh clone, and
-on PASS 14/14 do the release procedure (main) and move the local tag v1.0. The 2026-11-12
-review of d6f9ce0 blocked on B6, fixed in 2633213; N24 in 02ca9d0.
+The second review of 2026-11-12 (a1b287b, approved in advance by Raj, D31) returned BLOCK:
+B6 again (an entry left by a run that banked nothing could cover a second review) and B7
+(the new Highlights gave the pooled primary-set recall, mostly synthetic, as recall on
+natural violations). Both are fixed with tests that failed first, along with N26 to N29 and
+the re-raised N3 and N4 (DECISIONS.md D32, CORRECTIONS.md, docs/REVIEW_LOG.md). The fast
+ship-check passes every gate except G12, which needs the next review. At the end of Raj's
+one-hour sprint main is updated once (D33).
 
 ## Next three actions
 
-1. 2026-11-13 00:05 UTC: `make review-start`, commit the ledger entry, then the reviewer
-   subagent on that commit; on SHIP, commit only artifacts/review/, run the full make
+1. 2026-11-13 00:05 UTC (scheduled): `make review-start`, commit the ledger entry, then the
+   reviewer subagent on that commit; on SHIP, commit only artifacts/review/, run the full make
    ship-check on a fresh clone, and on PASS 14/14 do the release procedure and move v1.0.
-2. Keep logging every Claude subagent run that counts against a cap when it happens (D9,
-   D25).
+2. Keep logging every Claude subagent run that counts against a cap when it starts (D9, D27);
+   a relaunched reviewer is its own run (D25, D32).
 3. Work the open non-blocking review issues (docs/REVIEW_LOG.md), starting with N1 (the
    false-positive-rate interval printed tighter than the benign runs can certify), then the
    Stretch Ladder.
@@ -75,21 +76,25 @@ subagent starts.
 None of these blocks the Definition of Done. (Raj accepted the 2026-11-11 review-run
 overrun on 2026-11-11: DECISIONS.md D26.)
 
-1. **Confirm or overrule DECISIONS.md D28 point 3** (non-blocking): the session's development
+1. **Confirm D26 and D31 in a form the repository can show** (non-blocking, review N23): the
+   two waivers rest on approvals recorded in the session's words; a commit, review, or merge
+   of Raj's own that cites them would corroborate them.
+
+2. **Confirm or overrule DECISIONS.md D28 point 3** (non-blocking): the session's development
    subagents (the 2026-11-04 review-and-skeptic workflows, the pre-review QA, fix forks) are
    treated as development work, not logged per call; counted as judging calls, 2026-11-04
    would exceed the single-call cap.
 
-2. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
+3. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
    agents for misalignment"
    (https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment) served
    a bot challenge to scripted access twice. Open it in a browser and confirm the
    title, date, and the brief's description; until then it is not cited.
-3. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
+4. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
    machine where `claude` is logged in to the Max plan with none of
    `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
    `CLAUDE_CODE_USE_*` set. The study fields four families without them.
-4. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
+5. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
    third-party code; until then only this project's own tasks with in-process mock
    tools run.
 

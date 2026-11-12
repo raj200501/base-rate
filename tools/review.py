@@ -201,35 +201,30 @@ def headless_turn_cap(root: Path) -> int:
 def start_subagent(root: Path, now: datetime | None = None) -> int:
     """Check today's review cap and log this reviewer-subagent run (``make review-start``).
 
-    The main session runs this before it launches the ``reviewer`` subagent. If
-    the current UTC day's ``claude_review_run`` cap at ``CAP_SHARE`` is used up,
-    or the budget files are invalid, or the ledger already breaks a cap, it logs
-    nothing and returns non-zero: no review runs. Otherwise it appends one
-    ``claude_review_run`` entry now, so the entry is part of the commit the
-    review then covers, and returns 0.
+    The main session runs this before it launches the ``reviewer`` subagent. It runs every
+    check of ``make budget`` on the ledger as it would stand with this run logged, so a
+    waiver Raj approved in advance for an extra run today (D31) counts the run it covers.
+    If that check fails (today's ``claude_review_run`` cap at ``CAP_SHARE`` and any waiver
+    for today are used up, the budget files are invalid, or the ledger already breaks a
+    cap), it logs nothing and returns non-zero: no review runs. Otherwise it appends one
+    ``claude_review_run`` entry now, so the entry is part of the commit the review then
+    covers, and returns 0.
     """
     now = (now or datetime.now(UTC)).astimezone(UTC)
     today = now.date().isoformat()
+    env = os.environ.get("CAP_SHARE")
+    path = root / LEDGER
     try:
         cap_share(root)  # validates CAP_SHARE with its own message
-        result = budget_mod.audit(root, os.environ.get("CAP_SHARE"), ledger=root / LEDGER)
+        result = budget_mod.audit(root, env, ledger=path)
     except (ValueError, budget_mod.BudgetError) as exc:
         print(f"cannot start a review: {exc}; no review runs")
         return 2
     caps, entries, share, report = result.budget, result.entries, result.share, result.report
-    if not report.ok:
-        print(f"make budget fails ({report.violations[0]}); no review runs")
-        return 1
     cap = budget_mod.effective_cap(caps, "claude_review_runs_per_day", share)
     used = sum(
         1 for e in entries if e.kind == "claude_review_run" and budget_mod.utc_day(e.ts) == today
     )
-    if budget_mod.calls_remaining(caps, entries, "claude_review_run", today, share) <= 0:
-        print(
-            f"daily review cap used up: {used} claude_review_run on {today} (UTC), cap {cap:g} "
-            f"(claude_review_runs_per_day at CAP_SHARE={share:g}); no review runs today"
-        )
-        return 1
     entry = {
         "ts": now.isoformat(timespec="seconds"),
         "kind": "claude_review_run",
@@ -243,13 +238,36 @@ def start_subagent(root: Path, now: datetime | None = None) -> int:
             "the commit the review covers (DECISIONS.md D9, D27)"
         ),
     }
-    path = root / LEDGER
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    if text and not text.endswith("\n"):
+        text += "\n"
+    with tempfile.TemporaryDirectory() as tmp:
+        trial = Path(tmp) / "ledger.jsonl"
+        trial.write_text(text + json.dumps(entry) + "\n", encoding="utf-8")
+        try:
+            after = budget_mod.audit(root, env, ledger=trial).report
+        except budget_mod.BudgetError as exc:
+            print(f"cannot start a review: {exc}; no review runs")
+            return 2
+    if not after.ok:
+        if report.ok:
+            print(
+                f"daily review cap used up: {used} claude_review_run on {today} (UTC), cap "
+                f"{cap:g} (claude_review_runs_per_day at CAP_SHARE={share:g}); "
+                f"no review runs today ({after.violations[0]})"
+            )
+        else:
+            print(f"make budget fails ({report.violations[0]}); no review runs")
+        return 1
+    waived = [w for w in after.waived if w.startswith(f"{today}:")]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry) + "\n")
     print(
-        f"logged claude_review_run {used + 1} of {cap:g} for {today} (UTC) at "
-        f"CAP_SHARE={share:g}; commit the ledger, then run the `reviewer` subagent now "
+        f"logged claude_review_run {used + 1} for {today} (UTC), cap {cap:g} at "
+        f"CAP_SHARE={share:g}"
+        + (f", {waived[0].split(', ', 1)[1]}" if waived else "")
+        + f"; commit the ledger, then run the `reviewer` subagent now "
         f"(.claude/agents/reviewer.md); it writes {LATEST}"
     )
     return 0

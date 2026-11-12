@@ -232,3 +232,31 @@ def test_review_start_refuses_an_unapproved_waiver(
     (root / "DECISIONS.md").write_text("# Decisions\n")  # no approval record
     assert review.start_subagent(root, now=NOW) != 0
     assert len(_ledger(root)) == 2
+
+
+def test_review_start_honors_a_same_day_waiver_approved_in_advance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Review N26: review-start checks the ledger as it would stand with this run logged.
+
+    Raj approved one extra review run on 2026-11-12 before it ran (D31). Before the run is
+    logged the waiver excuses nothing, so the check must count the run it is about to log.
+    """
+    monkeypatch.delenv("CAP_SHARE", raising=False)
+    root = _root(tmp_path, [_run("2026-11-12T00:01:00+00:00")])
+    (root / "budget.toml").write_text(BUDGET + "cap_share = 0.2\n")
+    (root / "budget_waivers.toml").write_text(
+        '[[waiver]]\ndecision = "D31"\nday = "2026-11-12"\nkind = "claude_review_run"\n'
+        'max_entries = 2\napproved_by = "Raj Kashikar"\napproved_on = "2026-11-12"\n'
+    )
+    (root / "DECISIONS.md").write_text(
+        "# Decisions\n\n## D31 (2026-11-12) Waiver: one extra review run\n\n"
+        "Waiver record: decision=D31; day=2026-11-12; kind=claude_review_run; max_entries=2; "
+        "approved_by=Raj Kashikar; approved_on=2026-11-12\n"
+    )
+    assert review.start_subagent(root, now=NOW.replace(hour=1)) == 0
+    assert len(_ledger(root)) == 2
+    assert "waived by D31" in capsys.readouterr().out
+    assert review.start_subagent(root, now=NOW.replace(hour=2)) != 0  # beyond the waiver
+    assert len(_ledger(root)) == 2
+    assert "daily review cap used up" in capsys.readouterr().out

@@ -7,11 +7,12 @@ was exceeded and that no cash was spent. ``plan_equivalent_usd`` (the API-price
 estimate that headless Claude reports) is tracked separately and never counts
 as cash.
 
-``budget_waivers.toml`` lists past overruns that Raj accepted after the fact,
-each recorded in DECISIONS.md. A waiver never changes a cap: it excuses exactly
-one overrun (one ledger kind on one UTC day, up to a stated number of
-entries), it may not be dated before that overrun, and a waiver that excuses
-nothing is itself an error. Every other overrun still fails.
+``budget_waivers.toml`` lists overruns that Raj accepted, each recorded in
+DECISIONS.md: after the fact (D26), or on the day itself for a stated extra run
+(D31, D32). A waiver never changes a cap: it excuses exactly one overrun (one
+ledger kind on one UTC day, up to a stated number of entries), it may not be
+dated before that day, and a waiver that excuses nothing is itself an error.
+Every other overrun still fails.
 """
 
 from __future__ import annotations
@@ -649,30 +650,72 @@ def read_banked_reviews(review_dir: Path) -> list[BankedReview]:
 def unlogged_reviews(reviews: Iterable[BankedReview], entries: Iterable[LedgerEntry]) -> list[str]:
     """Banked reviews without their own ``claude_review_run`` entry (review B6).
 
-    Each banked review must be matched by a distinct ``claude_review_run`` ledger entry
-    logged at or before its ``reviewed_at``, on the same or the previous UTC day (a run is
-    logged when it starts, D27, and may finish after midnight). Reviews are matched in time
-    order to the earliest eligible unused entry, which matches as many as any assignment
-    can, so one entry never covers two reviews and a review skipped by
-    ``make review-start`` cannot pass unnoticed.
+    A run is logged when it starts (D27) and banks at most one review, and runs do not
+    overlap. So, taking the banked reviews in time order, each needs a ``claude_review_run``
+    entry logged after the review banked before it and at or before its own
+    ``reviewed_at``, and no earlier than the previous UTC day (a run may finish after
+    midnight). Successive windows do not overlap, so one entry never covers two reviews,
+    and an entry left by a run that banked nothing cannot cover a review banked after
+    another review.
+
+    This checks the ledger against the reviews; it cannot see a run that leaves no trace.
+    An entry left by a run that banked nothing can still pair with the next review if that
+    review ran without ``make review-start``; :func:`reviews_over_daily_cap` then still
+    holds the day's reviews to the day's review cap.
     """
     runs = sorted(_aware(e.ts) for e in entries if e.kind == "claude_review_run")
-    used = [False] * len(runs)
     problems: list[str] = []
+    previous: datetime | None = None
     for review in sorted(reviews, key=lambda r: r.reviewed_at):
         at = review.reviewed_at
         start = datetime.combine(at.date() - timedelta(days=1), datetime.min.time(), UTC)
-        match = next(
-            (i for i, ts in enumerate(runs) if not used[i] and start <= ts <= at),
-            None,
-        )
-        if match is None:
+        if not any(start <= ts <= at and (previous is None or ts > previous) for ts in runs):
+            after = f"after the review at {previous.isoformat()} and " if previous else ""
             problems.append(
                 f"review of {review.reviewed_commit[:12]} at {at.isoformat()} has no "
-                "claude_review_run entry at or before it (same or previous UTC day)"
+                f"claude_review_run entry logged {after}at or before it "
+                "(same or previous UTC day)"
             )
-        else:
-            used[match] = True
+        previous = at
+    return problems
+
+
+def reviews_over_daily_cap(
+    budget: Budget,
+    reviews: Iterable[BankedReview],
+    entries: Iterable[LedgerEntry],
+    cap_share: float,
+    waivers: Sequence[Waiver] = (),
+) -> list[str]:
+    """UTC days on which more reviews were banked than review runs were allowed (review B6).
+
+    A run banks at most one review, so the reviews banked on a UTC day are held to that
+    day's ``claude_review_run`` cap, or to the day's waiver for that kind (D26, D31). As in
+    :func:`check_ledger`, the day's share is the smallest of ``cap_share`` and every
+    ``cap_share`` logged that day. This catches an unlogged review that paired with an
+    entry logged the day before by a run that banked nothing. A run that starts before
+    midnight and banks its review after it counts on both days here, which can only fail
+    closed.
+    """
+    day_share: dict[str, float] = {}
+    for e in entries:
+        day = utc_day(e.ts)
+        day_share[day] = min(day_share.get(day, cap_share), e.cap_share)
+    by_day = {w.day: w for w in waivers if w.kind == "claude_review_run"}
+    counts = Counter(utc_day(r.reviewed_at) for r in reviews)
+    problems: list[str] = []
+    for day, n in sorted(counts.items()):
+        cap = effective_cap(
+            budget, DAILY_CAP_FOR_KIND["claude_review_run"], day_share.get(day, cap_share)
+        )
+        w = by_day.get(day)
+        allowed = max(cap, w.max_entries) if w else cap
+        if n > allowed:
+            runs = "review run" if allowed == 1 else "review runs"
+            note = f" (waiver {w.decision})" if w else ""
+            problems.append(
+                f"{day}: {n} banked reviews > {allowed:g} {runs} allowed that day{note}"
+            )
     return problems
 
 
@@ -722,9 +765,9 @@ def audit(
     valid = [w for w in rows if not waiver_record_problems([w], text)]
     entries = read_ledger(ledger or base / "artifacts" / "usage" / "ledger.jsonl")
     report = check_ledger(budget, entries, valid, cap_share=share)
-    problems += unlogged_reviews(
-        read_banked_reviews(reviews or base / "artifacts" / "review"), entries
-    )
+    banked = read_banked_reviews(reviews or base / "artifacts" / "review")
+    problems += unlogged_reviews(banked, entries)
+    problems += reviews_over_daily_cap(budget, banked, entries, share, valid)
     report.violations[:0] = problems
     return AuditResult(budget, entries, report, share)
 

@@ -110,3 +110,18 @@ Iteration history moved out of STATUS.md. Newest last.
   commit trailers) answer the cheap non-blocking items. Next review: 2026-11-13 00:05 UTC.
 - Lapse: commit 05e65dd (the BLOCK review and its log entries) was pushed before make ci ran;
   make ci then passed on it. Every later push runs make ci in the same command first.
+
+## 2026-11-12, goal turn 8 (Raj's one-hour sprint, continued)
+
+- The second review of the day (a1b287b; D31) returned BLOCK on B6 (second round) and B7,
+  with new non-blocking N26 to N29 and re-raised N3 and N4. Banked in artifacts/review/.
+- B6: reviews are matched to runs logged since the review before them, each day's banked
+  reviews are held to the review cap, and G14 reads every committed review file; G12 requires
+  latest.json to be the newest review (N27). Tests failed first (budget, review-start, G12 and
+  G14 mutations).
+- B7, N3, N4, N28: the Highlights, a key result, and REPORT section 5.2 give natural-only
+  recall, scope the E0 claim, and state that E4 has no split by source (CORRECTIONS.md).
+- N26: review-start audits the ledger with the new run included, so an advance waiver works;
+  D31 discloses that its run's entry was written by hand. D32 records the design, D33 the
+  end-of-sprint update of main.
+

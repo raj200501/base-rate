@@ -503,8 +503,11 @@ the 8B model 1.000 [0.535, 1.000], against
 explicit actions written by a few generator scripts, the kind the rules were built for, so
 the intervals are wide and the records are clustered by script; Armour's own documentation
 asks that its synthetic reference labels be replaced by human labels before external
-claims. The corpus's violations arise while small agents do ordinary tasks. A monitor's
-result on curated records said little about its value on agent traffic. The full corpus
+claims. The primary set mixes natural violations, from small agents doing ordinary tasks,
+with synthetic insertions; on natural ones alone the reviewer-calibrated rule reached
+0.00 [0.00, 0.02] and the 8B
+0.00 [0.00, 0.02]. A monitor's result on curated records
+said little about its value on agent traffic. The full corpus
 adds Armour's records and the procedural variants to the primary set, so its rule-monitor
 recall sits between the two (at 100 reviews per 10,000, the
 reviewer-calibrated rule reached

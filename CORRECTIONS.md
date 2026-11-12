@@ -3,6 +3,25 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-12 Claims corrected after the review of a1b287b
+
+- README Highlights (new in a1b287b) gave the reviewer-calibrated rule's pooled primary-set
+  recall, most of whose violations are synthetic insertions, as its recall on violations
+  "that arose while small agents did ordinary tasks". It now gives the natural-only row of
+  the same analysis, whose interval is wider. The same pooled figure stood behind the older
+  README key result on Armour's records and the matching REPORT sentence (section 5.2); both
+  now give the natural-only rows for the rule and the 8B model (B7).
+- README Highlights said "the interval methods were validated by simulation before use", the
+  claim withdrawn on 2026-11-11; they now name the two methods E0 checked and say the other
+  intervals were not checked (N4). The matching key-result heading is scoped the same way.
+- README Highlights implied that the rule-to-8B cascade's held-out gain (E4), like the main
+  study's combined monitors, came mostly from synthetic insertions; E4 has no split by
+  source, and the sentence now says so and gives the split only for E2 (N28). The
+  dataset-set figure now carries the caveat that the rules were built for those records (N3).
+- README Status said a banked review without its own logged run fails `make budget` and
+  G14. The review found a case that passed (B6, second round). The check is stricter now
+  (DECISIONS.md D32), and the sentence states the limit that remains.
+
 ## 2026-11-12 Claims refined after the 2026-11-12 review
 
 - README Status said any overrun other than the waived one fails `make budget`; that held
