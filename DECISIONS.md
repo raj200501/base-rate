@@ -509,3 +509,16 @@ public README claims (B7, N4, N28) and fixes gate defects (B6, N26, N27). Under 
 instruction the session updates main once at the end of the sprint, by the procedure of D30
 (fast-forward only, make ci on a fresh clone, claimcheck and freshness), and returns to D30's
 rule afterwards.
+
+## D34 (2026-11-12) Pre-review QA before the 2026-11-13 review
+
+Recorded before it runs. To find defects before the next `make review` (the only review run
+on 2026-11-13 at CAP_SHARE=0.2), the session runs one read-only QA workflow of three agents
+over the fixes of 7d1e31e: gate integrity (G12, G14, make budget, make review-start), claim
+honesty (README.md, docs/REPORT.md, docs/DATA.md against the artifacts), and process rules
+(section 9 and CLAUDE.md over the commits since d6f9ce0). Like the 2026-11-11 pre-review QA,
+it is development work under D28 point 3, not a logged claude_agent_run: such an entry needs
+a turn count within claude_agent_max_turns (8 at the 0.2 share), which a QA agent exceeds.
+Raj may overrule D28 point 3 (STATUS.md, Needs Raj); until then every such workflow is
+recorded here before it runs. The agents edit nothing; the session verifies each finding
+before acting on it.
