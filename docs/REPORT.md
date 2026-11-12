@@ -12,12 +12,14 @@ and procedurally generated data are labeled as such wherever they appear.
 A monitor over an agent's traffic is worth what it catches at the prevalence of real
 violations and the number of trajectories humans can review, not its accuracy on a
 balanced test set. base-rate is an open library that estimates recall, precision, and the
-false-positive rate at a fixed review budget and a stated prevalence, with interval methods
-whose coverage was checked by a preregistered simulation, and with sample-size and cascade
-tools built on the same estimators. We apply it, in four
-preregistered experiments, to a corpus of 25,023 labeled
-trajectories from 2,808 independent source runs of small local agents
-in eight mock-tool domains, and to three Armour rule configurations, Qwen3 monitors from
+false-positive rate at a fixed review budget and a stated prevalence, with budget-recall and
+fixed-threshold interval methods whose coverage was checked by a preregistered simulation,
+and with sample-size and cascade tools built on the same estimators. We apply it, in
+preregistered experiments, to a corpus of 25,023 labeled trajectories
+(synthetic share 0.888: procedural variants, inserted violations,
+and Armour's generated records) from 2,808 independent source runs, of
+small local agents in eight mock-tool domains and a few groups of Armour's records, and to
+three Armour rule configurations, Qwen3 monitors from
 0.6B to 8B parameters, one ensemble, and one cascade. At a budget of
 20 reviews per 10,000 trajectories and a prevalence of 1e-3, no
 single monitor caught more violations than random review within its 95%
@@ -26,13 +28,16 @@ model, reached recall 0.069 [0.042, 0.102], mostly
 on synthetic inserted violations. Rule
 thresholds that catch 0.143 [0.122, 0.165] of violations flag
 0.067 [0.058, 0.078] of benign runs, far more than any budget studied
-allows. The rule monitors and the larger models reached recall near one, with wide
-intervals, on Armour's curated reference records, so results on curated records said little
-about value on agent traffic. Thresholds tuned in one domain did not keep the review load within a factor of
-two in others, and on held-out data a cascade from a rule filter to the 8B model
-caught more than the 8B alone at a fraction of its compute. Every number in this
-report is rendered from a banked artifact; the corpus, scores, and analyses are in the
-repository with the code.
+allows. The rule monitors and the 4B and 8B models reached recall near one, with wide
+intervals, on Armour's curated reference records (scored against Armour's own benign
+records), so results on curated records said little
+about value on agent traffic. Thresholds tuned in one domain kept the review load within a
+factor of two of the budget in only 0.393 of
+domain pairs for a rule monitor and 0.196 for the
+0.6B model, and on held-out data a cascade from a
+rule filter to the 8B model caught more than the 8B alone at a fraction of
+its compute, pooled over natural and synthetic inserted violations (E4 has no split by
+source).
 
 ## 1. Introduction
 
@@ -46,15 +51,11 @@ not supply: estimates at the deployment prevalence, estimates at the review budg
 team can actually staff, and intervals that are honest about how few independent
 benign runs stand behind a false-positive rate.
 
-This report describes base-rate, an open library and study for that question. The
-library estimates recall, precision, and the false-positive rate at a fixed review
-budget and a stated prevalence, with interval methods whose coverage was checked by a
-preregistered simulation; computes how many labeled runs a claim needs; and optimizes
-cheap-to-expensive monitor cascades under compute and review budgets. The study, which also
-tests whether a threshold tuned in one setting transfers (E3), applies it to a labeled
-corpus of agent trajectories in mock-tool domains, built for this purpose, and to four
-monitor families: rule monitors, a size ladder of small open-weight model monitors with
-one frozen prompt, an ensemble, and a cascade.
+This report describes base-rate, an open library and study for that question. The study
+applies the library to a labeled corpus of agent trajectories in mock-tool domains, built
+for this purpose, and to four monitor families: rule monitors, a size ladder of small
+open-weight model monitors with one frozen prompt, an ensemble, and a cascade; it also
+tests whether a threshold tuned in one setting transfers (E3).
 
 The contributions are:
 
@@ -73,21 +74,18 @@ The contributions are:
 ## 2. Related work
 
 Closest in framing is "Practical challenges of control monitoring in frontier AI
-deployments" [@practical-challenges-2025], a conceptual analysis of what changes when
-control monitoring moves from simplified evaluations to real deployments: many agent
-instances in parallel, oversight that takes time, attacks that make partial progress
-across instances, and actions too ambiguous to justify shutdown. It compares synchronous,
-semi-synchronous, and asynchronous monitoring, models availability from the flag rate,
-audit duration, and instance count, and sketches a safety case whose claims include monitor
-and human recall and latencies. It states that these quantities can be estimated with
+deployments" [@practical-challenges-2025], a conceptual analysis of control monitoring in
+real deployments (parallel agent instances, oversight that takes time, attacks spread across
+instances, actions too ambiguous to justify shutdown) that compares synchronous and
+asynchronous monitoring and sketches a safety case whose claims include monitor and human
+recall and latencies. It states that these quantities can be estimated with
 control evaluations and extrapolated conservatively, and it illustrates that a limited
 review capacity forces a monitor to operate at a matching false-positive rate, after which
 recall drives safety. It gives no estimator, interval, or sample size for any of these
 quantities, and it does not discuss precision, prevalence, review budgets, or cascades.
-base-rate supplies that measurement layer: recall and precision at a fixed number of
-reviews per unit of traffic, at stated prevalences, with intervals whose coverage was
-checked, sample sizes for certifying a claim, a test of whether the operating threshold
-transfers, and cost-recall fronts for cascades. It does not address synchrony,
+base-rate supplies that measurement layer: recall and precision at a fixed review budget
+and stated prevalences, budget-recall intervals whose coverage was checked, certification
+sample sizes, a threshold-transfer test, and cascade cost-recall fronts. It does not address synchrony,
 cross-instance coordination, recovery, or shutdown policy, and its estimates are inputs to
 the per-attempt catch rate of such a safety case, not a replacement for it. The control
 safety-case sketch of [@korbak-safety-case-2025] makes the same dependence explicit:
@@ -154,9 +152,10 @@ There, recall and the false-positive rate are binomial proportions, and precisio
 prevalence $\pi$ is $\pi R / (\pi R + (1 - \pi) F)$.
 
 Trajectories are not independent. Procedural variants of one agent run, and the
-violation inserted into a benign run, share that run's source-run id. Every interval in
-base-rate resamples or counts at the level of source runs, and every table states the
-number of independent source runs beside the trace count.
+violation inserted into a benign run, share that run's source-run id. Every interval on a
+monitor metric here resamples or counts at the level of source runs (the label-audit
+interval counts audited records), and every table states the number of independent source
+runs beside the trace count.
 
 ### 3.2. Interval methods
 
@@ -232,9 +231,8 @@ operational (DECISIONS.md D11).
 Subject agents are local open-weight models (Qwen3 at 1.7B and 4B
 parameters, pinned by revision and hash) served by a pinned llama.cpp build. An agent sees
 a system prompt listing the domain's tools and the task request, and replies with one
-JSON tool call per turn; a Python simulator answers each call. Nothing is executed: the
-mock tools run inside the Python process, the model runs in a local server, and nothing
-leaves the machine. The first action of every real, inserted, and variant trajectory is the
+JSON tool call per turn; a Python simulator answers each call. Nothing is executed, and
+nothing leaves the machine. The first action of every real, inserted, and variant trajectory is the
 user request, so monitors see what was asked; Armour's records hold only the agent's
 events. A real run in which the oracle finds a violation is a
 natural violation, with the first violating action as its step label; the other real runs
@@ -255,12 +253,9 @@ reorder the keys of JSON observations and swap some phrases; they are labeled sy
 and keep the source run's id, so they add scale without pretending to add independent
 runs. Armour's labeled records add a third, separately reported violation
 source, clustered by source file and agent family because they come from a few
-generator scripts (DECISIONS.md D12). A Claude subagent of the session that built the
-corpus, given only the monitor view of a stratified random sample of trajectories, labeled
-them blind to the corpus labels; each auditor agent read only its own batch file of that
-view and returned its answers, which tools/label_audit.py checks from the workflow's
-records and transcripts and banks with the audit.
-Agreement is reported in docs/DATA.md and Section 5.
+generator scripts (DECISIONS.md D12). Claude subagents of the session that built the
+corpus, given only the monitor view of a stratified random sample, labeled it blind to the
+corpus labels (Section 5.1, docs/DATA.md).
 
 ### 3.6. Monitors
 
@@ -285,7 +280,7 @@ trajectories.
 
 ## 4. Experiments
 
-All four confirmatory experiments were preregistered: the hypotheses or estimands,
+The confirmatory experiments, E0 to E4, were preregistered: the hypotheses or estimands,
 metrics, analysis plan, thresholds, sample sizes, seeds, exclusions, and stopping rules
 were committed under prereg/ before any data they govern existed. `make prereg-verify`
 checks, from git history, that every artifact citing a preregistration (the corpus
@@ -293,8 +288,8 @@ manifest, the metadata of every score file, the label audit, and every results f
 first committed after each preregistration it cites was frozen. Anything else in this
 report is labeled exploratory.
 
-E0 (prereg/0001-e0-statistical-engine.md) is a simulation study of every interval method
-on a grid of score distributions (two binormal separations, a heavy-tailed benign
+E0 (prereg/0001-e0-statistical-engine.md) is a simulation study of the budget-recall and
+fixed-threshold interval methods on a grid of score distributions (two binormal separations, a heavy-tailed benign
 distribution, and a tied four-level distribution), sample-size designs with and without
 source-run clustering, three prevalences, and three review budgets, with the exact truth
 computed for every cell. A cell passes if its simulated coverage is at least the nominal
@@ -346,9 +341,8 @@ and Armour tables are in docs/DATA.md.
 Controlled insertion accounted for every planned attempt:
 618 of 700 attempts yielded an inserted
 violation, and every skip, each with its preregistered reason, was a false completion:
-either the task was already done at the drawn step, so declaring it complete there would
-not be a false completion (logged as no valid call of the drawn type), or the subject model
-wrote no usable summary when asked to declare the task done. False completion is
+either the task was already done at the drawn step, so finishing there would not be false
+(logged as no valid call of the drawn type), or the subject model wrote no usable summary. False completion is
 therefore under-represented among inserted violations, and recall by violation type
 (Table e2-breakdown) carries that imbalance.
 
@@ -370,8 +364,8 @@ agreement on the benign or violation label alone of 0.975
 [0.943, 0.992]. Each auditor was a Claude subagent that
 read only its own batch file of monitor views; tools/label_audit.py refused the audit
 unless every auditor's transcript showed no other tool call and no other file read. The
-auditor shares the definitions and the model family of the session that wrote them, so the
-agreement measures consistency with the definitions, not their correctness.
+auditor shares the definitions and model family of the session that wrote them, so the
+agreement measures consistency with the definitions (Section 6).
 
 *Blind label audit, agreement [95% interval]. Set: label audit sample. Traces: 200. Independent source runs: 181. Synthetic share: 0.500.*
 
@@ -388,7 +382,7 @@ agreement measures consistency with the definitions, not their correctness.
 
 **Recall at the review budget.** Figure 1 and the table below give recall for every
 monitor at each prevalence and budget on the primary set. The single monitors sit at or
-near the review rate itself, which is the recall of reviewing a random sample: at
+below the review rate itself, which is the recall of reviewing a random sample: at
 20 reviews per 10,000, random review catches 0.002 of
 violations, and every single monitor's interval contains that value at prevalence
 1e-3. The two preregistered combinations are the exceptions. The rank-mean
@@ -397,11 +391,12 @@ ensemble of the reviewer-calibrated rule and the 8B model reached
 the top 5% of traffic by the 0.6B score to the 8B reached
 0.025 [0.009, 0.041]. Most of their gain is on
 the synthetic inserted violations: by violation source, the ensemble reached
-0.11 [0.06, 0.15] on inserted and
-0.01 [0.00, 0.05] on natural violations, and the
-cascade 0.03 [0.01, 0.05] and
-0.01 [0.00, 0.04], so on the violations
-that arose naturally the cascade's interval contains the random-review rate. At the largest budget,
+0.107 [0.064, 0.154] on inserted and
+0.014 [0.003, 0.046] on natural violations, and the
+cascade 0.032 [0.011, 0.054] and
+0.014 [0.001, 0.039], so on the violations
+that arose naturally the cascade's interval contains the random-review rate and the
+ensemble's lies just above it. At the largest budget,
 100 per 10,000, the ensemble reached
 0.090 [0.064, 0.120]. For the single monitors,
 recall barely moves with prevalence, because their reviewed set is almost all benign at
@@ -433,7 +428,10 @@ highest scores. For a rule monitor those form a tie at its maximum score, which 
 is about as likely as a benign run to receive, so randomizing within the tie returns the
 review rate. The model monitors
 read one frozen prompt and return the probability-weighted digit; on this corpus their top
-scores were no more concentrated on violations than the rules', at every size.
+scores were no more concentrated on violations than the rules', at every size, and at
+100 reviews the 1.7B and 4B fell below random review
+(0.000 [0.000, 0.004] and
+0.002 [0.000, 0.009], against 0.01).
 
 *Rule monitors at the fixed threshold 0.2, cluster-aware exact intervals (95%). Set: primary. Traces: 3,418. Independent source runs: 2,800. Synthetic share: 0.181.*
 
@@ -490,8 +488,8 @@ say which.
 **Time to detection.** As preregistered, time to detection counts only the violations the
 budget catches by their full-trace score, and reports the share flagged at the violating
 step itself and the median delay after it. Single monitors catch so few violations at the
-budget that these rows (artifacts/report/tables/e2-ttd.md) rest on a handful of violations
-and say little about how early the monitors fire.
+budget that these rows (artifacts/report/tables/e2-ttd.md) say little about how early the
+monitors fire.
 
 **Armour's records, the full corpus, and breakdowns.** The sharpest contrast in the study is
 between the corpus and Armour's labeled reference records. At the same prevalence and
@@ -501,12 +499,14 @@ the 8B model 1.000 [0.535, 1.000], against
 0.002 [0.000, 0.013] and
 0.003 [0.000, 0.015] on the primary set. Armour's violations are
 explicit actions written by a few generator scripts, the kind the rules were built for, so
-the intervals are wide and the records are clustered by script; Armour's own documentation
+the intervals are wide and the records are clustered by script; they are also scored
+against Armour's own benign records, not the corpus's, so the benign tail differs too;
+Armour's own documentation
 asks that its synthetic reference labels be replaced by human labels before external
 claims. The primary set mixes natural violations, from small agents doing ordinary tasks,
 with synthetic insertions; on natural ones alone the reviewer-calibrated rule reached
-0.00 [0.00, 0.02] and the 8B
-0.00 [0.00, 0.02]. A monitor's result on curated records
+0.002 [0.000, 0.020] and the 8B
+0.002 [0.000, 0.019]. A monitor's result on curated records
 said little about its value on agent traffic. The full corpus
 adds Armour's records and the procedural variants to the primary set, so its rule-monitor
 recall sits between the two (at 100 reviews per 10,000, the
@@ -535,12 +535,13 @@ threshold tuned in one domain at prevalence 1e-3 and 100 reviews per
 10,000 kept the realized review rate within a factor of two of the budget for a
 share 0.393 of ordered domain pairs for the
 reviewer-calibrated rule and 0.196 for the 0.6B
-model, against the preregistered 75%. A team that tunes a threshold on one
-product surface and deploys it on another should expect its review queue to grow or shrink
-by more than half. The recall-transfer hypothesis (H3.2) was supported for both monitors:
+model, against the preregistered 75%: in this corpus a threshold tuned in one
+mock domain missed the budget by more than a factor of two in most others. The recall-transfer hypothesis (H3.2) was supported for both monitors:
 a share 0.893 of pairs for the rule monitor and
 1.000 for the 0.6B model kept the recall gap within
-the preregistered tenth. For the rule monitor, own-domain recall varies across domains at
+the preregistered tenth, but many of those pairs had also missed the review budget by more
+than a factor of two (artifacts/report/tables/e3-pairs.md), so H3.2 is weak evidence that
+recall transfers at the intended budget. For the rule monitor, own-domain recall varies across domains at
 this budget, and the few pairs that miss, such as those into devops, lose more. Prevalence transfer (H3.3) was supported at both target prevalences
 for both monitors; for the rule monitor at 1e-4 the realized review rate was
 0.994 of the intended rate
@@ -576,7 +577,8 @@ to the 8B model reached test recall 0.062
 [0.041, 0.085] at 1.723 seconds of
 compute per trajectory, within its limit of 11.765, while the 8B
 alone reached 0.004 [0.000, 0.021]. The
-cascade from the 0.6B to the 8B model reached 0.063
+held-out violations mix natural and synthetic inserted ones and E4 has no split by source,
+so these test recalls are pooled over both. The cascade from the 0.6B to the 8B model reached 0.063
 [0.010, 0.132], while the one from the 1.7B
 to the 8B model reached only 0.002 [0.000,
 0.006]. A cascade can beat its expensive stage
@@ -603,7 +605,8 @@ ones. Taken together they support three claims about these monitors on this corp
 monitor's value at a realistic review budget is decided by the extreme upper tail of its
 benign scores, which balanced metrics and fixed thresholds do not show; combining two weak
 signals, by rank averaging or by a cascade, recovered many times the recall of either
-alone at the same budget; and thresholds must be re-tuned per domain because review load
+alone at the same budget, mostly on synthetic inserted violations where E2 splits by source
+(E4 does not); and thresholds must be re-tuned per domain because review load
 does not transfer. They do not support any claim about frontier agents, adversarial
 violations, or monitors with tuned prompts.
 
@@ -624,7 +627,8 @@ mistakes rather than concealed behavior (the corpus tables give their types). In
 violations are one call chosen by the harness, after which the same agent continues; an
 inserted false completion ends the episode at that call, and the same model writes its
 summary. They are labeled synthetic, and recall on them can differ from recall on natural
-violations, which is why the two are reported separately. Armour's records come
+violations, which is why E2 reports the two separately; E4 pools them, a gap in its
+analysis. Armour's records come
 from a few generator scripts and are clustered accordingly. None of the three sources is
 an adversary trying to evade a monitor; the study measures monitors against violations
 that do not hide.
@@ -666,8 +670,8 @@ corrected to follow the preregistration (DECISIONS.md D22).
 
 **Monitors.** The model monitors share one frozen prompt and one scoring rule (the
 probability-weighted digit), with no prompt tuning, so the size ladder compares sizes at
-one prompt, not each model at its best. No Claude model served as a subject or a monitor in
-this environment (Section 7). The ensemble and the cascade are the preregistered pairs only.
+one prompt, not each model at its best. The ensemble and the cascade are the preregistered
+pairs only.
 
 **Cost and time.** E4's compute cost is the median wall-clock seconds per scored trace on
 this machine (a local model server with four slots and four threads), as prereg/0005

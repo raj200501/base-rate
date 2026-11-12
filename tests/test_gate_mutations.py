@@ -908,6 +908,10 @@ ONE_RUN = (
 )
 
 
+TWO_RUNS_ONE_DAY = "".join(
+    json.dumps({"ts": ts, "kind": "claude_review_run", "cap_share": 0.2}) + "\n"
+    for ts in ("2026-11-21T00:05:00+00:00", "2026-11-21T00:40:00+00:00")
+)
 ORPHAN_THEN_ONE_RUN = "".join(
     json.dumps({"ts": ts, "kind": "claude_review_run", "cap_share": 0.2}) + "\n"
     for ts in ("2026-11-20T10:00:00+00:00", "2026-11-21T09:00:00+00:00")
@@ -922,6 +926,21 @@ def test_g14_passes_when_every_banked_review_is_logged(g14: Any, tmp_path: Path)
     g14.write("artifacts/usage/ledger.jsonl", ONE_RUN)
     g14.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-12T00:29:00Z"))
     g14.commit("one logged review")
+    assert_pass(14, g14, tmp_path)
+
+
+def test_g14_passes_for_a_run_that_banks_after_midnight(g14: Any, tmp_path: Path) -> None:
+    """QA (D34): one run started each UTC day, the first banking after midnight."""
+    g14.write(
+        "artifacts/usage/ledger.jsonl",
+        "".join(
+            json.dumps({"ts": ts, "kind": "claude_review_run", "cap_share": 0.2}) + "\n"
+            for ts in ("2026-11-20T23:50:00+00:00", "2026-11-21T10:00:00+00:00")
+        ),
+    )
+    g14.write("artifacts/review/history/h.json", _review_file("a" * 40, "2026-11-21T00:20:00Z"))
+    g14.write("artifacts/review/latest.json", _review_file("b" * 40, "2026-11-21T10:30:00Z"))
+    g14.commit("two runs on two start days")
     assert_pass(14, g14, tmp_path)
 
 
@@ -975,7 +994,7 @@ G14_CASES += [
             r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-21T09:30:00Z")),
             r.commit("two reviews on 2026-11-21, one logged that day"),
         ),
-        "2 banked reviews > 1 review run allowed that day",
+        "has no claude_review_run entry",
     ),
     (
         "unlogged-review-deleted-from-history",
@@ -988,6 +1007,51 @@ G14_CASES += [
             r.commit("a logged review and an unlogged one"),
             r.git("rm", "-q", "artifacts/review/history/h.json"),
             r.commit("drop the unlogged review"),
+        ),
+        "has no claude_review_run entry",
+    ),
+    (
+        # QA (D34): a committed review-run entry deleted from the ledger still counts
+        "review-run-entry-deleted-from-the-ledger",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", TWO_RUNS_ONE_DAY),
+            r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-21T01:00:00Z")),
+            r.commit("a dead run and its relaunch, both logged; one review"),
+            r.write("artifacts/usage/ledger.jsonl", TWO_RUNS_ONE_DAY.splitlines(True)[1]),
+            r.commit("drop the dead run's entry"),
+        ),
+        "2026-11-21: 2 claude_review_run entries > cap 1",
+    ),
+    (
+        # QA (D34): git log quotes non-ASCII paths unless -z is used
+        "unlogged-review-with-a-non-ascii-name-deleted",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ONE_RUN),
+            r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-12T00:29:00Z")),
+            r.write(
+                "artifacts/review/history/r\u00e9vision-b.json",
+                _review_file("b" * 40, "2026-11-12T03:00:00Z"),
+            ),
+            r.commit("a logged review and an unlogged one"),
+            r.git("rm", "-q", "artifacts/review/history/r\u00e9vision-b.json"),
+            r.commit("drop the unlogged review"),
+        ),
+        "has no claude_review_run entry",
+    ),
+    (
+        # QA (D34): path-limited git log prunes a side branch merged with -s ours
+        "unlogged-review-only-on-a-merged-side-branch",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ONE_RUN),
+            r.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-12T00:29:00Z")),
+            r.commit("one logged review"),
+            r.git("checkout", "-q", "-b", "side"),
+            r.write(
+                "artifacts/review/history/h.json", _review_file("b" * 40, "2026-11-12T03:00:00Z")
+            ),
+            r.commit("an unlogged review on a side branch"),
+            r.git("checkout", "-q", "main"),
+            r.git("merge", "-q", "-s", "ours", "--no-edit", "side"),
         ),
         "has no claude_review_run entry",
     ),
@@ -1077,7 +1141,11 @@ G12_CASES: list[tuple[str, Callable[[Any], None], str]] = [
     ),
     (
         "non-blocking-id-missing-from-review-log",
-        lambda r: _rereview(r, non_blocking=[{"id": "N1"}, {"id": "N2", "title": "t"}]),
+        lambda r: _rereview(
+            r,
+            reviewed_at="2026-10-23T01:00:00Z",
+            non_blocking=[{"id": "N1"}, {"id": "N2", "title": "t"}],
+        ),
         "non-blocking issues missing from docs/REVIEW_LOG.md: N2",
     ),
     (
@@ -1107,6 +1175,65 @@ G12_CASES: list[tuple[str, Callable[[Any], None], str]] = [
             r.commit("a newer review sits in history"),
         ),
         "latest.json is not the newest banked review",
+    ),
+    (
+        # QA (D34): a newer review whose path git log would quote, committed then deleted
+        "newer-review-with-a-non-ascii-name-deleted",
+        lambda r: (
+            r.write_json(
+                "artifacts/review/history/r\u00e9vision.json",
+                review(
+                    r.read_json(LATEST)["reviewed_commit"],
+                    reviewed_at="2026-10-24T00:00:00Z",
+                    verdict="BLOCK",
+                    blocking=[BLOCKER],
+                    final_line="REVIEW: BLOCK",
+                ),
+            ),
+            r.commit("a newer review"),
+            r.git("rm", "-q", "artifacts/review/history/r\u00e9vision.json"),
+            r.commit("drop it"),
+        ),
+        "latest.json is not the newest banked review",
+    ),
+    (
+        # QA (D34): a banked review never changes; BLOCK edited in place back to SHIP
+        "review-edited-in-place",
+        lambda r: (
+            _rereview(r, verdict="BLOCK", blocking=[BLOCKER], final_line="REVIEW: BLOCK"),
+            _rereview(r),
+        ),
+        "changed after it was banked",
+    ),
+    (
+        # QA (D34): rename detection hides the source path of a move into an allowed path
+        "code-renamed-into-an-allowed-path",
+        lambda r: (
+            r.git("mv", "src.py", "artifacts/review/src.py"),
+            r.commit("move the reviewed code"),
+        ),
+        "code changed since review: src.py",
+    ),
+    (
+        # QA (D34): a review run logged after the latest review, then its entry deleted
+        "review-run-logged-after-the-latest-review",
+        lambda r: (
+            r.write(
+                "artifacts/usage/ledger.jsonl",
+                json.dumps(
+                    {
+                        "ts": "2026-10-24T00:00:00+00:00",
+                        "kind": "claude_review_run",
+                        "cap_share": 0.2,
+                    }
+                )
+                + "\n",
+            ),
+            r.commit("a second review run starts"),
+            r.git("rm", "-q", "artifacts/usage/ledger.jsonl"),
+            r.commit("its entry is dropped and its review never banked"),
+        ),
+        "a review run was logged after the latest review",
     ),
 ]
 

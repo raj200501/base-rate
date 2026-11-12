@@ -126,6 +126,7 @@ def _review(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = {
         "schema": "baserate-review/1",
         "reviewed_commit": "a" * 40,
+        "reviewed_at": "2026-11-12T01:53:00Z",
         "reviewer": "subagent",
         "verdict": "SHIP",
         "blocking": [],
@@ -160,6 +161,9 @@ def test_review_validation_accepts_well_formed_ship() -> None:
         ({"schema": "other"}, "schema"),
         ({"reviewer": "me"}, "reviewer"),
         ({"blocking": None}, "must be lists"),
+        ({"reviewed_at": None}, "reviewed_at"),
+        ({"reviewed_at": "yesterday"}, "reviewed_at"),
+        ({"reviewed_at": "2026-11-12T01:53:00"}, "reviewed_at"),
     ],
 )
 def test_review_validation_rejects_inconsistent_reviews(

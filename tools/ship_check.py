@@ -1392,14 +1392,23 @@ def g12(ctx: Ctx) -> str:
     bm = _budget_module()
     try:
         mine = bm.parse_banked_review(review, "artifacts/review/latest.json")
-        newer = [r for r in banked_review_versions(ctx) if r.reviewed_at > mine.reviewed_at]
+        versions, edited = banked_review_versions(ctx)
+        runs = [e for e in committed_ledger_entries(ctx) if e.kind == "claude_review_run"]
     except (bm.BudgetError, ValueError, subprocess.CalledProcessError) as exc:
         raise GateError(f"banked reviews unreadable: {exc}") from exc
+    need(not edited, "; ".join(edited))
+    newer = [r for r in versions if r.reviewed_at > mine.reviewed_at]
     need(
         not newer,
         "latest.json is not the newest banked review: "
         + ", ".join(f"{r.reviewed_commit[:12]} at {r.reviewed_at.isoformat()}" for r in newer[:3])
         + " is newer",
+    )
+    later = sorted(bm.utc_iso(e.ts) for e in runs if bm.as_utc(e.ts) > mine.reviewed_at)
+    need(
+        not later,
+        f"a review run was logged after the latest review ({', '.join(later[:3])}); "
+        "its review is not banked",
     )
     reviewed = str(review.get("reviewed_commit", ""))
     head = git(ctx.clone, "rev-parse", "HEAD")
@@ -1407,7 +1416,9 @@ def g12(ctx: Ctx) -> str:
         reviewed == head or is_strict_ancestor(ctx.clone, reviewed, head),
         "reviewed commit is not HEAD or an ancestor",
     )
-    changed = git(ctx.clone, "diff", "--name-only", reviewed, head).splitlines()
+    # no rename detection: a file moved into an allowed path counts under its old name too
+    out = git(ctx.clone, "diff", "--no-renames", "-z", "--name-only", reviewed, head)
+    changed = [p for p in out.split("\0") if p]
     drift = [p for p in changed if not drift_allowed(p)]
     need(not drift, f"code changed since review: {', '.join(drift[:5])}")
     log = rel(ctx, "docs/REVIEW_LOG.md")
@@ -1606,54 +1617,116 @@ def _budget_module() -> ModuleType:
     return module
 
 
-def banked_review_versions(ctx: Ctx) -> list[Any]:
-    """Every review ever banked: each committed version of each file under artifacts/review/.
+_VERSIONS: dict[str, dict[str, set[str]]] = {}
+_BLOBS: dict[str, str] = {}
+REVIEW_FILE_RE = re.compile(r"artifacts/review/(?:latest\.json|history/[^/]+\.json)")
+LEDGER_PATH = "artifacts/usage/ledger.jsonl"
 
-    A review overwritten in place, moved, or deleted still counts (review B6), and so do
-    the files at HEAD. A review that appears more than once counts once.
+
+def committed_versions(ctx: Ctx) -> dict[str, set[str]]:
+    """Every blob of a review file or of the usage ledger in HEAD's ancestry, with its paths.
+
+    Lists the tree of every commit (``git rev-list HEAD``: merges and side branches
+    included, with no history simplification) with ``ls-tree -z``, so no path is quoted
+    (review B6, D35).
+    """
+    key = f"{ctx.clone}@{git(ctx.clone, 'rev-parse', 'HEAD')}"
+    if key in _VERSIONS:
+        return _VERSIONS[key]
+    blobs: dict[str, set[str]] = {}
+    _VERSIONS[key] = blobs
+    for sha in git(ctx.clone, "rev-list", "HEAD").split():
+        out = git(ctx.clone, "ls-tree", "-r", "-z", sha, "--", "artifacts/review", LEDGER_PATH)
+        for item in out.split("\0"):
+            if not item:
+                continue
+            meta, _, path = item.partition("\t")
+            parts = meta.split()
+            if len(parts) == 3 and parts[1] == "blob":
+                blobs.setdefault(parts[2], set()).add(path)
+    return blobs
+
+
+def blob_text(ctx: Ctx, blob: str) -> str:
+    """The text of one blob of the clone (cached; a blob never changes)."""
+    if blob not in _BLOBS:
+        _BLOBS[blob] = git(ctx.clone, "cat-file", "blob", blob)
+    return _BLOBS[blob]
+
+
+def banked_review_versions(ctx: Ctx) -> tuple[list[Any], list[str]]:
+    """Every review ever banked, and the reviews whose content changed after banking.
+
+    The reviews are every version of artifacts/review/latest.json and
+    artifacts/review/history/*.json in HEAD's ancestry (committed_versions), so a review
+    overwritten in place, moved, or deleted still counts (review B6). A review appears
+    once per (reviewed_commit, reviewed_at); two versions with that key but different
+    content mean a banked review was edited, which a banked review never is (D35).
     """
     bm = _budget_module()
     reviews: dict[tuple[str, Any], Any] = {}
-    out = git(ctx.clone, "log", "--format=@%H", "--name-only", "--", "artifacts/review")
-    sha = ""
-    for line in out.splitlines():
-        if line.startswith("@"):
-            sha = line[1:]
+    content: dict[tuple[str, Any], str] = {}
+    problems: list[str] = []
+    for blob, paths in sorted(committed_versions(ctx).items()):
+        named = sorted(p for p in paths if REVIEW_FILE_RE.fullmatch(p))
+        if not named:
             continue
-        path = line.strip()
-        if not path.endswith(".json"):
+        data = json.loads(blob_text(ctx, blob))
+        r = bm.parse_banked_review(data, f"{named[0]}@{blob[:12]}")
+        key = (r.reviewed_commit, r.reviewed_at)
+        canon = json.dumps(data, sort_keys=True)
+        if key in content and content[key] != canon:
+            problems.append(
+                f"review of {r.reviewed_commit[:12]} at {r.reviewed_at.isoformat()} "
+                "changed after it was banked"
+            )
+        content.setdefault(key, canon)
+        reviews.setdefault(key, r)
+    return sorted(reviews.values(), key=lambda r: r.reviewed_at), sorted(set(problems))
+
+
+def committed_ledger_entries(ctx: Ctx) -> list[Any]:
+    """Every usage-ledger entry ever committed in HEAD's ancestry (D35).
+
+    Each distinct line counts as many times as it appears in the version where it appears
+    most, so deleting a committed entry cannot hide a run.
+    """
+    bm = _budget_module()
+    counts: dict[str, int] = {}
+    for blob, paths in committed_versions(ctx).items():
+        if LEDGER_PATH not in paths:
             continue
-        try:
-            text = git(ctx.clone, "show", f"{sha}:{path}")
-        except subprocess.CalledProcessError:
-            continue  # this commit deleted the file
-        r = bm.parse_banked_review(json.loads(text), f"{path}@{sha[:12]}")
-        reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
-    for r in bm.read_banked_reviews(rel(ctx, "artifacts/review")):
-        reviews.setdefault((r.reviewed_commit, r.reviewed_at), r)
-    return sorted(reviews.values(), key=lambda r: r.reviewed_at)
+        here: dict[str, int] = {}
+        for line in blob_text(ctx, blob).splitlines():
+            if line.strip():
+                canon = json.dumps(json.loads(line), sort_keys=True)
+                here[canon] = here.get(canon, 0) + 1
+        for canon, n in here.items():
+            counts[canon] = max(counts.get(canon, 0), n)
+    return [bm.parse_entry(json.loads(c)) for c, n in sorted(counts.items()) for _ in range(n)]
 
 
 def unlogged_review_problems(ctx: Ctx) -> list[str]:
-    """Banked reviews that lack their own claude_review_run ledger entry (G14, review B6).
+    """Review runs and reviews that disagree, over the whole history (G14, B6, D32, D35).
 
-    The reviews are every version of every file ever committed under artifacts/review/
-    (banked_review_versions). The budget module matches each to an entry logged after the
-    review before it and at or before its own time, and holds each UTC day's reviews to
-    that day's review-run cap or waiver.
+    Every review ever banked (banked_review_versions) must have its own claude_review_run
+    entry among the entries ever committed to the ledger (committed_ledger_entries), and
+    those entries must respect the caps and waivers as the ledger at HEAD must.
     """
     bm = _budget_module()
     try:
-        reviews = banked_review_versions(ctx)
-        entries = bm.read_ledger(rel(ctx, "artifacts/usage/ledger.jsonl"))
+        reviews, problems = banked_review_versions(ctx)
+        entries = committed_ledger_entries(ctx)
         caps = bm.load_budget(rel(ctx, "budget.toml"))
         share = bm.share_in_force(caps, os.environ.get("CAP_SHARE"))
         waivers = bm.load_waivers(rel(ctx, "budget_waivers.toml"))
     except (bm.BudgetError, ValueError, subprocess.CalledProcessError) as exc:
-        return [f"banked reviews unreadable: {exc}"]
+        return [f"banked reviews or ledger history unreadable: {exc}"]
+    report = bm.check_ledger(caps, entries, waivers, cap_share=share)
     return [
+        *problems,
         *bm.unlogged_reviews(reviews, entries),
-        *bm.reviews_over_daily_cap(caps, reviews, entries, share, waivers),
+        *(f"ledger history: {v}" for v in report.violations),
     ]
 
 

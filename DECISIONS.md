@@ -551,3 +551,14 @@ twenty-five smaller ones; each blocking one was reproduced. Changes:
    found by the pre-review QA, so the next review can reuse their ids. Under brief 10.1
    step 8 a reviewed commit may differ from HEAD only in artifacts/review/, STATUS.md, and
    docs/LOG.md, so a review that raises new ids cannot pass G12 the same day.
+
+## D36 (2026-11-12) E4 reports no recall by violation source (a deviation found late)
+
+Brief section 5 asks that natural, inserted, and dataset violations be reported
+separately, including recall by source. E4's preregistration (prereg/0005) did not include
+a split by source, and artifacts/e4/results.json has none, so the E4 cascade results pool
+natural and synthetic inserted violations. The pre-review QA found this (D34). It is a
+deviation from the brief, not from the preregistration; the README and REPORT section 5.4
+now say for every E4 result that its held-out violations mix natural and synthetic inserted
+ones and that E4 has no split by source, and E2, which does split, carries the by-source
+comparison. A split for E4 would be exploratory and is left for later work.

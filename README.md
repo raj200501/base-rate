@@ -7,9 +7,9 @@ budget and a stated violation prevalence, with intervals that count independent 
 fixed budget the false-positive rate is set by the budget itself); it sizes the labeled
 samples a claim needs and optimizes cheap-to-expensive cascades. The study applies it to
 25,023 labeled trajectories from 2,808 independent
-agent runs in mock-tool domains (synthetic share 0.888: procedural
-variants, inserted violations, and Armour's generated records), scored by rule and model
-monitors. Every result number in this README is a claim over a committed artifact.
+source runs (small local agents in mock-tool domains, plus a few groups of Armour's records;
+synthetic share 0.888: procedural variants, inserted violations,
+and Armour's generated records), scored by rule and model monitors. Every result number in this README is a claim over a committed artifact.
 
 **At a human-review budget of 20 per 10,000 trajectories and a
 violation prevalence of 1e-3, no single monitor in this preregistered study (three
@@ -17,8 +17,8 @@ Armour rule configurations and Qwen3 models from 0.6B to 8B parameters)
 caught more violations than random review would within its 95% interval; the best
 combination, a rank-mean ensemble of the reviewer-calibrated rule and the 8B model,
 caught 0.069 [0.042, 0.102] of them, mostly the
-synthetic inserted ones (0.11 [0.06, 0.15] of
-inserted and 0.01 [0.00, 0.05] of natural
+synthetic inserted ones (0.107 [0.064, 0.154] of
+inserted and 0.014 [0.003, 0.046] of natural
 violations).** Random review at that budget catches 0.002. The corpus is agent trajectories in mock-tool domains,
 its inserted violations are synthetic, and the monitors are small local models, so these
 numbers describe these monitors on this corpus; the methods are the reusable part.
@@ -54,18 +54,19 @@ uv run baserate eval examples/fixtures/monitor_scores.csv --prevalence 1e-4 --bu
   reviewer-calibrated rule caught
   0.930 [0.436, 1.000] of the violations in
   Armour's curated reference records (explicit actions from a few generator scripts, the
-  kind the rules were built for, hence the wide interval) and
-  0.00 [0.00, 0.02] of the natural violations,
-  those that arose while small agents did ordinary tasks. A monitor's score on curated data
-  said little about its value on agent traffic.
+  kind the rules were built for, hence the wide interval; scored against Armour's own benign
+  records) and 0.002 [0.000, 0.020] of the natural
+  violations, those that arose while small agents did ordinary tasks (scored against the
+  corpus's real benign runs). A monitor's score on curated data said little about its value
+  on agent traffic.
 - **What helped: combining weak signals.** A rule filter in front of the 8B model
   reached held-out recall 0.062 at 1.723 seconds of compute per
   trajectory, against 0.004 for the 8B alone (E4, on held-out
   primary-set runs, whose violations mix natural and synthetic inserted ones; E4 reports no
   split by source). In the main study, the rank-mean ensemble of the rule and the
-  8B caught 0.11 [0.06, 0.15] of the
+  8B caught 0.107 [0.064, 0.154] of the
   synthetic inserted violations but only
-  0.01 [0.00, 0.05] of the natural ones.
+  0.014 [0.003, 0.046] of the natural ones.
 - **Evidence you can audit.** Every experiment was preregistered and checked against git
   history; no result number is typed by hand; the budget-recall and fixed-threshold
   interval methods were checked by preregistered simulation (E0) before use, and the other
@@ -120,34 +121,42 @@ numbers do not.
 ## Key results
 
 Each result comes from a banked artifact and a preregistration committed before its data
-existed; `make prereg-verify` checks the order from git history. Intervals are 95%
-and resample or count whole source runs. Null and negative results are reported with the
-same prominence as the rest.
+existed; `make prereg-verify` checks the order from git history. Intervals on monitor
+metrics are 95% and resample or count whole source runs; the label-audit interval
+is exact over the audited records (docs/DATA.md). Null and negative results are reported
+with the same prominence as the rest.
 
-- **Single monitors are near chance at realistic budgets** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
+- **Single monitors are no better than random review at realistic budgets** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   At prevalence 1e-3 and 20 reviews per 10,000, recall was
   0.002 [0.000, 0.013] for the reviewer-calibrated
   rule, 0.001 [0.000, 0.012] for Qwen3 0.6B,
   0.000 [0.000, 0.004] for 1.7B,
   0.000 [0.000, 0.004] for 4B, and
-  0.003 [0.000, 0.015] for 8B. The two preregistered
-  combinations did better overall, the ensemble
+  0.003 [0.000, 0.015] for 8B; at 100 reviews
+  per 10,000 the 1.7B and 4B fell below random review
+  (0.000 [0.000, 0.004] and
+  0.002 [0.000, 0.009], against 0.01). The two
+  preregistered combinations did better overall, the ensemble
   (0.069 [0.042, 0.102]) and the cascade that sends
   the top 5% by the 0.6B score to the 8B
   (0.025 [0.009, 0.041]), but mostly on the
   synthetic inserted violations: on natural violations the ensemble reached
-  0.01 [0.00, 0.05] and the cascade
-  0.01 [0.00, 0.04], an interval that
-  contains the random-review rate.
-- **The same monitors look strong on curated records** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
+  0.014 [0.003, 0.046], an interval just above the
+  random-review rate, and the cascade
+  0.014 [0.001, 0.039], an interval that
+  contains it.
+- **The rule monitors and the 4B and 8B models look strong on curated records** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   On Armour's labeled reference records, at the same prevalence and budget, the
   reviewer-calibrated rule reached recall
   0.930 [0.436, 1.000] and the 8B
-  model 1.000 [0.535, 1.000]. Those records are
-  explicit violating actions from a few generator scripts (hence the wide intervals). On the
+  model 1.000 [0.535, 1.000] (the smaller models' rows
+  are in docs/REPORT.md section 5.2). Those records are
+  explicit violating actions from a few generator scripts (hence the wide intervals), scored
+  against Armour's own benign records, so both the violations and the benign tail differ
+  from the corpus's. On the
   natural violations, those that arose while small agents did ordinary tasks, the same rule
-  reached 0.00 [0.00, 0.02] and the 8B
-  model 0.00 [0.00, 0.02]. A monitor's result on curated
+  reached 0.002 [0.000, 0.020] and the 8B
+  model 0.002 [0.000, 0.019]. A monitor's result on curated
   records said little about its value on agent traffic.
 - **Why: a decent detector at its own threshold is uninformative at the top of the benign tail** ([E2 results](artifacts/e2/results.json), [prereg/0003](prereg/0003-e2-main-study.md)).
   At its native threshold the reviewer-calibrated rule caught
@@ -173,15 +182,21 @@ same prominence as the rest.
   1.002]), as expected when
   reviewed traffic is almost all benign. The recall-transfer hypothesis was supported for
   both (shares 0.893 and
-  1.000 of pairs within the preregistered recall gap),
-  though for the rule monitor a few pairs, such as those into devops, lose more.
-- **A rule filter in front of the 8B model beat the 8B alone** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
+  1.000 of pairs within the preregistered recall gap), but
+  many of those pairs had also missed the review budget by more than a factor of two, so it
+  is weak evidence that recall transfers at the intended budget; for the rule monitor a few
+  pairs, such as those into devops, lose more. The E3 set is mostly procedural variants
+  (synthetic share 0.887).
+- **A rule filter in front of the 8B model beat the 8B alone, pooled over natural and synthetic violations** ([E4 results](artifacts/e4/results.json), [prereg/0005](prereg/0005-e4-cascades.md)).
   On the held-out half of the source runs, the cascade from the reviewer-calibrated rule to
   the 8B model reached recall 0.062 [0.041,
   0.085] at 1.723 seconds of compute per trajectory,
   while the 8B alone reached 0.004 [0.000,
   0.021]. Not every cascade did: from the 1.7B to the 8B,
-  test recall was 0.002. Every cascade's training estimate held on the
+  test recall was 0.002. The held-out violations mix natural and synthetic
+  inserted ones, and E4 reports no recall by source, so whether these gains hold on natural
+  violations is not shown; in E2 the combined monitors' gain was mostly on inserted ones.
+  Every cascade's training estimate held on the
   test half (H4.1 supported for every pair); the efficiency hypothesis H4.2 held for every
   pair too, which says little when the second stage alone catches almost nothing.
 - **The corpus and its blind label audit** ([corpus manifest](artifacts/corpus/manifest.json), [label audit](artifacts/corpus/label_audit.json), [prereg/0002](prereg/0002-e1-corpus.md)).
@@ -192,7 +207,9 @@ same prominence as the rest.
   was already done at the drawn step or because the subject model wrote no usable
   summary). A blind audit of
   200 sampled labels by Claude subagents given only the monitor view agreed with the corpus label, type, and step on 0.930
-  [0.885, 0.961] of them (docs/DATA.md).
+  [0.885, 0.961] of them, in a sample half
+  synthetic by design (prereg/0002); agreement was lower on the natural violations, which
+  docs/DATA.md reports by stratum.
 - **The budget-recall and fixed-threshold intervals were checked before use** ([E0 summary](artifacts/e0/summary.json), [prereg/0001](prereg/0001-e0-statistical-engine.md)). The budget-recall and
   fixed-threshold interval methods were checked by preregistered simulation against exact
   truth; cells where a method undercovers are
@@ -209,19 +226,21 @@ same prominence as the rest.
 - **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
   and `make review` the review; STATUS.md records the latest result of each, and every review
   is kept in artifacts/review/. Reviews have blocked the release more than once, and every
-  blocking issue was fixed: those that changed published claims are recorded in
-  CORRECTIONS.md, and the others were gates that could pass while their property was false.
-  The latest review blocked; its fixes are in later commits and await the next review
-  (2026-11-13). The usage ledger records a cap
+  blocking issue so far was fixed: those that changed published claims are recorded in
+  CORRECTIONS.md, and the others were gates that could pass while their property was false;
+  STATUS.md and artifacts/review/latest.json give the latest verdict. The usage ledger
+  records a cap
   overrun on 2026-11-11, a `make review` run beyond the project's share of review runs for
   that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
   (DECISIONS.md D25 and D26, budget_waivers.toml). A second review run on 2026-11-12,
   after that day's review blocked on an issue since fixed, Raj approved in advance by the same
   kind of scoped waiver (D31). Caps are unchanged. Any other logged overrun fails
-  `make budget` and G14, and so does a banked review with no run logged since the review
-  before it, or a day that banks more reviews than its review cap. The check cannot see a
-  run that leaves no trace: a reviewer that dies before banking a review leaves an entry that
-  a relaunched review can pair with, so a relaunch must be logged as its own run (D25, D32).
+  `make budget` and G14. G14 also fails when a banked review has no review run logged in the
+  six hours before it and since the review before it; it reads every committed version of
+  the review files and of the ledger, while `make budget` checks the files at HEAD. The
+  check cannot see a run that leaves no trace: a reviewer that dies before banking a review
+  leaves an entry that a relaunched review can pair with, so a relaunch must be logged as its
+  own run (D25, D32, D35).
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify, and that the Armour rule configurations score every primary-set trace
@@ -242,14 +261,15 @@ flowchart LR
   E --> F
   F --> G[Monitors score traces]
   G --> H[Recall and precision at a review budget and prevalence]
-  H --> I[Intervals validated in simulation, E0]
+  H --> I[Budget-recall and fixed-threshold intervals checked in simulation, E0]
   H --> J[Certification, transfer, cascades]
 ```
 
 A monitor's scores on labeled benign and violation trajectories are reweighted to a
 deployment prevalence; the threshold that reviews exactly the budget is placed (randomized
-at ties); recall, precision, and the false-positive rate follow, each with an interval
-that resamples or counts whole source runs. Details are in docs/REPORT.md.
+at ties); recall, precision, and the false-positive rate follow, and recall and precision
+carry intervals that resample or count whole source runs (open issue N1 covers the
+false-positive rate). Details are in docs/REPORT.md.
 
 ## Use it on your own benchmark or agent
 

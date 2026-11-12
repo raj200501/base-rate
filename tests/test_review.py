@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -260,3 +261,28 @@ def test_review_start_honors_a_same_day_waiver_approved_in_advance(
     assert review.start_subagent(root, now=NOW.replace(hour=2)) != 0  # beyond the waiver
     assert len(_ledger(root)) == 2
     assert "daily review cap used up" in capsys.readouterr().out
+
+
+def test_drift_lists_a_file_renamed_into_an_allowed_path(tmp_path: Path) -> None:
+    """QA (D34): with rename detection, git diff --name-only names only the destination."""
+    root = tmp_path / "r"
+    root.mkdir()
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    (root / "src.py").write_text("print('reviewed code')\n" * 20)
+    git("add", "-A")
+    git("commit", "-q", "-m", "reviewed")
+    reviewed = git("rev-parse", "HEAD")
+    (root / "artifacts" / "review").mkdir(parents=True)
+    git("mv", "src.py", "artifacts/review/src.py")
+    git("commit", "-q", "-m", "move the code under an allowed path")
+    assert review.drift_outside_allowed(root, reviewed) == ["src.py"]

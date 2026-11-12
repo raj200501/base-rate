@@ -666,7 +666,7 @@ def table_breakdown(reg: Registry, e2: dict[str, Any]) -> str:
         for m in mons:
             sel = f"breakdowns[{key(m)},by={g},value={v}]"
             cid = cid_part(f"e2.by.{g}.{vid}.{short(m)}")
-            cells.append(reg.tag(cid, E2_SRC, sel, "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"))
+            cells.append(reg.tag(cid, E2_SRC, sel, "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"))
         rows.append(cells)
     r0 = rows_in[0]
     cap = caption("primary", set_tags(reg, E2_SRC, "sets.primary"))
