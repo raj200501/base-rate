@@ -1,4 +1,4 @@
-goal_turn: 10
+goal_turn: 11
 STATE: ACTIVE
 
 # Status
@@ -37,6 +37,12 @@ logged as N30 to N58 in docs/REVIEW_LOG.md (D35), so the next review can reuse t
 Heartbeat of 04:19 UTC: with no review allowed until 2026-11-13, the full-check-only parts
 of G10 were run on a fresh clone of 8a0c390 (`make reproduce`: REPRODUCE: PASS 4 checks, no
 file changed; freshness passed), so the re-rendered claims hold for the full ship-check.
+Heartbeat of 06:19 UTC: the qualitative statements the documentation fork added (D35) were
+checked against the artifacts and hold: the 1.7B and 4B intervals at 100 reviews lie below
+the random-review rate; the ensemble's natural-violation interval lies above it and the
+cascade's contains it; most E3 pairs within the recall gap missed the budget by more than a
+factor of two; audit agreement was lower on natural violations; the E3 set is mostly
+procedural variants.
 
 ## Next three actions
 
