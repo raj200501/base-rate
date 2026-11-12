@@ -1,4 +1,4 @@
-goal_turn: 6
+goal_turn: 7
 STATE: ACTIVE
 
 # Status
@@ -29,18 +29,16 @@ sprint then revised README.md, so G12 needs a fresh review of the new commit.
 | G11 Preregistration integrity | passes | |
 | G12 Independent review | SHIP for c433208 | fresh make review of the release commit (next day's allowance) |
 | G13 Documentation | passes | |
-| G14 Hygiene | passes; the 2026-11-11 review-run overrun (D25) is waived by Raj (D26) | |
+| G14 Hygiene | passes; review-run overruns waived by Raj: 2026-11-11 (D25, D26) and 2026-11-12 (D31) | |
 
 ## Now
 
-Final sequence, 2026-11-12: `make review-start` logged the day's one review run, and the
-review of d6f9ce0 returned BLOCK on one issue, B6: G14 did not compare the reviews banked
-in artifacts/review/ with the ledger, so a review that skipped review-start would pass.
-Fixed with tests (make budget and G14 now require every banked review, including every
-committed version of latest.json, to have its own logged run); the reviewer's
-counterexample fails the new gate. Cheap non-blocking items were fixed too (README and
-REPORT wording, D26 quotes Raj's instruction, D30 records the main pushes and the commit
-trailers). No second review runs today: the next is scheduled for 2026-11-13 00:05 UTC.
+Raj asked for all fourteen gates within the hour and approved one extra review run on
+2026-11-12 (D31, a dated waiver scoped to that day and run, logged when the run starts).
+The README gained a Highlights section. The second review of the day covers this commit;
+on SHIP: commit only artifacts/review/, run the full make ship-check on a fresh clone, and
+on PASS 14/14 do the release procedure (main) and move the local tag v1.0. The 2026-11-12
+review of d6f9ce0 blocked on B6, fixed in 2633213; N24 in 02ca9d0.
 
 ## Next three actions
 

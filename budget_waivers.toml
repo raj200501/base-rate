@@ -12,3 +12,11 @@ kind = "claude_review_run"
 max_entries = 2
 approved_by = "Raj Kashikar"
 approved_on = "2026-11-11"
+
+[[waiver]]
+decision = "D31"
+day = "2026-11-12"
+kind = "claude_review_run"
+max_entries = 2
+approved_by = "Raj Kashikar"
+approved_on = "2026-11-12"

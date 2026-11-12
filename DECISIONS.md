@@ -451,3 +451,15 @@ their share (they fail closed without it), and a day's cap uses the smallest sha
    with a Co-Authored-By trailer that names the co-authoring model; that trailer is the one
    exception, and message bodies and repository files still never name the serving model.
 
+## D31 (2026-11-12) Waiver: a second claude_review_run on 2026-11-12, approved in advance
+
+Approved by Raj on 2026-11-12. The day's one review run (00:06 UTC) had returned BLOCK on
+B6, since fixed with tests, and Raj asked for all fourteen gates within the hour. Asked
+whether to approve one extra review run that day, recorded as a dated waiver like D26, he
+answered: "Approve one extra today". The waiver is scoped to that one day and that one extra
+run: budget_waivers.toml excuses at most two claude_review_run entries on 2026-11-12 and
+nothing else. Caps and CAP_SHARE=0.2 are unchanged. Unlike D26 it was approved before the
+run, and the run was logged when it started (D27). Like D26, it is an exception to D5
+approved by Raj.
+
+Waiver record: decision=D31; day=2026-11-12; kind=claude_review_run; max_entries=2; approved_by=Raj Kashikar; approved_on=2026-11-12

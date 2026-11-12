@@ -48,6 +48,26 @@ uv run baserate certify --fpr 0.001 --recall 0.9
 uv run baserate eval examples/fixtures/monitor_scores.csv --prevalence 1e-4 --budget 20
 ```
 
+## Highlights
+
+- **The base-rate effect, measured.** The reviewer-calibrated rule caught
+  0.930 [0.436, 1.000] of the violations in
+  Armour's curated reference records, and
+  0.002 [0.000, 0.013] of those that arose while small
+  agents did ordinary tasks, at the same prevalence and review budget: a monitor's score on
+  curated data said little about its value on agent traffic.
+- **What helped: combining weak signals.** A rule filter in front of the 8B model
+  reached held-out recall 0.062 at 1.723 seconds of compute per
+  trajectory, against 0.004 for the 8B alone; most of the combined
+  monitors' gain was on synthetic inserted violations, which the results say plainly.
+- **Evidence you can audit.** Every experiment was preregistered and checked against git
+  history; no result number is typed by hand; the interval methods were validated by
+  simulation before use; `make ship-check` runs the definition-of-done gates on a fresh
+  clone; and every review, the blocking ones included, is public with its fixes
+  (artifacts/review/, CORRECTIONS.md).
+- **Reusable tools.** `baserate eval`, `baserate certify` (how many independent runs a claim
+  needs), cascade optimization, and a monitor report card, with three offline examples.
+
 ## What it is and is not
 
 base-rate is a library and a study for one question: if violations are rare and humans
@@ -184,7 +204,9 @@ same prominence as the rest.
   the others were gates that could pass with results missing. The usage ledger records a cap
   overrun on 2026-11-11, a `make review` run beyond the project's share of review runs for
   that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
-  (DECISIONS.md D25 and D26, budget_waivers.toml). Caps are unchanged; any other overrun,
+  (DECISIONS.md D25 and D26, budget_waivers.toml). A second review run on 2026-11-12,
+  after that day's review blocked on an issue since fixed, Raj approved in advance by the same
+  kind of scoped waiver (D31). Caps are unchanged; any other overrun,
   whether logged or a banked review without its own logged run, fails `make budget` and G14.
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can

@@ -355,13 +355,14 @@ def test_repository_waivers_match_the_repository_ledger() -> None:
     root = Path(__file__).resolve().parents[1]
     caps = budget.load_budget(root / "budget.toml")
     waivers = budget.load_waivers(root / "budget_waivers.toml")
-    assert [(w.decision, w.day, w.kind) for w in waivers] == [
-        ("D26", "2026-11-11", "claude_review_run")
+    assert [(w.decision, w.day, w.kind, w.max_entries) for w in waivers] == [
+        ("D26", "2026-11-11", "claude_review_run", 2),
+        ("D31", "2026-11-12", "claude_review_run", 2),
     ]
     report = budget.check_ledger(
         caps, budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl"), waivers
     )
-    assert report.ok and len(report.waived) == 1 and report.waived[0].startswith("2026-11-11:")
+    assert report.ok and [w.split(":")[0] for w in report.waived] == ["2026-11-11", "2026-11-12"]
     decisions = (root / "DECISIONS.md").read_text(encoding="utf-8")
     assert budget.waiver_record_problems(waivers, decisions) == []
 
