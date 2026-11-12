@@ -77,29 +77,33 @@ starts.
 None of these blocks the Definition of Done. (Raj accepted the 2026-11-11 review-run
 overrun on 2026-11-11: DECISIONS.md D26.)
 
-1. **Confirm D26 and D31 on GitHub** (non-blocking, review N23): the two waivers rest on
+1. **Main lags the branch on two labels (optional).** main is at 7d1e31e (D33). The branch
+   since adds synthetic labels to every E4 result and the corpus's synthetic share to the
+   REPORT abstract (N40, N41), with gate fixes. Under D30 main moves at the next point with
+   more gates passing (after a SHIP review); push the branch to main sooner if you prefer.
+2. **Confirm D26 and D31 on GitHub** (non-blocking, review N23): the two waivers rest on
    approvals recorded in the session's words, and git cannot tell Raj's commits from the
    session's (D13). A GitHub-side action of Raj's that cites D26 and D31 (a comment, a pull
    request review, or a merge made on GitHub), or a signed commit, would corroborate them.
-2. **Decide whether CLAUDE.md names the trailer exception** (non-blocking, review N19):
+3. **Decide whether CLAUDE.md names the trailer exception** (non-blocking, review N19):
    CLAUDE.md says commit messages never name the serving model; D30 point 2 records the
    Co-Authored-By trailer you asked for (D13) as the one exception. CLAUDE.md is your file.
 
-3. **Confirm or overrule DECISIONS.md D28 point 3** (non-blocking): the session's development
+4. **Confirm or overrule DECISIONS.md D28 point 3** (non-blocking): the session's development
    subagents (the 2026-11-04 review-and-skeptic workflows, the pre-review QA, fix forks) are
    treated as development work, not logged per call; counted as judging calls, 2026-11-04
    would exceed the single-call cap.
 
-4. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
+5. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
    agents for misalignment"
    (https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment) served
    a bot challenge to scripted access twice. Open it in a browser and confirm the
    title, date, and the brief's description; until then it is not cited.
-5. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
+6. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
    machine where `claude` is logged in to the Max plan with none of
    `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
    `CLAUDE_CODE_USE_*` set. The study fields four families without them.
-6. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
+7. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
    third-party code; until then only this project's own tasks with in-process mock
    tools run.
 
