@@ -902,6 +902,50 @@ G14_CASES += [
 ]
 
 
+ONE_RUN = (
+    json.dumps({"ts": "2026-11-12T00:06:05+00:00", "kind": "claude_review_run", "cap_share": 0.2})
+    + "\n"
+)
+
+
+def _review_file(commit: str, at: str) -> str:
+    return json.dumps({"reviewed_commit": commit, "reviewed_at": at}) + "\n"
+
+
+def test_g14_passes_when_every_banked_review_is_logged(g14: Any, tmp_path: Path) -> None:
+    g14.write("artifacts/usage/ledger.jsonl", ONE_RUN)
+    g14.write("artifacts/review/latest.json", _review_file("a" * 40, "2026-11-12T00:29:00Z"))
+    g14.commit("one logged review")
+    assert_pass(14, g14, tmp_path)
+
+
+G14_CASES += [
+    (
+        "review-banked-but-not-logged",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ONE_RUN),
+            r.write(
+                "artifacts/review/history/h.json", _review_file("b" * 40, "2026-11-12T01:00:00Z")
+            ),
+            r.write("artifacts/review/latest.json", _review_file("c" * 40, "2026-11-12T03:00:00Z")),
+            r.commit("two reviews, one logged run"),
+        ),
+        "has no claude_review_run entry",
+    ),
+    (
+        "review-overwritten-in-place",
+        lambda r: (
+            r.write("artifacts/usage/ledger.jsonl", ONE_RUN),
+            r.write("artifacts/review/latest.json", _review_file("b" * 40, "2026-11-12T01:00:00Z")),
+            r.commit("first review"),
+            r.write("artifacts/review/latest.json", _review_file("c" * 40, "2026-11-12T03:00:00Z")),
+            r.commit("second review overwrites the first, no history file"),
+        ),
+        "has no claude_review_run entry",
+    ),
+]
+
+
 @pytest.mark.parametrize(
     ("mutate", "needle"), [c[1:] for c in G14_CASES], ids=[c[0] for c in G14_CASES]
 )

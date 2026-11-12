@@ -570,3 +570,90 @@ def test_invalid_recorded_shares_are_refused(bad: Any) -> None:
 def test_repository_budget_records_the_project_share() -> None:
     root = Path(__file__).resolve().parents[1]
     assert budget.load_budget(root / "budget.toml").cap_share == 0.2
+
+
+# ---------------------------------------------------------------- banked reviews vs the ledger (B6)
+
+
+def _review(at: str, commit: str = "a" * 40) -> budget.BankedReview:
+    at_ts = budget.datetime.fromisoformat(at)
+    return budget.BankedReview(reviewed_commit=commit, reviewed_at=at_ts)
+
+
+def _review_runs(*ts: str) -> list[budget.LedgerEntry]:
+    return [
+        budget.LedgerEntry(
+            ts=budget.datetime.fromisoformat(t), kind="claude_review_run", cap_share=0.2
+        )
+        for t in ts
+    ]
+
+
+def test_each_banked_review_needs_its_own_logged_run() -> None:
+    entries = _review_runs("2026-11-12T00:06:05+00:00")
+    assert budget.unlogged_reviews([_review("2026-11-12T00:29:00+00:00")], entries) == []
+    two = [
+        _review("2026-11-12T01:00:00+00:00", "b" * 40),
+        _review("2026-11-12T03:00:00+00:00", "c" * 40),
+    ]
+    problems = budget.unlogged_reviews(two, entries)
+    assert len(problems) == 1 and "c" * 12 in problems[0]
+
+
+@pytest.mark.parametrize(
+    ("run", "review", "ok"),
+    [
+        ("2026-11-12T00:30:00+00:00", "2026-11-12T00:29:00+00:00", False),
+        ("2026-11-11T23:55:00+00:00", "2026-11-12T00:20:00+00:00", True),
+        ("2026-11-10T23:55:00+00:00", "2026-11-12T00:20:00+00:00", False),
+    ],
+    ids=["logged-after-the-review", "started-the-previous-utc-day", "two-days-earlier"],
+)
+def test_a_review_run_is_logged_at_or_before_it(run: str, review: str, ok: bool) -> None:
+    problems = budget.unlogged_reviews([_review(review)], _review_runs(run))
+    assert (problems == []) is ok
+
+
+def _bank(review_dir: Path, latest: tuple[str, str], *history: tuple[str, str]) -> None:
+    (review_dir / "history").mkdir(parents=True, exist_ok=True)
+    (review_dir / "latest.json").write_text(
+        json.dumps({"reviewed_commit": latest[0], "reviewed_at": latest[1]})
+    )
+    for i, (commit, at) in enumerate(history):
+        (review_dir / "history" / f"h{i}.json").write_text(
+            json.dumps({"reviewed_commit": commit, "reviewed_at": at})
+        )
+
+
+def test_read_banked_reviews_takes_latest_and_history(tmp_path: Path) -> None:
+    d = tmp_path / "artifacts" / "review"
+    _bank(d, ("b" * 40, "2026-11-12T00:29:00Z"), ("a" * 40, "2026-11-11T05:12:30Z"))
+    got = budget.read_banked_reviews(d)
+    assert [(r.reviewed_commit[0], r.reviewed_at.isoformat()) for r in got] == [
+        ("a", "2026-11-11T05:12:30+00:00"),
+        ("b", "2026-11-12T00:29:00+00:00"),
+    ]
+
+
+def test_cli_fails_on_an_unlogged_banked_review(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    b, led = _write(
+        tmp_path,
+        DEFAULT_TOML + "cap_share = 0.2\n",
+        [{"ts": "2026-11-12T00:06:05+00:00", "kind": "claude_review_run", "cap_share": 0.2}],
+    )
+    d = tmp_path / "artifacts" / "review"
+    _bank(d, ("c" * 40, "2026-11-12T03:00:00Z"), ("b" * 40, "2026-11-12T01:00:00Z"))
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1
+    out = capsys.readouterr().out
+    assert "has no claude_review_run entry" in out and out.rstrip().endswith("caps: VIOLATED")
+    (d / "history" / "h0.json").unlink()  # one review, one logged run
+    assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 0
+
+
+def test_repository_reviews_are_all_logged() -> None:
+    root = Path(__file__).resolve().parents[1]
+    reviews = budget.read_banked_reviews(root / "artifacts" / "review")
+    entries = budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl")
+    assert len(reviews) >= 3 and budget.unlogged_reviews(reviews, entries) == []

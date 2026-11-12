@@ -26,7 +26,7 @@ import tomllib
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -586,6 +586,89 @@ def format_report(budget: Budget, report: BudgetReport) -> list[str]:
     return lines
 
 
+@dataclass(frozen=True)
+class BankedReview:
+    """A review banked in ``artifacts/review/`` (``latest.json`` or a file in ``history/``)."""
+
+    reviewed_commit: str
+    reviewed_at: datetime
+
+
+def _aware(ts: datetime) -> datetime:
+    return (ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)).astimezone(UTC)
+
+
+def parse_banked_review(data: Any, where: str) -> BankedReview:
+    """One review record: its ``reviewed_commit`` and ``reviewed_at`` (ISO 8601).
+
+    Raises:
+        BudgetError: If either field is missing or malformed.
+    """
+    if not isinstance(data, Mapping):
+        raise BudgetError(f"{where}: a review must be a JSON object")
+    commit = data.get("reviewed_commit")
+    raw = data.get("reviewed_at")
+    if not isinstance(commit, str) or not isinstance(raw, str):
+        raise BudgetError(f"{where}: a review needs reviewed_commit and reviewed_at")
+    try:
+        at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise BudgetError(f"{where}: reviewed_at is not ISO 8601: {raw!r}") from exc
+    try:
+        return BankedReview(commit, _aware(at))
+    except OverflowError as exc:
+        raise BudgetError(f"{where}: reviewed_at is out of range: {raw!r}") from exc
+
+
+def read_banked_reviews(review_dir: Path) -> list[BankedReview]:
+    """Every review banked in ``review_dir`` (``latest.json`` and ``history/*.json``), by time.
+
+    A missing directory has no reviews; a review that appears twice counts once.
+    """
+    files = [review_dir / "latest.json", *sorted((review_dir / "history").glob("*.json"))]
+    seen: dict[tuple[str, datetime], BankedReview] = {}
+    for path in files:
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            raise BudgetError(f"cannot read {path}: {exc}") from exc
+        review = parse_banked_review(data, str(path))
+        seen.setdefault((review.reviewed_commit, review.reviewed_at), review)
+    return sorted(seen.values(), key=lambda r: r.reviewed_at)
+
+
+def unlogged_reviews(reviews: Iterable[BankedReview], entries: Iterable[LedgerEntry]) -> list[str]:
+    """Banked reviews without their own ``claude_review_run`` entry (review B6).
+
+    Each banked review must be matched by a distinct ``claude_review_run`` ledger entry
+    logged at or before its ``reviewed_at``, on the same or the previous UTC day (a run is
+    logged when it starts, D27, and may finish after midnight). Reviews are matched in time
+    order to the earliest eligible unused entry, which matches as many as any assignment
+    can, so one entry never covers two reviews and a review skipped by
+    ``make review-start`` cannot pass unnoticed.
+    """
+    runs = sorted(_aware(e.ts) for e in entries if e.kind == "claude_review_run")
+    used = [False] * len(runs)
+    problems: list[str] = []
+    for review in sorted(reviews, key=lambda r: r.reviewed_at):
+        at = review.reviewed_at
+        start = datetime.combine(at.date() - timedelta(days=1), datetime.min.time(), UTC)
+        match = next(
+            (i for i, ts in enumerate(runs) if not used[i] and start <= ts <= at),
+            None,
+        )
+        if match is None:
+            problems.append(
+                f"review of {review.reviewed_commit[:12]} at {at.isoformat()} has no "
+                "claude_review_run entry at or before it (same or previous UTC day)"
+            )
+        else:
+            used[match] = True
+    return problems
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Print the budget report; exit non-zero on any violation."""
     parser = argparse.ArgumentParser(prog="baserate budget", description=__doc__)
@@ -603,9 +686,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="approval records for the waivers (default: DECISIONS.md beside --budget)",
     )
+    parser.add_argument(
+        "--reviews",
+        type=Path,
+        default=None,
+        help="banked reviews to match with the ledger (default: artifacts/review by --budget)",
+    )
     args = parser.parse_args(argv)
     waivers_path = args.waivers or args.budget.parent / "budget_waivers.toml"
     decisions_path = args.decisions or args.budget.parent / "DECISIONS.md"
+    reviews_path = args.reviews or args.budget.parent / "artifacts" / "review"
     try:
         budget = load_budget(args.budget)
         share = share_in_force(budget, os.environ.get("CAP_SHARE"))
@@ -621,7 +711,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         valid = (
             [w for w in waivers if not waiver_record_problems([w], decisions)] if waivers else []
         )
-        report = check_ledger(budget, read_ledger(args.ledger), valid, cap_share=share)
+        entries = read_ledger(args.ledger)
+        report = check_ledger(budget, entries, valid, cap_share=share)
+        problems += unlogged_reviews(read_banked_reviews(reviews_path), entries)
         report.violations[:0] = problems
     except BudgetError as exc:
         print(f"budget error: {exc}")
