@@ -1,37 +1,46 @@
 {
   "schema": "baserate-review/1",
-  "reviewed_commit": "c433208173f69791cab7bc23601962515d7a325e",
-  "reviewed_at": "2026-11-11T05:25:05Z",
+  "reviewed_commit": "d6f9ce06af6410da7f0d9b0cc2516bd8e53f6ec8",
+  "reviewed_at": "2026-11-12T00:29:30Z",
   "reviewer": "subagent",
-  "previous_review": "e403a4e7774e182f5b6c491df1ed17766bc54968",
-  "verdict": "SHIP",
-  "blocking": [],
-  "resolved": [
-    {"id": "B1", "evidence": "tools/analyze.py now builds breakdowns for every primary monitor, using derived_scores for the ensemble and the cascade. artifacts/e2/results.json has 81 breakdown rows across 9 monitors, and the 63 earlier rows are unchanged. The new rows match my independent recomputation: ensemble inserted 0.1068 [0.0637, 0.1539] and natural 0.0141 [0.0032, 0.0457]; cascade inserted 0.0324 [0.0113, 0.0542] and natural 0.0141 [0.0011, 0.0394]. The README first screen and key results, the REPORT abstract, and REPORT 5.2 now give the source split and say that the cascade's natural-violation interval contains the random-review rate."},
-    {"id": "B2", "evidence": "ttd() now counts a violation only when its full-trace score is caught under the same tie draw. The 0.6B row changed from share caught 0.122 to 0.001, which equals its recall at the budget (0.000957), with a median delay of 3 from the one caught violation. The rule and 1.7B rows are unchanged, as expected for monotone or uncaught scores. REPORT now describes the measure as preregistered."},
-    {"id": "B3", "evidence": "The 'near zero in every domain' premise is gone from README and REPORT. H3.2 is now reported with its banked shares (0.893 and 1.000) and the caveat that rule-monitor pairs into devops lose more, which matches the E3 pairs."},
-    {"id": "B4", "evidence": "g7 now calls e2_missing, which checks the preregistered monitors, sets, metrics, and method, the fixed-threshold and time-to-detection rows, breakdowns for every primary monitor, and the ladder rungs. I re-ran my counterexample (dropping model:qwen3-4b-q4_k_m) on a clone of c433208 and G7 now fails ('estimate model:qwen3-4b-q4_k_m primary p0.01 b5 recall_at_budget (composite) (and 57 more)'). Unmodified HEAD passes."},
-    {"id": "B5", "evidence": "g8 now compares the listed hypotheses with expected_hypotheses from the prereg/0004 and prereg/0005 configs. I re-ran my counterexample (dropping the two not_supported H3.1 entries) and G8 now fails ('E3 lacks preregistered hypotheses: H3.1-armour-reviewer-calibrated, H3.1-qwen3-0.6b-q8_0'). Unmodified HEAD passes."}
-  ],
-  "checks": [
-    "E2, E3, and E4 re-run from the banked shards and scores in a scratch root match artifacts/*/results.json in every field except provenance",
-    "python tools/ship_check.py --fast at c433208: 13/14; the only failure is G12 (latest review was BLOCK)",
-    "The Proc.status change in G10, G12, and G13 still requires a zero exit code, so a failing tool cannot pass on its status line alone",
-    "The README and REPORT numbers changed since e403a4e match the artifacts (source split, H3.2 shares, the p4 cascade 0.002 [0.000, 0.006], the 0.6B time to detection)"
+  "previous_review": "c433208173f69791cab7bc23601962515d7a325e",
+  "verdict": "BLOCK",
+  "blocking": [
+    {
+      "id": "B6",
+      "title": "G14 can pass while the review-run cap is exceeded: neither make budget nor G14 compares the banked reviews with the ledger, the gap behind the false 14/14 at 19dbd5a",
+      "location": "tools/ship_check.py:1558-1569 (g14); src/baserate/budget.py:450-526 (check_ledger); artifacts/review/; artifacts/usage/ledger.jsonl; README.md:185-186",
+      "evidence": "G14 guards 'every cap respected' (brief G14). CORRECTIONS.md (2026-11-11) itself calls the 19dbd5a pass false on that property, because two make review runs were banked but not logged. make budget, and so G14, reads only budget.toml, budget_waivers.toml, DECISIONS.md, and the ledger. Nothing compares the reviews banked in artifacts/review/ (each carries the reviewer's own reviewed_at, and README.md says every review is kept there) with the ledger's claude_review_run entries. Counterexample, run against the real gate code: in a scratch clone of d6f9ce0 I banked two SHIP reviews dated 2026-11-12T01:00:00Z and 2026-11-12T03:00:00Z. The second moved the first to history/, in a commit touching only artifacts/review/, which is what the final sequence commits after a review. The ledger kept its one 2026-11-12 entry. With CAP_SHARE unset, ship_check.g14 returned PASS ('caps respected except waived overruns (D26, approved by Raj Kashikar in DECISIONS.md)') and ship_check.g12 returned PASS. Yet two review runs on 2026-11-12 exceed the cap of 1 at the recorded share of 0.2. This is the path the 2026-11-11 overrun took. c605476 added make review-start, a step the main session has to remember, but no check, so a skipped review-start passes both gates again. README.md:185-186 ('any other overrun fails make budget') overstates this: make budget catches only overruns that were logged. A check the repository can already support: every banked review (every committed version of artifacts/review/latest.json, plus history/) needs its own claude_review_run entry at or before its reviewed_at, on the same or the previous UTC day. The current history passes this check: the two 2026-11-11 entries carry the reviews' own times, and the 2026-11-12 00:06:05 entry precedes this review."
+    }
   ],
   "non_blocking": [
-    {"id": "N1", "title": "Still open: FPR at the budget is banked and printed by baserate eval far tighter than the benign runs can certify; label it as fixed by the budget or drop the interval", "location": "artifacts/e2/results.json (fpr_at_budget); src/baserate/estimate/atbudget.py:276"},
-    {"id": "N2", "title": "Still open: the three Armour rule configurations score the corpus identically, and the documents do not say so", "location": "artifacts/scores/primary/rule_*.jsonl.gz; README.md:4-5"},
+    {"id": "N1", "title": "Still open: FPR at the budget is banked and printed by baserate eval far tighter than the benign runs can certify. The README 'What is built and validated' bullet still gives the false-positive rate 'with cluster-aware intervals', without the caveat the pitch now has", "location": "artifacts/e2/results.json (fpr_at_budget); src/baserate/estimate/atbudget.py:276; README.md:70-71"},
+    {"id": "N2", "title": "Still open in docs/REPORT.md: README Status now says the rule configurations score every primary-set trace identically (checked: 0 of 3,418 differ, and all 27 primary rule cells have equal estimates). REPORT does not say so, and the size ladder's best_rule_monitor is a tie broken by list order", "location": "artifacts/scores/primary/rule_*.jsonl.gz; artifacts/e2/results.json (size_ladder); docs/REPORT.md:476"},
     {"id": "N3", "title": "Still open: dataset-set estimates with 7 to 8 clusters are marked E0-supported by the closest-design rule", "location": "artifacts/e2/results.json (set=dataset)"},
-    {"id": "N8", "title": "Still open: smaller undeclared analysis choices are missing from the deviations paragraph", "location": "docs/REPORT.md (section 6, Deviations)"},
+    {"id": "N8", "title": "Still open: smaller undeclared analysis choices are missing from the deviations paragraph, which README Status now cites as the full list", "location": "docs/REPORT.md:651-660; README.md:174-176"},
     {"id": "N9", "title": "Still open: E4 n_train_runs and n_test_runs double count shared source runs", "location": "tools/analyze.py (run_e4); artifacts/e4/results.json"},
     {"id": "N10", "title": "Still open: bootstraps resample the two classes independently despite shared source runs", "location": "tools/analyze.py; src/baserate/cascade/optimize.py"},
     {"id": "N11", "title": "Still open: E0 support for 100 violations is extrapolated to 1,045", "location": "artifacts/e0/summary.json"},
-    {"id": "N12", "title": "Still open: G6 does not check audit items against the corpus or the preregistered sample (checked by hand: consistent)", "location": "tools/ship_check.py (g6)"},
+    {"id": "N12", "title": "Still open: G6 does not check audit items against the corpus or the preregistered sample", "location": "tools/ship_check.py (g6)"},
     {"id": "N13", "title": "Still open: fixed template values in inserted calls are a possible tell", "location": "src/baserate/traces/domains/browser.py:339"},
     {"id": "N14", "title": "Still open: the auditor instructions are not banked", "location": "artifacts/corpus/label_audit.json"},
     {"id": "N15", "title": "Still open: the cascade escalation threshold is not re-estimated in the E2 bootstrap", "location": "tools/analyze.py (derived_scores)"},
-    {"id": "N19", "title": "Still open: CLAUDE.md and DECISIONS.md D13 disagree on naming the session model in commit trailers", "location": "CLAUDE.md; DECISIONS.md D13"}
+    {"id": "N19", "title": "Still open: commit trailers since c433208 still name the session model, against CLAUDE.md; D13 is not reconciled with it", "location": "CLAUDE.md (Working rules); DECISIONS.md D13; git log c433208..HEAD"},
+    {"id": "N21", "title": "The session pushed main twice: origin/main went to 543f7ef at 21:14:56 UTC and to 8c5f3d8 at 22:26:19 UTC on 2026-11-11, both 'update by push' in this checkout's reflog. D1 and D9 limit pushes to the working branch ('never to main'), and no DECISIONS.md entry records an instruction to push main. Brief 10.1 step 11 itself allows pushes to origin, so this is not a section 9 breach. Record the instruction, or keep to the working branch", "location": "DECISIONS.md:14 and :104; docs/LOG.md:90"},
+    {"id": "N22", "title": "REPORT still credits the library with threshold-transfer tools ('tests whether a threshold tuned in one setting transfers to another'). CORRECTIONS.md (2026-11-11) withdrew that claim from the README because transfer is tested by the E3 analysis, not by a library function, and src/baserate has no transfer module", "location": "docs/REPORT.md:14-17 and :49-53; CORRECTIONS.md:18-19"},
+    {"id": "N23", "title": "Raj's approval of D26 is recorded only in the session's words, and no artifact from Raj is banked, so G14's 'approved by Raj Kashikar in DECISIONS.md' rests on text the session wrote. The record fits the timeline (Raj's GitHub merge 87d2413 of the PR that asked him, then 913117f), and tests pin the waiver set to D26 and cap_share to 0.2, so I treat it as approved. Ask Raj to confirm it in a form the repository can show. The 'not approved' guard is wording-only: a D26 section saying 'Raj declined' with the record line still passes make budget (checked in scratch)", "location": "DECISIONS.md:357-372; src/baserate/budget.py:416-447; tests/test_budget.py:354-366"},
+    {"id": "N24", "title": "tools/review.py budget handling: (1) run_headless logs its entry after the run, so on a machine where headless review works the entry lands after the reviewed commit and outside G12's allowed drift, and a headless review can never be current. That is against D27 and fails closed. (2) check_ledger applies claude_agent_max_turns only to claude_agent_run, not to a headless review's recorded turns, although D28 says that cap binds headless reviews. (3) start_subagent passes waivers to check_ledger without their DECISIONS.md approval check", "location": "tools/review.py:218 and :288; src/baserate/budget.py:490"},
+    {"id": "N25", "title": "D28.3 classifies the 2026-11-04 development workflows (119 agents) and the 2026-11-11 pre-review QA workflow as outside every cap. It is a reading written after those runs that 'Raj may overrule', but STATUS.md 'Needs Raj' does not list it, so Raj is not asked", "location": "DECISIONS.md:410-417; STATUS.md:74-90"}
   ],
-  "final_line": "REVIEW: SHIP"
+  "checks": [
+    "python tools/ship_check.py --fast at d6f9ce0: 13/14. The only failure is G12 (no review of the current code). G14 PASS with the D26 waiver named",
+    "tests/test_budget.py, tests/test_gate_mutations.py, tests/test_review.py, and tests/test_tools.py pass. claimcheck PASS (678 claim spans, 401 allowances) and freshness PASS on README.md, docs/REPORT.md, and docs/DATA.md",
+    "make budget at HEAD: cash_usd = 0. 2026-11-11 has 2 claude_review_run (cap 1, waived by D26) and 20 claude_single_call (cap 60). 2026-11-12 has 1 claude_review_run (cap 1). CAP_SHARE=1 leaves this unchanged because budget.toml's 0.2 binds. CAP_SHARE=0.1 fails",
+    "The waiver is exactly as recorded: one budget_waivers.toml row equal to the D26 record line (2026-11-11, claude_review_run, max_entries 2, the two logged runs). Scratch counterexamples fail make budget as they should: a third 2026-11-11 review run, a second 2026-11-12 run (share 0.2 or 1.0), and 61 single calls on 2026-11-11",
+    "The ledger was only ever appended to. The 2026-11-12 entry is in the reviewed commit (D27). The committed versions of artifacts/review/latest.json (2 on 2026-11-11) match the ledger's review entries",
+    "No preregistration, analysis code, or result artifact changed since c433208. Among the gates only G14 changed. The merge 87d2413 has the same tree as d100cbf",
+    "The README pitch numbers (25,023 traces; 2,808 independent source runs, of which 8 are Armour clusters; synthetic share 0.888) match artifacts/corpus/manifest.json. E4 H4.1 and H4.2 are supported for p1 to p4 ('every pair'). The CORRECTIONS.md 2026-11-11 entries match the diffs of 795ea75 and 543f7ef..8c5f3d8",
+    "No em dashes or hype words in tracked files or in commit messages since c433208. No tracked file names the session model. v1.0 is a local tag at 19dbd5a, and origin has no tags"
+  ],
+  "final_line": "REVIEW: BLOCK"
 }
