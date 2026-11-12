@@ -33,19 +33,20 @@ sprint then revised README.md, so G12 needs a fresh review of the new commit.
 
 ## Now
 
-Final sequence (brief 10.6), 2026-11-12: the day's review allowance opened at 00:00 UTC;
-`make review-start` logged review run 1 of 1 for the day (CAP_SHARE 0.2 from budget.toml,
-D29), and the reviewer subagent reviews this commit (main and this branch were at 8c5f3d8,
-fast check 13/14 with only G12 failing). On SHIP: commit only artifacts/review/, then the
-full make ship-check, the release procedure, and the local tag v1.0. On BLOCK: fix with
-tests, and the next review waits for 2026-11-13.
+Final sequence, 2026-11-12: `make review-start` logged the day's one review run, and the
+review of d6f9ce0 returned BLOCK on one issue, B6: G14 did not compare the reviews banked
+in artifacts/review/ with the ledger, so a review that skipped review-start would pass.
+Fixed with tests (make budget and G14 now require every banked review, including every
+committed version of latest.json, to have its own logged run); the reviewer's
+counterexample fails the new gate. Cheap non-blocking items were fixed too (README and
+REPORT wording, D26 quotes Raj's instruction, D30 records the main pushes and the commit
+trailers). No second review runs today: the next is scheduled for 2026-11-13 00:05 UTC.
 
 ## Next three actions
 
-1. When the next day's review allowance opens (2026-11-12 UTC): `make review-start`, commit
-   the ledger entry, then the reviewer subagent; fix any blocking findings (no second review
-   that day), then the full make ship-check on a fresh clone; on PASS 14/14 move the local
-   tag v1.0 to that commit.
+1. 2026-11-13 00:05 UTC: `make review-start`, commit the ledger entry, then the reviewer
+   subagent on that commit; on SHIP, commit only artifacts/review/, run the full make
+   ship-check on a fresh clone, and on PASS 14/14 do the release procedure and move v1.0.
 2. Keep logging every Claude subagent run that counts against a cap when it happens (D9,
    D25).
 3. Work the open non-blocking review issues (docs/REVIEW_LOG.md), starting with N1 (the
@@ -76,16 +77,21 @@ subagent starts.
 None of these blocks the Definition of Done. (Raj accepted the 2026-11-11 review-run
 overrun on 2026-11-11: DECISIONS.md D26.)
 
-1. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
+1. **Confirm or overrule DECISIONS.md D28 point 3** (non-blocking): the session's development
+   subagents (the 2026-11-04 review-and-skeptic workflows, the pre-review QA, fix forks) are
+   treated as development work, not logged per call; counted as judging calls, 2026-11-04
+   would exceed the single-call cap.
+
+2. **Check one reference by hand.** The OpenAI post "How we monitor internal coding
    agents for misalignment"
    (https://openai.com/index/how-we-monitor-internal-coding-agents-misalignment) served
    a bot challenge to scripted access twice. Open it in a browser and confirm the
    title, date, and the brief's description; until then it is not cited.
-2. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
+3. **Claude arms (optional).** Claude subject runs and Claude-judge monitors need a
    machine where `claude` is logged in to the Max plan with none of
    `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or
    `CLAUDE_CODE_USE_*` set. The study fields four families without them.
-3. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
+4. **Sandbox (optional).** A running Docker daemon or bubblewrap would allow
    third-party code; until then only this project's own tasks with in-process mock
    tools run.
 

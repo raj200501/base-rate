@@ -366,6 +366,12 @@ also requires each applied waiver to be tracked and to cite a DECISIONS.md entry
 records Raj's approval for that day and kind (tests/test_gate_mutations.py). The overrun
 stays disclosed in README.md, CORRECTIONS.md, and STATUS.md.
 
+Raj's instruction of 2026-11-11, verbatim: "G14: Raj accepts the 2026-11-11 review-run
+overrun (D25). Record it in DECISIONS.md as a dated waiver approved by Raj on 2026-11-11,
+scoped to that one day and that one overrun, and make `make budget` and G14 honor exactly
+that waiver, with a test showing any other overrun still fails. Keep it disclosed in README,
+CORRECTIONS and STATUS. Caps stay unchanged."
+
 The approval, field by field (`make budget` and G14 require budget_waivers.toml to match
 this line exactly):
 
@@ -427,3 +433,21 @@ the share in force is the smaller of that and `CAP_SHARE` when the environment s
 (src/baserate/budget.py share_in_force; tools/review.py). An unset or larger `CAP_SHARE` can
 no longer raise the caps; a smaller one still lowers them. Claude ledger entries must record
 their share (they fail closed without it), and a day's cap uses the smallest share in force.
+
+## D30 (2026-11-12) Pushing main, and the commit trailers
+
+1. Main. D1 and D9 kept pushes to the working branch. On 2026-11-11 Raj wrote, after merging
+   the release: "Raj authorizes you to update main yourself: at each RELEASE-READY point, run
+   `git fetch origin && git merge --ff-only origin/main` ... confirm make ci passes on a fresh
+   clone and claimcheck and freshness pass, then `git push origin HEAD` and
+   `git push origin HEAD:main` (never force)", where a RELEASE-READY point is when "the branch
+   is worth publishing again (more gates passing, README still honest, make ci green)". The
+   session pushed main twice under that authorization: 543f7ef, when G14 newly passed, and
+   8c5f3d8, which corrected public README claims with the same gates passing, a looser
+   reading of "worth publishing" recorded here. From now on main moves only at a point with
+   more gates passing than the last one, an honest README, and make ci green on a fresh clone.
+2. Commit trailers. CLAUDE.md says commit messages never name the model serving the session.
+   At Raj's request (D13) and under the session's attribution instructions, every commit ends
+   with a Co-Authored-By trailer that names the co-authoring model; that trailer is the one
+   exception, and message bodies and repository files still never name the serving model.
+

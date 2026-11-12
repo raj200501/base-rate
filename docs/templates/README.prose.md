@@ -56,7 +56,8 @@ numbers do not.
 ## What is built and validated
 
 - **The library** (`src/baserate`, MIT): recall, precision, and false-positive rate at a
-  review budget and prevalence, with cluster-aware intervals; `baserate certify` (how many
+  review budget and prevalence, with cluster-aware intervals for recall and precision
+  (open issue N1 covers the false-positive rate); `baserate certify` (how many
   independent runs a claim needs); cascade sweeps and a budget-constrained optimizer; a
   monitor report card; an Armour trace adapter; a CLI and three offline examples. It is
   covered by a test suite that `make test` runs offline.
@@ -161,8 +162,9 @@ same prominence as the rest.
 
 - **Experiments:** E0 to E4 ran under their preregistrations, with the deviations
   docs/REPORT.md section 6 reports (the E1 amendments prereg/0006 and prereg/0007, and the
-  double commit of prereg/0003), and are banked under artifacts/. Every result above comes
-  from them; none comes from an unfinished experiment.
+  double commit of prereg/0003; smaller analysis choices not listed there are open issue N8
+  in docs/REVIEW_LOG.md), and are banked under artifacts/. Every result above comes from
+  them; none comes from an unfinished experiment.
 - **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
   and `make review` the review; STATUS.md records the latest result of each, and every review
   is kept in artifacts/review/. The first review blocked the release, and every blocking
@@ -170,8 +172,8 @@ same prominence as the rest.
   the others were gates that could pass with results missing. The usage ledger records a cap
   overrun on {{date:2026-11-11}}, a `make review` run beyond the project's share of review runs for
   that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
-  (DECISIONS.md D25 and D26, budget_waivers.toml). Caps are unchanged, and any other overrun
-  fails `make budget`.
+  (DECISIONS.md D25 and D26, budget_waivers.toml). Caps are unchanged; any other overrun,
+  whether logged or a banked review without its own logged run, fails `make budget` and G14.
 - **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify, and that the Armour rule configurations score every primary-set trace

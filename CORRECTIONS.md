@@ -3,6 +3,20 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-12 Claims refined after the 2026-11-12 review
+
+- README Status said any overrun other than the waived one fails `make budget`; that held
+  only for logged overruns until the B6 fix. It now says that any other overrun, logged or a
+  banked review without its own logged run, fails `make budget` and G14, which both now check.
+- The README's library bullet credited cluster-aware intervals to the false-positive rate as
+  well; it now scopes them to recall and precision and points to open issue N1. Its Status
+  section now says the smaller analysis choices of open issue N8 are not in the report's list
+  of deviations.
+- docs/REPORT.md's abstract and introduction still credited the library with
+  threshold-transfer tools; transfer is the E3 analysis, and both now say so. The size-ladder
+  paragraph now says the three rule configurations score every primary-set trace
+  identically, so its best rule monitor is a tie broken by list order.
+
 ## 2026-11-11 README claims made exact before the next review
 
 A development QA pass over the release README (commits 795ea75 to 543f7ef, public since the

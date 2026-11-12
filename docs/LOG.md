@@ -101,3 +101,12 @@ Iteration history moved out of STATUS.md. Newest last.
   wording fails), Claude ledger entries must record their share, the cap share is recorded in
   budget.toml (D29), and make review-start enforces and logs the daily review cap (D28 notes
   the turn cap and the development workflows). Each fix has a test that failed first.
+
+## 2026-11-12 Goal turn 6 (final sequence, review blocked)
+
+- make review-start logged the day's one review run (00:06 UTC); the review of d6f9ce0
+  returned BLOCK on B6 (G14 did not compare banked reviews with the ledger). Fixed with tests
+  in 2633213; README and REPORT wording, D26 (Raj's instruction quoted), and D30 (main pushes,
+  commit trailers) answer the cheap non-blocking items. Next review: 2026-11-13 00:05 UTC.
+- Lapse: commit 05e65dd (the BLOCK review and its log entries) was pushed before make ci ran;
+  make ci then passed on it. Every later push runs make ci in the same command first.

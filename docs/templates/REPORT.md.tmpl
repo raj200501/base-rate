@@ -13,8 +13,8 @@ A monitor over an agent's traffic is worth what it catches at the prevalence of 
 violations and the number of trajectories humans can review, not its accuracy on a
 balanced test set. base-rate is an open library that estimates recall, precision, and the
 false-positive rate at a fixed review budget and a stated prevalence, with interval methods
-whose coverage was checked by a preregistered simulation, and with sample-size,
-threshold-transfer, and cascade tools built on the same estimators. We apply it, in four
+whose coverage was checked by a preregistered simulation, and with sample-size and cascade
+tools built on the same estimators. We apply it, in four
 preregistered experiments, to a corpus of {{claim:corpus.total.traces}} labeled
 trajectories from {{claim:corpus.total.runs}} independent source runs of small local agents
 in eight mock-tool domains, and to three Armour rule configurations, Qwen3 monitors from
@@ -49,9 +49,9 @@ benign runs stand behind a false-positive rate.
 This report describes base-rate, an open library and study for that question. The
 library estimates recall, precision, and the false-positive rate at a fixed review
 budget and a stated prevalence, with interval methods whose coverage was checked by a
-preregistered simulation; computes how many labeled runs a claim needs; tests whether a
-threshold tuned in one setting transfers to another; and optimizes cheap-to-expensive
-monitor cascades under compute and review budgets. The study applies it to a labeled
+preregistered simulation; computes how many labeled runs a claim needs; and optimizes
+cheap-to-expensive monitor cascades under compute and review budgets. The study, which also
+tests whether a threshold tuned in one setting transfers (E3), applies it to a labeled
 corpus of agent trajectories in mock-tool domains, built for this purpose, and to four
 monitor families: rule monitors, a size ladder of small open-weight model monitors with
 one frozen prompt, an ensemble, and a cascade.
@@ -470,8 +470,10 @@ reviewed trajectory is benign; at {{param:1e-2}} the ensemble's precision was
 {{claim:e2.ladder.qwen3-0.6b}}, {{name:1.7B}} {{claim:e2.ladder.qwen3-1.7b}}, {{name:4B}}
 {{claim:e2.ladder.qwen3-4b}}, and {{name:8B}} {{claim:e2.ladder.qwen3-8b}}. The preregistered
 crossing rule names the {{name:8B}} rung as the first whose point estimate exceeds the best
-rule monitor's, but not clearly, since the intervals overlap; a larger model, a better
-prompt, or both might change that, and this study does not say which.
+rule monitor's, but not clearly, since the intervals overlap (the three rule configurations
+score every primary-set trace identically, so that best rule monitor is a tie broken by list
+order); a larger model, a better prompt, or both might change that, and this study does not
+say which.
 
 ![Figure 3: recall at the budget along the model size ladder, with the best rule monitor for reference](../artifacts/report/figures/size_ladder.svg)
 
