@@ -657,3 +657,36 @@ def test_repository_reviews_are_all_logged() -> None:
     reviews = budget.read_banked_reviews(root / "artifacts" / "review")
     entries = budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl")
     assert len(reviews) >= 3 and budget.unlogged_reviews(reviews, entries) == []
+
+
+def test_a_headless_review_run_is_held_to_the_turn_cap() -> None:
+    """D28: claude_agent_max_turns binds headless children, a headless review among them."""
+    caps = budget.parse_budget(_defaults(cap_share=0.2))  # 8 turns at 0.2
+    over = budget.LedgerEntry(
+        ts=budget.datetime.fromisoformat("2026-11-20T01:00:00+00:00"),
+        kind="claude_review_run",
+        turns=9,
+        cap_share=0.2,
+    )
+    report = budget.check_ledger(caps, [over], (), 0.2)
+    assert any("9 turns > cap 8" in v for v in report.violations)
+    subagent = budget.LedgerEntry(  # a subagent review records no turns: nothing to check
+        ts=budget.datetime.fromisoformat("2026-11-21T01:00:00+00:00"),
+        kind="claude_review_run",
+        cap_share=0.2,
+    )
+    assert budget.check_ledger(caps, [subagent], (), 0.2).ok
+
+
+def test_audit_runs_every_check_the_cli_runs(tmp_path: Path) -> None:
+    _, led = _write(
+        tmp_path,
+        DEFAULT_TOML + "cap_share = 0.2\n",
+        [{"ts": "2026-11-12T00:06:05+00:00", "kind": "claude_review_run", "cap_share": 0.2}],
+    )
+    d = tmp_path / "artifacts" / "review"
+    _bank(d, ("c" * 40, "2026-11-12T03:00:00Z"), ("b" * 40, "2026-11-12T01:00:00Z"))
+    result = budget.audit(tmp_path, env=None, ledger=led)
+    assert not result.report.ok
+    assert any("has no claude_review_run entry" in v for v in result.report.violations)
+    assert result.share == 0.2

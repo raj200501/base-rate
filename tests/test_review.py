@@ -198,3 +198,37 @@ def test_the_budget_files_share_binds_without_the_environment(
     assert len(_ledger(root)) == 1
     monkeypatch.setenv("CAP_SHARE", "1")  # the environment cannot raise it
     assert review.start_subagent(root, now=NOW.replace(hour=13)) != 0
+
+
+def test_review_start_refuses_when_a_banked_review_is_unlogged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """review-start runs the same checks as make budget (review N24), banked reviews included."""
+    monkeypatch.delenv("CAP_SHARE", raising=False)
+    root = _root(tmp_path)
+    (root / "budget.toml").write_text(BUDGET + "cap_share = 0.2\n")
+    review_dir = root / "artifacts" / "review"
+    review_dir.mkdir(parents=True)
+    (review_dir / "latest.json").write_text(
+        json.dumps({"reviewed_commit": "a" * 40, "reviewed_at": "2026-11-11T05:00:00Z"})
+    )
+    assert review.start_subagent(root, now=NOW) != 0  # the 2026-11-11 review was never logged
+    assert _ledger(root) == []
+
+
+def test_review_start_refuses_an_unapproved_waiver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CAP_SHARE", raising=False)
+    root = _root(
+        tmp_path,
+        [_run("2026-11-11T01:00:00+00:00"), _run("2026-11-11T02:00:00+00:00")],
+    )
+    (root / "budget.toml").write_text(BUDGET + "cap_share = 0.2\n")
+    (root / "budget_waivers.toml").write_text(
+        '[[waiver]]\ndecision = "D26"\nday = "2026-11-11"\nkind = "claude_review_run"\n'
+        'max_entries = 2\napproved_by = "Raj Kashikar"\napproved_on = "2026-11-11"\n'
+    )
+    (root / "DECISIONS.md").write_text("# Decisions\n")  # no approval record
+    assert review.start_subagent(root, now=NOW) != 0
+    assert len(_ledger(root)) == 2

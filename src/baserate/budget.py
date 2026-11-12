@@ -493,6 +493,13 @@ def check_ledger(
                 report.violations.append(f"{e.ts.isoformat()}: agent run without turn count")
             elif e.turns > cap:
                 report.violations.append(f"{e.ts.isoformat()}: {e.turns} turns > cap {cap:g}")
+        if e.kind == "claude_review_run" and e.turns is not None:
+            # a headless review records its turns; claude_agent_max_turns binds it (D28)
+            cap = effective_cap(budget, "claude_agent_max_turns", min(e.cap_share, ceiling))
+            if e.turns > cap:
+                report.violations.append(
+                    f"{e.ts.isoformat()}: review run of {e.turns} turns > cap {cap:g}"
+                )
         if e.kind == "local_call" and e.params_b is not None:
             cap = budget.caps["local_model_max_params_b"]
             if e.params_b > cap:
@@ -669,6 +676,59 @@ def unlogged_reviews(reviews: Iterable[BankedReview], entries: Iterable[LedgerEn
     return problems
 
 
+@dataclass
+class AuditResult:
+    """Everything ``make budget`` checks, for one repository."""
+
+    budget: Budget
+    entries: list[LedgerEntry]
+    report: BudgetReport
+    share: float
+
+
+def audit(
+    root: Path,
+    env: str | None,
+    *,
+    budget_path: Path | None = None,
+    ledger: Path | None = None,
+    waivers: Path | None = None,
+    decisions: Path | None = None,
+    reviews: Path | None = None,
+) -> AuditResult:
+    """Run every check of ``make budget`` (and ``make review-start``) for ``root``.
+
+    The caps at the share in force (budget.toml's ``cap_share``, lowered by ``env``,
+    the ``CAP_SHARE`` value), the waivers with their DECISIONS.md approval records
+    (an unapproved waiver is a violation and is not applied), and every banked review
+    against the ledger. Paths default to their places beside budget.toml.
+
+    Raises:
+        BudgetError: If a file is missing, unreadable, or malformed.
+    """
+    budget_file = budget_path or root / "budget.toml"
+    base = budget_file.parent
+    budget = load_budget(budget_file)
+    share = share_in_force(budget, env)
+    rows = load_waivers(waivers or base / "budget_waivers.toml")
+    problems: list[str] = []
+    text = ""
+    if rows:
+        try:
+            text = (decisions or base / "DECISIONS.md").read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise BudgetError(f"waivers need their approval records: {exc}") from exc
+        problems = waiver_record_problems(rows, text)
+    valid = [w for w in rows if not waiver_record_problems([w], text)]
+    entries = read_ledger(ledger or base / "artifacts" / "usage" / "ledger.jsonl")
+    report = check_ledger(budget, entries, valid, cap_share=share)
+    problems += unlogged_reviews(
+        read_banked_reviews(reviews or base / "artifacts" / "review"), entries
+    )
+    report.violations[:0] = problems
+    return AuditResult(budget, entries, report, share)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Print the budget report; exit non-zero on any violation."""
     parser = argparse.ArgumentParser(prog="baserate budget", description=__doc__)
@@ -693,35 +753,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="banked reviews to match with the ledger (default: artifacts/review by --budget)",
     )
     args = parser.parse_args(argv)
-    waivers_path = args.waivers or args.budget.parent / "budget_waivers.toml"
-    decisions_path = args.decisions or args.budget.parent / "DECISIONS.md"
-    reviews_path = args.reviews or args.budget.parent / "artifacts" / "review"
     try:
-        budget = load_budget(args.budget)
-        share = share_in_force(budget, os.environ.get("CAP_SHARE"))
-        waivers = load_waivers(waivers_path)
-        problems: list[str] = []
-        decisions = ""
-        if waivers:
-            try:
-                decisions = decisions_path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError) as exc:
-                raise BudgetError(f"waivers need their approval records: {exc}") from exc
-            problems = waiver_record_problems(waivers, decisions)
-        valid = (
-            [w for w in waivers if not waiver_record_problems([w], decisions)] if waivers else []
+        result = audit(
+            args.budget.parent,
+            os.environ.get("CAP_SHARE"),
+            budget_path=args.budget,
+            ledger=args.ledger,
+            waivers=args.waivers,
+            decisions=args.decisions,
+            reviews=args.reviews,
         )
-        entries = read_ledger(args.ledger)
-        report = check_ledger(budget, entries, valid, cap_share=share)
-        problems += unlogged_reviews(read_banked_reviews(reviews_path), entries)
-        report.violations[:0] = problems
     except BudgetError as exc:
         print(f"budget error: {exc}")
         print("caps: VIOLATED")
         return 1
-    for line in format_report(budget, report):
+    for line in format_report(result.budget, result.report):
         print(line)
-    return 0 if report.ok else 1
+    return 0 if result.report.ok else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

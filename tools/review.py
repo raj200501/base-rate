@@ -211,16 +211,14 @@ def start_subagent(root: Path, now: datetime | None = None) -> int:
     now = (now or datetime.now(UTC)).astimezone(UTC)
     today = now.date().isoformat()
     try:
-        share = cap_share(root)
-        caps = budget_mod.load_budget(root / "budget.toml")
-        entries = budget_mod.read_ledger(root / LEDGER)
-        waivers = budget_mod.load_waivers(root / "budget_waivers.toml")
-        report = budget_mod.check_ledger(caps, entries, waivers)
+        cap_share(root)  # validates CAP_SHARE with its own message
+        result = budget_mod.audit(root, os.environ.get("CAP_SHARE"), ledger=root / LEDGER)
     except (ValueError, budget_mod.BudgetError) as exc:
         print(f"cannot start a review: {exc}; no review runs")
         return 2
+    caps, entries, share, report = result.budget, result.entries, result.share, result.report
     if not report.ok:
-        print(f"the usage ledger already breaks a cap ({report.violations[0]}); no review runs")
+        print(f"make budget fails ({report.violations[0]}); no review runs")
         return 1
     cap = budget_mod.effective_cap(caps, "claude_review_runs_per_day", share)
     used = sum(
