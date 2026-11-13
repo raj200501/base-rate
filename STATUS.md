@@ -1,9 +1,9 @@
-goal_turn: 11
+goal_turn: 12
 STATE: ACTIVE
 
 # Status
 
-Updated 2026-11-12 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
+Updated 2026-11-13 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
 
 ## Gates
 
@@ -29,20 +29,12 @@ CORRECTIONS.md. Since then the README changed, so G12 needs a review of the curr
 
 ## Now
 
-The second review of 2026-11-12 (a1b287b, D31) returned BLOCK on B6 (second round) and B7;
-both were fixed in 7d1e31e, and main was updated once at the end of Raj's sprint (D33). A
-read-only pre-review QA workflow (D34) then found three more gate defects and two mislabeled
-claims a reviewer could block on, and about twenty-five smaller issues; they are fixed or
-logged as N30 to N58 in docs/REVIEW_LOG.md (D35), so the next review can reuse their ids.
-Heartbeat of 04:19 UTC: with no review allowed until 2026-11-13, the full-check-only parts
-of G10 were run on a fresh clone of 8a0c390 (`make reproduce`: REPRODUCE: PASS 4 checks, no
-file changed; freshness passed), so the re-rendered claims hold for the full ship-check.
-Heartbeat of 06:19 UTC: the qualitative statements the documentation fork added (D35) were
-checked against the artifacts and hold: the 1.7B and 4B intervals at 100 reviews lie below
-the random-review rate; the ensemble's natural-violation interval lies above it and the
-cascade's contains it; most E3 pairs within the recall gap missed the budget by more than a
-factor of two; audit agreement was lower on natural violations; the E3 set is mostly
-procedural variants.
+The 2026-11-13 review allowance opened at 00:05 UTC. `make review-start` logged the day's one
+review run (00:05:57 UTC); this commit carries that entry, and the reviewer subagent reviews
+it (brief 10.6 final sequence). The 2026-11-12 work this review covers: B6 (second round)
+and B7 fixed in 7d1e31e; the pre-review QA (D34) and its fixes (D35, D36), with every QA
+finding logged as N30 to N58; `make reproduce` passing on a fresh clone; and the claim
+fork's qualitative statements checked against the artifacts.
 
 ## Next three actions
 
