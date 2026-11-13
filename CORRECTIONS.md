@@ -3,6 +3,61 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-12 Claims corrected after the pre-review QA (DECISIONS.md D34, D35)
+
+- E4 (README Key results heading and bullet; REPORT abstract and sections 5.4, 5.5, and 6):
+  the cascade's held-out gain over the 8B alone was stated without saying that the held-out
+  violations mix natural and synthetic inserted ones, or that E4 reports no recall by
+  source. Every E4 statement now says so, and section 5.5 now says the combined monitors'
+  gain was mostly on synthetic inserted violations where E2 splits by source (QA claims0).
+- The REPORT abstract gave the corpus size with no synthetic share and called every source
+  run a run of small local agents; it now gives the synthetic share and its sources, and
+  says a few source runs are groups of Armour's records. The README pitch called the same
+  count "independent agent runs"; it now says independent source runs (claims1).
+- REPORT section 5.2 said the single monitors sit "at or near" the random-review rate, but
+  at the largest budget the 1.7B and 4B monitors fall below it, which neither document
+  said. Both now say it, and the README heading says single monitors were no better than
+  random review (claims2).
+- README Highlights and Key results and the REPORT abstract and section 5.2 explained the
+  curated-records contrast by the violations alone; they now say that Armour's records are
+  scored against Armour's own benign records, so the benign tail differs too (claims3).
+- The README gave the label audit's pooled agreement without saying the sample is half
+  synthetic by design; it now says so, and that agreement was lower on natural violations
+  (docs/DATA.md gives each stratum) (claims4).
+- Recall by violation source was rendered at two decimals, which hid that the ensemble's
+  natural-violation interval lies just above the random-review rate. Breakdown claims now
+  render at three decimals like the other recall claims, and the README says which interval
+  excludes the random-review rate (claims5).
+- Interval claims withdrawn or narrowed earlier still stood in places: the README diagram's
+  "Intervals validated in simulation", the README method summary's interval for the
+  false-positive rate, REPORT section 4's "a simulation study of every interval method",
+  and unscoped coverage claims in the REPORT abstract, introduction, and related work. Each
+  now names the budget-recall and fixed-threshold methods E0 checked, or scopes intervals
+  to recall and precision (open issue N1) (claims6).
+- The README and REPORT section 3.1 said every interval resamples or counts source runs; the
+  label-audit interval counts audited records. Both now scope the statement to monitor
+  metrics (claims7).
+- The REPORT abstract said transferred thresholds "did not keep" the review load within a
+  factor of two, and section 5.3 generalized to teams and product surfaces. The abstract now
+  gives the shares of domain pairs that did, section 5.3 speaks of this corpus's mock
+  domains, and both documents say that many pairs within the recall-transfer bar had also
+  missed the review budget, so H3.2 is weak evidence; the README labels the E3 set as mostly
+  procedural variants (claims9).
+- The README said "the same monitors look strong on curated records" and the REPORT
+  abstract "the larger models"; only the rule monitors and the 4B and 8B models reached
+  recall near one there, and both now say so (claims10).
+- REPORT section 4 said "All four confirmatory experiments" before describing E0 to E4; it
+  now says E0 to E4 (claims11).
+- docs/DATA.md said Raj built the corpus; it now says a Claude Code session operated by Raj
+  built it, as REPORT section 7 says (claims12).
+- README Status said the latest review blocked and that its fixes await the next review, a
+  sentence that would turn false once that review lands; it now points to STATUS.md and
+  artifacts/review/latest.json for the latest verdict (process0). Its sentence on the
+  review-run check now states the rule of DECISIONS.md D35 (a run logged within six hours
+  before each review and after the review before it, checked over every committed version
+  of the review files and the ledger) and that `make budget` checks only the files at HEAD
+  (QA gates5).
+
 ## 2026-11-12 Claims corrected after the review of a1b287b
 
 - README Highlights (new in a1b287b) gave the reviewer-calibrated rule's pooled primary-set

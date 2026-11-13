@@ -292,7 +292,7 @@ def utc_day(ts: datetime) -> str:
 
 @dataclass(frozen=True)
 class Waiver:
-    """One past cap overrun that Raj accepted (recorded in DECISIONS.md).
+    """One cap overrun that Raj accepted on or after its day (recorded in DECISIONS.md).
 
     Attributes:
         decision: The DECISIONS.md entry that records the approval (``D26``).
@@ -333,8 +333,9 @@ def parse_waivers(data: Mapping[str, Any]) -> list[Waiver]:
 
     Raises:
         BudgetError: On an unknown or missing field, a kind without a daily cap,
-            a non-positive entry count, an invalid date, a waiver dated before its
-            overrun (waivers accept past overruns only), or a repeated day and kind.
+            a non-positive entry count, an invalid date, a waiver approved before its
+            day (Raj approves a waiver on or after the day it covers), or a repeated day
+            and kind.
     """
     unknown = sorted(set(data) - {"waiver"})
     if unknown:
@@ -365,7 +366,7 @@ def parse_waivers(data: Mapping[str, Any]) -> list[Waiver]:
         if approved_on < day:
             raise BudgetError(
                 f"waiver {decision} is approved before its overrun day {day}; "
-                "a waiver may only accept a past overrun"
+                "a waiver may not be dated before the day it covers"
             )
         kind = str(item["kind"])
         if kind not in DAILY_CAP_FOR_KIND:
@@ -606,6 +607,16 @@ def _aware(ts: datetime) -> datetime:
     return (ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)).astimezone(UTC)
 
 
+def as_utc(ts: datetime) -> datetime:
+    """A ledger or review time in UTC (a naive time is taken as UTC)."""
+    return _aware(ts)
+
+
+def utc_iso(ts: datetime) -> str:
+    """A ledger or review time as ISO 8601 in UTC."""
+    return _aware(ts).isoformat()
+
+
 def parse_banked_review(data: Any, where: str) -> BankedReview:
     """One review record: its ``reviewed_commit`` and ``reviewed_at`` (ISO 8601).
 
@@ -647,75 +658,47 @@ def read_banked_reviews(review_dir: Path) -> list[BankedReview]:
     return sorted(seen.values(), key=lambda r: r.reviewed_at)
 
 
-def unlogged_reviews(reviews: Iterable[BankedReview], entries: Iterable[LedgerEntry]) -> list[str]:
-    """Banked reviews without their own ``claude_review_run`` entry (review B6).
+MAX_REVIEW_RUN = timedelta(hours=6)
+"""How long before its review a review run's entry may be logged (D35).
 
-    A run is logged when it starts (D27) and banks at most one review, and runs do not
+A review run takes minutes (the headless path is also held to the turn cap), so a run's
+entry is logged at most this long before the review it banks.
+"""
+
+
+def unlogged_reviews(reviews: Iterable[BankedReview], entries: Iterable[LedgerEntry]) -> list[str]:
+    """Banked reviews without their own ``claude_review_run`` entry (review B6, D32, D35).
+
+    A run is logged when it starts (D27), banks at most one review, and runs do not
     overlap. So, taking the banked reviews in time order, each needs a ``claude_review_run``
     entry logged after the review banked before it and at or before its own
-    ``reviewed_at``, and no earlier than the previous UTC day (a run may finish after
-    midnight). Successive windows do not overlap, so one entry never covers two reviews,
-    and an entry left by a run that banked nothing cannot cover a review banked after
-    another review.
+    ``reviewed_at``, at most :data:`MAX_REVIEW_RUN` earlier. Successive windows do not
+    overlap, so one entry never covers two reviews, and each review's run starts on the UTC
+    day of an entry that the ledger's daily cap already counts.
 
     This checks the ledger against the reviews; it cannot see a run that leaves no trace.
-    An entry left by a run that banked nothing can still pair with the next review if that
-    review ran without ``make review-start``; :func:`reviews_over_daily_cap` then still
-    holds the day's reviews to the day's review cap.
+    An entry left by a run that banked nothing can still pair with a review banked soon
+    after it that ran without ``make review-start`` (D32 point 4).
     """
     runs = sorted(_aware(e.ts) for e in entries if e.kind == "claude_review_run")
     problems: list[str] = []
     previous: datetime | None = None
     for review in sorted(reviews, key=lambda r: r.reviewed_at):
         at = review.reviewed_at
-        start = datetime.combine(at.date() - timedelta(days=1), datetime.min.time(), UTC)
+        try:
+            start = at - MAX_REVIEW_RUN
+        except OverflowError:
+            start = datetime.min.replace(tzinfo=UTC)
+        if previous is not None:
+            start = max(start, previous)
         if not any(start <= ts <= at and (previous is None or ts > previous) for ts in runs):
-            after = f"after the review at {previous.isoformat()} and " if previous else ""
+            after = f"after the review at {previous.isoformat()}, " if previous else ""
+            hours = MAX_REVIEW_RUN.total_seconds() / 3600
             problems.append(
                 f"review of {review.reviewed_commit[:12]} at {at.isoformat()} has no "
-                f"claude_review_run entry logged {after}at or before it "
-                "(same or previous UTC day)"
+                f"claude_review_run entry logged {after}at most {hours:g} hours before it"
             )
         previous = at
-    return problems
-
-
-def reviews_over_daily_cap(
-    budget: Budget,
-    reviews: Iterable[BankedReview],
-    entries: Iterable[LedgerEntry],
-    cap_share: float,
-    waivers: Sequence[Waiver] = (),
-) -> list[str]:
-    """UTC days on which more reviews were banked than review runs were allowed (review B6).
-
-    A run banks at most one review, so the reviews banked on a UTC day are held to that
-    day's ``claude_review_run`` cap, or to the day's waiver for that kind (D26, D31). As in
-    :func:`check_ledger`, the day's share is the smallest of ``cap_share`` and every
-    ``cap_share`` logged that day. This catches an unlogged review that paired with an
-    entry logged the day before by a run that banked nothing. A run that starts before
-    midnight and banks its review after it counts on both days here, which can only fail
-    closed.
-    """
-    day_share: dict[str, float] = {}
-    for e in entries:
-        day = utc_day(e.ts)
-        day_share[day] = min(day_share.get(day, cap_share), e.cap_share)
-    by_day = {w.day: w for w in waivers if w.kind == "claude_review_run"}
-    counts = Counter(utc_day(r.reviewed_at) for r in reviews)
-    problems: list[str] = []
-    for day, n in sorted(counts.items()):
-        cap = effective_cap(
-            budget, DAILY_CAP_FOR_KIND["claude_review_run"], day_share.get(day, cap_share)
-        )
-        w = by_day.get(day)
-        allowed = max(cap, w.max_entries) if w else cap
-        if n > allowed:
-            runs = "review run" if allowed == 1 else "review runs"
-            note = f" (waiver {w.decision})" if w else ""
-            problems.append(
-                f"{day}: {n} banked reviews > {allowed:g} {runs} allowed that day{note}"
-            )
     return problems
 
 
@@ -765,9 +748,9 @@ def audit(
     valid = [w for w in rows if not waiver_record_problems([w], text)]
     entries = read_ledger(ledger or base / "artifacts" / "usage" / "ledger.jsonl")
     report = check_ledger(budget, entries, valid, cap_share=share)
-    banked = read_banked_reviews(reviews or base / "artifacts" / "review")
-    problems += unlogged_reviews(banked, entries)
-    problems += reviews_over_daily_cap(budget, banked, entries, share, valid)
+    problems += unlogged_reviews(
+        read_banked_reviews(reviews or base / "artifacts" / "review"), entries
+    )
     report.violations[:0] = problems
     return AuditResult(budget, entries, report, share)
 

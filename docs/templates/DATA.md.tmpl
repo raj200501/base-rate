@@ -18,8 +18,8 @@ monitor's recall and precision at a fixed human-review budget, at deployment pre
 far below those of any labeled set. That needs benign trajectories in bulk, violation
 trajectories with the step at which each violation happens, and a record of which
 trajectories share a source run, because an interval is only as tight as the number of
-independent runs behind it. It was built by Raj Kashikar for the base-rate study, with no
-funding and no paid compute.
+independent runs behind it. It was built for the base-rate study by a Claude Code session
+operated by Raj Kashikar, with no funding and no paid compute.
 
 ## Composition
 

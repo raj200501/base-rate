@@ -111,6 +111,16 @@ Iteration history moved out of STATUS.md. Newest last.
 - Lapse: commit 05e65dd (the BLOCK review and its log entries) was pushed before make ci ran;
   make ci then passed on it. Every later push runs make ci in the same command first.
 
+## 2026-11-12 Goal turn 7 (Raj's one-hour sprint)
+
+- Raj asked for all fourteen gates within the hour and approved one extra review run that
+  day (D31). The README gained a Highlights section; the waiver test pins D26 and D31.
+- The run's ledger entry was written by hand at 01:31:00 UTC, because make review-start
+  refused the run (it did not yet count an advance waiver; N26, fixed in turn 8).
+- For the record moved from STATUS.md: at 19dbd5a (2026-11-11) the full ship-check printed
+  PASS 14/14 with REVIEW: SHIP and the local tag v1.0; that pass is qualified because G14
+  then passed on a ledger missing two review runs (D25, D26; CORRECTIONS.md).
+
 ## 2026-11-12, goal turn 8 (Raj's one-hour sprint, continued)
 
 - The second review of the day (a1b287b; D31) returned BLOCK on B6 (second round) and B7,
@@ -124,4 +134,20 @@ Iteration history moved out of STATUS.md. Newest last.
 - N26: review-start audits the ledger with the new run included, so an advance waiver works;
   D31 discloses that its run's entry was written by hand. D32 records the design, D33 the
   end-of-sprint update of main.
+- End of the sprint: make ci passed on a fresh clone of 7d1e31e, claimcheck and freshness
+  passed, and main was fast-forwarded to 7d1e31e (D33). The fast ship-check was 13/14
+  (G12: latest review BLOCK).
+
+## 2026-11-12 Goal turn 9 (pre-review QA)
+
+- D34: a read-only QA workflow of three agents probed the fixes before the next review. It
+  reproduced three gate defects (ledger read only at HEAD, review versions missed by path
+  quoting, side branches, and merges, renames hiding drift) and two mislabeled claims (E4
+  without a synthetic label, the corpus without its synthetic share in the abstract).
+- D35: G14 and G12 now read every commit's review files and ledger (`rev-list` and
+  `ls-tree -z`), count every ledger entry ever committed, reject a banked review edited in
+  place, and list renamed files under both names; a review's run must be logged at most six
+  hours before it, replacing D32's per-day review count, which failed a legitimate
+  after-midnight history. Tests failed first. A documentation fork fixed the claims
+  (CORRECTIONS.md). All QA findings are logged as N30 to N58.
 

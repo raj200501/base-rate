@@ -509,3 +509,56 @@ public README claims (B7, N4, N28) and fixes gate defects (B6, N26, N27). Under 
 instruction the session updates main once at the end of the sprint, by the procedure of D30
 (fast-forward only, make ci on a fresh clone, claimcheck and freshness), and returns to D30's
 rule afterwards.
+
+## D34 (2026-11-12) Pre-review QA before the 2026-11-13 review
+
+Recorded before it runs. To find defects before the next `make review` (the only review run
+on 2026-11-13 at CAP_SHARE=0.2), the session runs one read-only QA workflow of three agents
+over the fixes of 7d1e31e: gate integrity (G12, G14, make budget, make review-start), claim
+honesty (README.md, docs/REPORT.md, docs/DATA.md against the artifacts), and process rules
+(section 9 and CLAUDE.md over the commits since d6f9ce0). Like the 2026-11-11 pre-review QA,
+it is development work under D28 point 3, not a logged claude_agent_run: such an entry needs
+a turn count within claude_agent_max_turns (8 at the 0.2 share), which a QA agent exceeds.
+Raj may overrule D28 point 3 (STATUS.md, Needs Raj); until then every such workflow is
+recorded here before it runs. The agents edit nothing; the session verifies each finding
+before acting on it.
+
+## D35 (2026-11-12) Acting on the pre-review QA (D34)
+
+Recorded before acting. The QA of D34 found five issues a reviewer could block on and about
+twenty-five smaller ones; each blocking one was reproduced. Changes:
+
+1. Review runs (amends D32 points 1 to 3). A review's run must be logged within six hours
+   before it (a review run lasts minutes; the headless path is held to the turn cap), after
+   the review banked before it. With the ledger's own daily cap this bounds the reviews of
+   each run-start day, so D32's separate count of reviews per banked day is dropped: it
+   failed a legitimate run that banks after midnight followed by the next day's run, and no
+   waiver could clear it. G14 reads every version of artifacts/review/latest.json and
+   artifacts/review/history/*.json and of the usage ledger in HEAD's ancestry (every commit,
+   merges and side branches included, paths read without quoting), and counts every
+   review-run entry ever committed, so deleting an entry cannot hide a run. A banked review
+   whose content changed under the same reviewed commit and time fails. G12 also requires
+   latest.json to be newer than every review run ever logged, and its drift check lists
+   renamed files under both names. The limit of D32 point 4 stands.
+2. An advance waiver (D31) is committed together with the entry of the run it covers; until
+   that run is logged, `make budget` reports that the waiver excuses no overrun.
+3. Documentation. A fork subagent of this session, development work under D28 point 3 like
+   the fix forks of 2026-11-11, corrects the README, REPORT, and DATA claims the QA found
+   mislabeled or overstated (synthetic labels on E4 and on the corpus, scoped interval
+   claims, wording that would go stale once the next review lands) and records them in
+   CORRECTIONS.md. The session reviews its diff before committing.
+4. The QA findings left open are logged in docs/REVIEW_LOG.md as N30 and later, marked as
+   found by the pre-review QA, so the next review can reuse their ids. Under brief 10.1
+   step 8 a reviewed commit may differ from HEAD only in artifacts/review/, STATUS.md, and
+   docs/LOG.md, so a review that raises new ids cannot pass G12 the same day.
+
+## D36 (2026-11-12) E4 reports no recall by violation source (a deviation found late)
+
+Brief section 5 asks that natural, inserted, and dataset violations be reported
+separately, including recall by source. E4's preregistration (prereg/0005) did not include
+a split by source, and artifacts/e4/results.json has none, so the E4 cascade results pool
+natural and synthetic inserted violations. The pre-review QA found this (D34). It is a
+deviation from the brief, not from the preregistration; the README and REPORT section 5.4
+now say for every E4 result that its held-out violations mix natural and synthetic inserted
+ones and that E4 has no split by source, and E2, which does split, carries the by-source
+comparison. A split for E4 would be exploratory and is left for later work.

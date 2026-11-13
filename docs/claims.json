@@ -961,17 +961,17 @@
   "e2.by.subject_model.qwen3-1.7b-q8_0.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.n": {
    "source": "artifacts/e2/results.json",
@@ -981,47 +981,47 @@
   "e2.by.subject_model.qwen3-1.7b-q8_0.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-1.7b-q8_0.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=subject_model,value=qwen3-1.7b-q8_0]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.n": {
    "source": "artifacts/e2/results.json",
@@ -1031,47 +1031,47 @@
   "e2.by.subject_model.qwen3-4b-q4_k_m.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.subject_model.qwen3-4b-q4_k_m.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=subject_model,value=qwen3-4b-q4_k_m]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.n": {
    "source": "artifacts/e2/results.json",
@@ -1081,47 +1081,47 @@
   "e2.by.violation_source.inserted.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.inserted.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_source,value=inserted]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.n": {
    "source": "artifacts/e2/results.json",
@@ -1131,47 +1131,47 @@
   "e2.by.violation_source.natural.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_source.natural.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_source,value=natural]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.n": {
    "source": "artifacts/e2/results.json",
@@ -1181,47 +1181,47 @@
   "e2.by.violation_type.audit_log_edit.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.audit_log_edit.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_type,value=audit_log_edit]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.n": {
    "source": "artifacts/e2/results.json",
@@ -1231,47 +1231,47 @@
   "e2.by.violation_type.false_completion.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.false_completion.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_type,value=false_completion]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.n": {
    "source": "artifacts/e2/results.json",
@@ -1281,47 +1281,47 @@
   "e2.by.violation_type.scope_overreach.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.scope_overreach.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_type,value=scope_overreach]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.n": {
    "source": "artifacts/e2/results.json",
@@ -1331,47 +1331,47 @@
   "e2.by.violation_type.unapproved_escalation.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unapproved_escalation.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_type,value=unapproved_escalation]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.baseline": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-baseline,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.cascade-qwen3-0.6b-qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=cascade:model:qwen3-0.6b-q8_0>model:qwen3-8b-q4_k_m@0.05,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.ensemble--rank-mean-": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[family=ensemble,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.n": {
    "source": "artifacts/e2/results.json",
@@ -1381,32 +1381,32 @@
   "e2.by.violation_type.unauthorized_data_access.qwen3-0.6b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-0.6b-q8_0,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.qwen3-1.7b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-1.7b-q8_0,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.qwen3-4b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-4b-q4_k_m,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.qwen3-8b": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=model:qwen3-8b-q4_k_m,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.reviewer-calibrated": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-reviewer-calibrated,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.by.violation_type.unauthorized_data_access.strict-agent": {
    "source": "artifacts/e2/results.json",
    "select": "breakdowns[monitor=rule:armour-strict-agent,by=violation_type,value=unauthorized_data_access]",
-   "format": "{recall:.2f} [{ci_low:.2f}, {ci_high:.2f}]"
+   "format": "{recall:.3f} [{ci_low:.3f}, {ci_high:.3f}]"
   },
   "e2.cascade-qwen3-0.6b-qwen3-8b.precision_at_budget.p0.0001.b100": {
    "source": "artifacts/e2/results.json",

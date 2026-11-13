@@ -28,7 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +56,17 @@ def git(root: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+def _utc_time(value: Any) -> bool:
+    """Whether ``value`` is an ISO 8601 time with a UTC offset (``Z`` or ``+00:00``)."""
+    if not isinstance(value, str):
+        return False
+    try:
+        at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return at.utcoffset() == timedelta(0)
+
+
 def validate(review: Any) -> list[str]:
     """Return schema problems in a parsed review (empty means valid)."""
     if not isinstance(review, dict):
@@ -67,6 +78,8 @@ def validate(review: Any) -> list[str]:
         problems.append("reviewed_commit must be a full 40-character SHA")
     if review.get("reviewer") not in {"headless-opus", "subagent"}:
         problems.append("reviewer must be headless-opus or subagent")
+    if not _utc_time(review.get("reviewed_at")):
+        problems.append("reviewed_at must be an ISO 8601 UTC time (for example ...T01:53:00Z)")
     verdict = review.get("verdict")
     if verdict not in {"SHIP", "BLOCK"}:
         problems.append("verdict must be SHIP or BLOCK")
@@ -101,7 +114,9 @@ def drift_outside_allowed(root: Path, reviewed: str) -> list[str] | None:
         git(root, "merge-base", "--is-ancestor", reviewed, "HEAD")
     except subprocess.CalledProcessError:
         return None
-    changed = git(root, "diff", "--name-only", reviewed, "HEAD").splitlines()
+    # no rename detection: a file moved into an allowed path counts under its old name too
+    out = git(root, "diff", "--no-renames", "-z", "--name-only", reviewed, "HEAD")
+    changed = [p for p in out.split("\0") if p]
     return [
         p
         for p in changed

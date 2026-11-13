@@ -641,41 +641,50 @@ def test_an_entry_logged_before_the_previous_review_cannot_cover_the_next() -> N
     assert len(problems) == 1 and "b" * 12 in problems[0]
 
 
-def test_banked_reviews_per_day_are_held_to_the_review_cap() -> None:
-    """A run banks at most one review, so a day's reviews count against its review cap.
+@pytest.mark.parametrize(
+    ("run", "review", "ok"),
+    [
+        ("2026-11-21T03:00:00+00:00", "2026-11-21T08:59:00+00:00", True),
+        ("2026-11-21T02:59:00+00:00", "2026-11-21T09:00:00+00:00", False),
+        ("2026-11-20T10:00:00+00:00", "2026-11-21T00:20:00+00:00", False),
+    ],
+    ids=["within-six-hours", "just-over-six-hours", "previous-utc-day-but-hours-earlier"],
+)
+def test_a_review_run_is_logged_within_six_hours_before_it(run: str, review: str, ok: bool) -> None:
+    """D35: a review run lasts minutes, so its entry is at most six hours old."""
+    problems = budget.unlogged_reviews([_review(review)], _review_runs(run))
+    assert (problems == []) is ok
 
-    This catches an unlogged review matched to a run logged the day before (review B6).
-    """
-    caps = budget.parse_budget(_defaults(cap_share=0.2))  # one review run a day at 0.2
+
+def test_an_orphan_from_the_day_before_cannot_cover_the_next_review() -> None:
+    """Review B6, second round, with the unlogged review first (D35)."""
+    entries = _review_runs("2026-11-20T10:00:00+00:00", "2026-11-21T09:00:00+00:00")
     reviews = [
         _review("2026-11-21T08:20:00+00:00", "b" * 40),
         _review("2026-11-21T09:30:00+00:00", "a" * 40),
     ]
-    assert (
-        budget.unlogged_reviews(
-            reviews, _review_runs("2026-11-20T10:00:00+00:00", "2026-11-21T09:00:00+00:00")
-        )
-        == []
-    )
-    assert budget.reviews_over_daily_cap(caps, reviews, [], 0.2) == [
-        "2026-11-21: 2 banked reviews > 1 review run allowed that day"
-    ]
-    assert budget.reviews_over_daily_cap(caps, reviews[:1], [], 0.2) == []
-    # a share logged that day binds even when the share passed in is higher
-    full = budget.parse_budget(_defaults())
-    logged = _review_runs("2026-11-21T09:00:00+00:00")
-    assert budget.reviews_over_daily_cap(full, reviews, logged, 1.0) == [
-        "2026-11-21: 2 banked reviews > 1 review run allowed that day"
-    ]
-    waiver = _waivers(D26.replace("2026-11-11", "2026-11-21"))
-    assert budget.reviews_over_daily_cap(caps, reviews, [], 0.2, waiver) == []
-    three = [*reviews, _review("2026-11-21T11:00:00+00:00", "c" * 40)]
-    assert budget.reviews_over_daily_cap(caps, three, [], 0.2, waiver) == [
-        "2026-11-21: 3 banked reviews > 2 review runs allowed that day (waiver D26)"
-    ]
+    problems = budget.unlogged_reviews(reviews, entries)
+    assert len(problems) == 1 and "b" * 12 in problems[0]
 
 
-def test_cli_fails_when_a_day_banks_more_reviews_than_its_cap(
+def test_a_run_that_banks_after_midnight_then_the_next_days_run_pass() -> None:
+    """QA (D34): one run started each UTC day, the first banking after midnight, is fine."""
+    caps = budget.parse_budget(_defaults(cap_share=0.2))
+    entries = _review_runs("2026-11-20T23:50:00+00:00", "2026-11-21T10:00:00+00:00")
+    reviews = [
+        _review("2026-11-21T00:20:00+00:00", "a" * 40),
+        _review("2026-11-21T10:30:00+00:00", "b" * 40),
+    ]
+    assert budget.unlogged_reviews(reviews, entries) == []
+    assert budget.check_ledger(caps, entries, cap_share=0.2).ok
+
+
+def test_a_review_at_the_bottom_of_the_time_range_is_a_problem_not_a_crash() -> None:
+    problems = budget.unlogged_reviews([_review("0001-01-01T01:00:00+00:00")], [])
+    assert len(problems) == 1
+
+
+def test_cli_fails_when_an_orphan_covers_the_next_review(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     b, led = _write(
@@ -690,7 +699,7 @@ def test_cli_fails_when_a_day_banks_more_reviews_than_its_cap(
     _bank(d, ("a" * 40, "2026-11-21T09:30:00Z"), ("b" * 40, "2026-11-21T08:20:00Z"))
     assert budget.main(["--budget", str(b), "--ledger", str(led)]) == 1
     out = capsys.readouterr().out
-    assert "2 banked reviews > 1 review run allowed" in out
+    assert "has no claude_review_run entry" in out and "b" * 12 in out
     assert out.rstrip().endswith("caps: VIOLATED")
 
 
@@ -737,9 +746,6 @@ def test_repository_reviews_are_all_logged() -> None:
     reviews = budget.read_banked_reviews(root / "artifacts" / "review")
     entries = budget.read_ledger(root / "artifacts" / "usage" / "ledger.jsonl")
     assert len(reviews) >= 3 and budget.unlogged_reviews(reviews, entries) == []
-    caps = budget.load_budget(root / "budget.toml")
-    waivers = budget.load_waivers(root / "budget_waivers.toml")
-    assert budget.reviews_over_daily_cap(caps, reviews, entries, caps.cap_share, waivers) == []
 
 
 def test_a_headless_review_run_is_held_to_the_turn_cap() -> None:
