@@ -1,4 +1,4 @@
-goal_turn: 13
+goal_turn: 14
 STATE: ACTIVE
 
 # Status
@@ -37,6 +37,9 @@ the operating point and lists the four commands. The day's one review (2a611f4) 
 REVIEW: SHIP with no blocking issue; it raised one new non-blocking id (N59, the unreported
 certification-calculator validation), so G12 waits for a review that finds N59 already
 logged. The fast ship-check is 13/14 (G12).
+Then Raj asked to finish on main (D39): the README reports the certification-calculator
+validation (N59), its Status section is condensed, and a Next item lists the stretch goals.
+G12 needs a review of this commit (on or after 2026-11-26).
 
 ## Next three actions
 
@@ -44,9 +47,8 @@ logged. The fast ship-check is 13/14 (G12).
    `make review-start`, commit the entry, and review that commit, where N59 is already
    logged. On SHIP with no new non-blocking ids: commit only artifacts/review/, run the full
    make ship-check, and on PASS 14/14 tag v1.0 locally and push the branch for Raj to merge.
-2. N59: register claims from artifacts/certify/validation.json and report the
-   certification-calculator validation in README.md and docs/REPORT.md (REPORT is near its
-   word limit, so trim elsewhere).
+2. Report the certification-calculator validation in docs/REPORT.md too, once words can be
+   freed (it is at its limit); the README reports it (N59).
 3. Work the open non-blocking issues (docs/REVIEW_LOG.md), starting with N1, then the
    Stretch Ladder.
 

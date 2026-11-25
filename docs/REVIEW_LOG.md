@@ -105,5 +105,5 @@ again; fixed on 2026-11-25 below); N48 gains a second case, the fixed-threshold 
 pooling natural and inserted violations without a label (the reviewer's recomputation
 holds the claim qualitatively).
 
-- **N59** The simulation validation of the certification calculators that research question 2 asks for is banked in artifacts/certify/validation.json, but neither README.md nor docs/REPORT.md reports it, and the tools/report.py docstring said it reads that file when no code does. (artifacts/certify/validation.json; tools/report.py). Status: open; the docstring was corrected on 2026-11-25. Reporting the validation needs claims registered from that artifact and room in docs/REPORT.md, which is near its word limit.
+- **N59** The simulation validation of the certification calculators that research question 2 asks for is banked in artifacts/certify/validation.json, but neither README.md nor docs/REPORT.md reports it, and the tools/report.py docstring said it reads that file when no code does. (artifacts/certify/validation.json; tools/report.py). Status: fixed on 2026-11-25: README.md reports the exploratory validation from four claims registered on artifacts/certify/validation.json (docs/templates/claims.prose.json); docs/REPORT.md, at its word limit, cites the artifact in its sequential-certification limitation; the tools/report.py docstring is corrected.
 

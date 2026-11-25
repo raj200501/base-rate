@@ -3,6 +3,16 @@
 Every changed or withdrawn claim gets a dated entry here: what was claimed,
 where, what changed, and why.
 
+## 2026-11-25 README Status condensed; certification validation reported
+
+- README Status described the review-run check in detail (six-hour window, history reads,
+  the limit for a run that leaves no trace); the description now lives only in DECISIONS.md
+  D32 and D35, and the README says that usage is capped in code and logged, with the two
+  waived review-run overruns (D26, D31). Nothing about the check itself changed.
+- README Status said the build brief's stretch goals had not started; a Next item now lists
+  them. The README now reports the exploratory simulation of the certification calculators
+  (review N59), which was banked but unreported.
+
 ## 2026-11-12 Claims corrected after the pre-review QA (DECISIONS.md D34, D35)
 
 - E4 (README Key results heading and bullet; REPORT abstract and sections 5.4, 5.5, and 6):

@@ -266,6 +266,30 @@
    "select": "by_stratum[\"real benign\"].n",
    "format": "{:,d}"
   },
+  "certify.validation.guaranteed_meet": {
+   "source": "artifacts/certify/validation.json",
+   "select": "summary.guaranteed_meet",
+   "format": "{:d}",
+   "note": "exploratory simulation of the certification calculators (synthetic data only)"
+  },
+  "certify.validation.guaranteed_rows": {
+   "source": "artifacts/certify/validation.json",
+   "select": "summary.guaranteed_rows",
+   "format": "{:d}",
+   "note": "exploratory simulation of the certification calculators (synthetic data only)"
+  },
+  "certify.validation.other_meet": {
+   "source": "artifacts/certify/validation.json",
+   "select": "summary.other_meet",
+   "format": "{:d}",
+   "note": "exploratory simulation of the certification calculators (synthetic data only)"
+  },
+  "certify.validation.other_rows": {
+   "source": "artifacts/certify/validation.json",
+   "select": "summary.other_rows",
+   "format": "{:d}",
+   "note": "exploratory simulation of the certification calculators (synthetic data only)"
+  },
   "corpus.agent.qwen3-1.7b-q8_0.independent_source_runs": {
    "source": "artifacts/report/numbers.json",
    "select": "corpus.agents[agent=qwen3-1.7b-q8_0].independent_source_runs",

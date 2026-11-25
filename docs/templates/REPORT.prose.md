@@ -585,7 +585,7 @@ defines it; on other hardware or through an API the costs, and so the best casca
 
 **Sequential certification.** Adding runs after looking at a claim and testing again on
 all runs tests the claim twice, and its error rate exceeds the nominal level
-(DECISIONS.md D17). The certification tools assume the number of runs is fixed in advance,
+(DECISIONS.md D17; artifacts/certify/validation.json). The certification tools assume the number of runs is fixed in advance,
 or that new runs are tested alone.
 
 ## 7. Ethics and disclosure

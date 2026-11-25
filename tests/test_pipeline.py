@@ -619,6 +619,7 @@ def test_real_prose_templates_render_and_pass_claimcheck(
         "docs/templates/claims.prose.json",
         "prereg/0002-e1-corpus.md",
         "artifacts/citecheck.json",
+        "artifacts/certify/validation.json",
         "docs/BUILD_BRIEF.md",
         "docs/BUILD_BRIEF.sha256",
     ):

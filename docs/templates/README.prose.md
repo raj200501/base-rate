@@ -103,7 +103,14 @@ numbers do not.
 - **Validated before use:** E0, a preregistered simulation study, checked the coverage of
   the budget-recall and fixed-threshold interval methods against exact truth on a grid of
   score distributions, sample sizes, prevalences, and budgets. Cells where a method
-  undercovers are listed in docs/UNSUPPORTED.md, and the library warns there.
+  undercovers are listed in docs/UNSUPPORTED.md, and the library warns there. An exploratory
+  simulation on synthetic data checked the calculators behind `baserate certify`: every
+  calculator with a guarantee met its confidence target
+  ({{claim:certify.validation.guaranteed_meet}} of {{claim:certify.validation.guaranteed_rows}}
+  settings), and {{claim:certify.validation.other_meet}} of
+  {{claim:certify.validation.other_rows}} other settings did; the misses are two-look designs
+  (certify, add runs, certify again), so the library says to fix the total number of runs in
+  advance (artifacts/certify/validation.json, DECISIONS.md D17).
 - **The data:** a labeled corpus with step-level violation labels, a datasheet
   (docs/DATA.md), a blind label audit, and a canary string in every record.
 - **The integrity checks:** every experiment was preregistered under prereg/ and
@@ -223,29 +230,20 @@ with the same prominence as the rest.
   in docs/REVIEW_LOG.md), and are banked under artifacts/. Every result above comes from
   them; none comes from an unfinished experiment.
 - **Gates and review:** `make ship-check` runs the definition-of-done gates on a fresh clone
-  and `make review` the review; STATUS.md records the latest result of each, and every review
-  is kept in artifacts/review/. Reviews have blocked the release more than once, and every
-  blocking issue so far was fixed: those that changed published claims are recorded in
-  CORRECTIONS.md, and the others were gates that could pass while their property was false;
-  STATUS.md and artifacts/review/latest.json give the latest verdict. The usage ledger
-  records a cap
-  overrun on {{date:2026-11-11}}, a `make review` run beyond the project's share of review runs for
-  that day, logged after the fact; Raj accepted it with a dated waiver scoped to that day
-  (DECISIONS.md D25 and D26, budget_waivers.toml). A second review run on {{date:2026-11-12}},
-  after that day's review blocked on an issue since fixed, Raj approved in advance by the same
-  kind of scoped waiver (D31). Caps are unchanged. Any other logged overrun fails
-  `make budget` and G14. G14 also fails when a banked review has no review run logged in the
-  six hours before it and since the review before it; it reads every committed version of
-  the review files and of the ledger, while `make budget` checks the files at HEAD. The
-  check cannot see a run that leaves no trace: a reviewer that dies before banking a review
-  leaves an entry that a relaunched review can pair with, so a relaunch must be logged as its
-  own run (D25, D32, D35).
-- **Open:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
+  and `make review` an independent adversarial review; every review, the blocking ones
+  included, is kept in artifacts/review/ with its fixes, and every changed claim is recorded
+  in CORRECTIONS.md. STATUS.md gives the latest gate and review results. Model usage is
+  capped in code and logged in artifacts/usage/ledger.jsonl, with no cash spent; two
+  review-run overruns of the project's own caps were waived by Raj (DECISIONS.md D26, D31).
+- **Known limits and open issues:** the non-blocking review issues in docs/REVIEW_LOG.md, among them that
   false-positive-rate intervals at the budget are printed tighter than the benign runs can
   certify, and that the Armour rule configurations score every primary-set trace
   identically, so their rows differ only by bootstrap noise; no Claude model has been run as
-  a subject or a monitor (DECISIONS.md D2); and the stretch goals of the build brief
-  (section 7) have not started.
+  a subject or a monitor (DECISIONS.md D2).
+- **Next:** adapters for real agent transcripts (Claude Code stream-json, Codex JSON, Inspect
+  logs, Harbor trajectories), streaming monitors with time to detection under latency
+  budgets, the study rerun on new model versions, and Claude subject and monitor arms (build
+  brief section 7).
 
 ## How it works
 

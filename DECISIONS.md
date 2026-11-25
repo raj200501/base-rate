@@ -581,3 +581,17 @@ open one. GitHub shows it was opened on 2026-11-13 at 00:38:58 UTC under Raj's a
 Raj at 00:42:44 UTC. This session opened no pull request; it read the pull request's
 metadata once, read-only, on 2026-11-25 to record this.
 
+## D39 (2026-11-25) Finishing on main for engineers and investors
+
+Raj wrote on 2026-11-25: "nah finsih this up get rid of any negatives and weak points in the
+repo optimize for anthripc engineers and VCs to love the repo main branch" (verbatim).
+Recorded before acting. Read as: fix the repository's real weak points and present it
+clearly, then publish to main. Section 9 rules 3, 4, and 13 still hold, so the negative and
+null results, the synthetic labels, and the limitations stay; they are the study's main
+finding. Changes: the certification-calculator validation is reported from banked claims
+(review N59); the README Status section drops internal gate mechanics (kept in D32 and D35)
+and keeps the waivers in one clause; a Next item lists the build brief's stretch goals; and
+main is updated by the procedure of D30 (fast-forward only, make ci on a fresh clone,
+claimcheck and freshness). G12 still needs a review of the new commit, which today's review
+allowance no longer covers, so main carries a fast ship-check of 13/14 until that review.
+
