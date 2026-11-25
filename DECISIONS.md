@@ -562,3 +562,13 @@ deviation from the brief, not from the preregistration; the README and REPORT se
 now say for every E4 result that its held-out violations mix natural and synthetic inserted
 ones and that E4 has no split by source, and E2, which does split, carries the by-source
 comparison. A split for E4 would be exploratory and is left for later work.
+
+## D37 (2026-11-25) The stopped review run of 2026-11-13, and resuming
+
+On 2026-11-13 Raj ended the build to save usage: "the build is ending now to save usage. Do
+only this, with no subagents, workflows, reviews, or model runs." The session stopped the
+day's reviewer subagent at its start, before it wrote anything, and deleted its scheduled
+tasks. That run's entry (2026-11-13T00:05:57Z, logged by `make review-start`) stays in the
+ledger: it is a logged run that banked no review, which D32 point 4 allows, and it counts
+against that day's cap. On 2026-11-25 Raj asked the session to continue and finalize the
+repository within an hour; the day's one review run (D9) covers the resulting commit.

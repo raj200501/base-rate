@@ -1,15 +1,26 @@
 # base-rate
 
 **What is an AI agent monitor worth when violations are rare and humans can review only a
-few trajectories?** base-rate is an open Python library and a preregistered study for that
-question. The library estimates a monitor's recall and precision at a fixed human-review
-budget and a stated violation prevalence, with intervals that count independent runs (at a
-fixed budget the false-positive rate is set by the budget itself); it sizes the labeled
-samples a claim needs and optimizes cheap-to-expensive cascades. The study applies it to
-{{claim:corpus.total.traces}} labeled trajectories from {{claim:corpus.total.runs}} independent
-source runs (small local agents in mock-tool domains, plus a few groups of Armour's records;
-synthetic share {{claim:corpus.total.synthetic}}: procedural variants, inserted violations,
-and Armour's generated records), scored by rule and model monitors. Every result number in this README is a claim over a committed artifact.
+few trajectories?** Monitors for AI agents are often evaluated on balanced or curated test
+sets. In deployment, violations are rare and a human team reviews only a fixed number of
+flagged trajectories, so what matters is how many violations land in that reviewed slice.
+base-rate is an open Python library that measures a monitor at that operating point, and a
+preregistered study that applies it:
+
+- `baserate eval`: a monitor's recall and precision at your review budget and deployment
+  prevalence, with intervals that count independent runs (at a fixed budget the
+  false-positive rate is set by the budget itself).
+- `baserate certify`: how many independent labeled runs a claim needs before you can make it,
+  and how many more an existing claim needs.
+- `baserate cascade`: the cost-recall front of cheap-filter-then-expensive-monitor cascades.
+- `baserate card`: a one-page monitor report card in Markdown or JSON.
+
+The study applies these to {{claim:corpus.total.traces}} labeled trajectories from
+{{claim:corpus.total.runs}} independent source runs (small local agents in mock-tool domains,
+plus a few groups of Armour's records; synthetic share {{claim:corpus.total.synthetic}}:
+procedural variants, inserted violations, and Armour's generated records), scored by rule and
+model monitors. Every experiment was preregistered and checked against git history, and every
+result number in this README is a claim over a committed artifact.
 
 **At a human-review budget of {{param:20}} per {{param:10,000}} trajectories and a
 violation prevalence of {{param:1e-3}}, no single monitor in this preregistered study (three

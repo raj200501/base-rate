@@ -1,9 +1,9 @@
-goal_turn: 12
+goal_turn: 13
 STATE: ACTIVE
 
 # Status
 
-Updated 2026-11-13 (resumed after Raj's pause of 2026-10-23). History: docs/LOG.md.
+Updated 2026-11-25 (resumed at Raj's request after the 2026-11-13 wrap-up, D37). History: docs/LOG.md.
 
 ## Gates
 
@@ -29,12 +29,14 @@ CORRECTIONS.md. Since then the README changed, so G12 needs a review of the curr
 
 ## Now
 
-The 2026-11-13 review allowance opened at 00:05 UTC. `make review-start` logged the day's one
-review run (00:05:57 UTC); this commit carries that entry, and the reviewer subagent reviews
-it (brief 10.6 final sequence). The 2026-11-12 work this review covers: B6 (second round)
-and B7 fixed in 7d1e31e; the pre-review QA (D34) and its fixes (D35, D36), with every QA
-finding logged as N30 to N58; `make reproduce` passing on a fresh clone; and the claim
-fork's qualitative statements checked against the artifacts.
+Raj stopped the build on 2026-11-13 to save usage; that day's review run was stopped at its
+start and banked nothing (its ledger entry stays, D37). On 2026-11-25 Raj asked for a
+one-hour pass to finalize the repository. The container had been replaced: `make setup`
+rebuilt the environment, and the checkout was a shallow clone, which failed G5 and G11
+until `git fetch --unshallow` restored the full history. main had merged the branch as pull
+request #2 (418630d, same tree), and the branch fast-forwarded to it. The README opening now
+states the operating point and lists the four commands. `make review-start` logged the
+day's one review run; the reviewer subagent reviews this commit (brief 10.6).
 
 ## Next three actions
 
