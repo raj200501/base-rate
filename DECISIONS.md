@@ -572,3 +572,12 @@ tasks. That run's entry (2026-11-13T00:05:57Z, logged by `make review-start`) st
 ledger: it is a logged run that banked no review, which D32 point 4 allows, and it counts
 against that day's cap. On 2026-11-25 Raj asked the session to continue and finalize the
 repository within an hour; the day's one review run (D9) covers the resulting commit.
+
+## D38 (2026-11-25) Who opened pull request #2
+
+Review N21 asked who opened pull request #2, since section 9 rule 8 forbids the session to
+open one. GitHub shows it was opened on 2026-11-13 at 00:38:58 UTC under Raj's account
+(raj200501) by a different Claude Code session, as its description states, and merged by
+Raj at 00:42:44 UTC. This session opened no pull request; it read the pull request's
+metadata once, read-only, on 2026-11-25 to record this.
+

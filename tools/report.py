@@ -2,8 +2,8 @@
 
 Reads artifacts/e0/summary.json, artifacts/corpus/manifest.json,
 artifacts/corpus/label_audit.json, artifacts/e2/results.json,
-artifacts/e3/results.json, artifacts/e4/results.json, and (if present)
-artifacts/certify/validation.json, and writes:
+and artifacts/e3/results.json and artifacts/e4/results.json, and writes (it does not yet
+read artifacts/certify/validation.json; review N59):
 
 - SVG figures under artifacts/report/figures/ (fixed hash salt and no date,
   so rebuilds are byte-identical);

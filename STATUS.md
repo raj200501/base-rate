@@ -23,32 +23,30 @@ CORRECTIONS.md. Since then the README changed, so G12 needs a review of the curr
 | G9 Usable by others | passes | |
 | G10 Claim integrity | passes (claimcheck, freshness, reproduce) | |
 | G11 Preregistration integrity | passes | |
-| G12 Independent review | fails: the review of a1b287b (2026-11-12) is BLOCK (B6, B7); fixed in 7d1e31e and after the pre-review QA (D35) | next make review, 2026-11-13 00:05 UTC (the two runs D31 allowed on 2026-11-12 are used) |
+| G12 Independent review | fails: the 2026-11-25 review of 2a611f4 is SHIP with no blocking issue, but it raised one new non-blocking id (N59), which a later review must find already logged (brief 10.1 step 8) | a review of a commit that logs N59 (on or after 2026-11-26; no scheduled task exists, D37) |
 | G13 Documentation | passes | |
 | G14 Hygiene | passes; review-run overruns waived by Raj: 2026-11-11 (D25, D26) and 2026-11-12 (D31) | |
 
 ## Now
 
 Raj stopped the build on 2026-11-13 to save usage; that day's review run was stopped at its
-start and banked nothing (its ledger entry stays, D37). On 2026-11-25 Raj asked for a
-one-hour pass to finalize the repository. The container had been replaced: `make setup`
-rebuilt the environment, and the checkout was a shallow clone, which failed G5 and G11
-until `git fetch --unshallow` restored the full history. main had merged the branch as pull
-request #2 (418630d, same tree), and the branch fast-forwarded to it. The README opening now
-states the operating point and lists the four commands. `make review-start` logged the
-day's one review run; the reviewer subagent reviews this commit (brief 10.6).
+start and banked nothing (D37). On 2026-11-25 Raj asked for a one-hour pass to finalize the
+repository. The container had been replaced: `make setup` rebuilt the environment, and the
+shallow checkout, which failed G5 and G11, was unshallowed. The README opening now states
+the operating point and lists the four commands. The day's one review (2a611f4) returned
+REVIEW: SHIP with no blocking issue; it raised one new non-blocking id (N59, the unreported
+certification-calculator validation), so G12 waits for a review that finds N59 already
+logged. The fast ship-check is 13/14 (G12).
 
 ## Next three actions
 
-1. 2026-11-13 00:05 UTC (scheduled): `make review-start`, commit the ledger entry, then the
-   reviewer subagent on that commit. On SHIP with no new non-blocking ids: commit only
-   artifacts/review/, run the full make ship-check on a fresh clone, and on PASS 14/14 do the
-   release procedure and move v1.0. On SHIP with new ids, or on BLOCK: bank the review, log
-   the ids in docs/REVIEW_LOG.md (which G12's allowed drift does not cover, brief 10.1 step
-   8), fix what blocks, and schedule the next review for the following day.
-2. Keep logging every capped Claude run when it starts (D9, D27); a relaunched reviewer is
-   its own run (D25, D32), and every development workflow is recorded in DECISIONS.md
-   before it runs (D34, D35).
+1. On or after 2026-11-26, when Raj resumes the build (no scheduled task exists, D37):
+   `make review-start`, commit the entry, and review that commit, where N59 is already
+   logged. On SHIP with no new non-blocking ids: commit only artifacts/review/, run the full
+   make ship-check, and on PASS 14/14 tag v1.0 locally and push the branch for Raj to merge.
+2. N59: register claims from artifacts/certify/validation.json and report the
+   certification-calculator validation in README.md and docs/REPORT.md (REPORT is near its
+   word limit, so trim elsewhere).
 3. Work the open non-blocking issues (docs/REVIEW_LOG.md), starting with N1, then the
    Stretch Ladder.
 
@@ -64,26 +62,24 @@ pull requests into main; make ci passes locally before every push (D14).
 
 cash_usd = 0 (`make budget`). artifacts/usage/ledger.jsonl records the local model calls
 (logged per batch) and the capped Claude runs (D27): the twenty label-audit auditors as
-single calls, and four `make review` runs, two on 2026-11-11 (logged after the fact; the
-second exceeded the day's cap and is waived, D25, D26) and two on 2026-11-12 (logged when
-they started; the second, approved in advance by Raj, is waived by D31, and its entry was
-written by hand because review-start did not yet count an advance waiver, fixed since).
-Claude has run only as subagents of this session (no headless children). Development
-workflows are not logged per call (D28 point 3, for Raj to confirm): those through
-2026-11-11 are listed in D28, the 2026-11-12 pre-review QA in D34, and its documentation
-fork in D35. `make review-start` audits the ledger at the share in force (budget.toml
-records 0.2, D29) as it would stand with the new run, and logs the run before the reviewer
-starts.
+single calls, and six `make review` runs: two on 2026-11-11 (logged after the fact; the
+second waived, D25, D26), two on 2026-11-12 (the second approved in advance and waived, D31;
+its entry written by hand, fixed since), one on 2026-11-13 that Raj's wrap-up stopped before
+it banked a review (D37), and one on 2026-11-25. Claude has run only as subagents of this
+session (no headless children). Development workflows are not logged per call (D28 point
+3, for Raj to confirm): those through 2026-11-11 are listed in D28, the 2026-11-12
+pre-review QA in D34, and its documentation fork in D35. `make review-start` audits the
+ledger at the share in force (budget.toml records 0.2, D29) as it would stand with the new
+run, and logs the run before the reviewer starts.
 
 ## Needs Raj
 
 None of these blocks the Definition of Done. (Raj accepted the 2026-11-11 review-run
 overrun on 2026-11-11: DECISIONS.md D26.)
 
-1. **Main lags the branch on two labels (optional).** main is at 7d1e31e (D33). The branch
-   since adds synthetic labels to every E4 result and the corpus's synthetic share to the
-   REPORT abstract (N40, N41), with gate fixes. Under D30 main moves at the next point with
-   more gates passing (after a SHIP review); push the branch to main sooner if you prefer.
+1. **Merge the branch into main when you like (optional).** main merged the branch as pull
+   request #2 (418630d, D38). The branch has since added the 2026-11-25 commits: the README
+   opening, the banked SHIP review, and the records of this session.
 2. **Confirm D26 and D31 on GitHub** (non-blocking, review N23): the two waivers rest on
    approvals recorded in the session's words, and git cannot tell Raj's commits from the
    session's (D13). A GitHub-side action of Raj's that cites D26 and D31 (a comment, a pull

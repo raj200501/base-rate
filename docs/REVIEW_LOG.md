@@ -53,7 +53,7 @@ recall, mostly synthetic insertions, as recall on natural violations). Re-raised
 - **N26** This run went around make review-start: review-start refused it in both orders, so the 01:31:00 ledger entry (artifacts/usage/ledger.jsonl:1200) was written by hand, four minutes before the commit that contains it; and the waiver docs said a waiver accepts only a past overrun, which no longer described D31. (tools/review.py:227; src/baserate/budget.py:10-14; budget_waivers.toml:1-4; DECISIONS.md D31). Status: fixed on 2026-11-12: D31 now states the bypass; review-start runs the budget audit on the ledger as it would stand with the new run logged, so it accepts a run an approved waiver covers and refuses others (test first); the docstrings, the waiver error message (pre-review QA), and the waiver file describe approval on or after the day a waiver covers (D32, D35).
 - **N27** G12 does not check that latest.json is the newest banked review, so an older SHIP restored over a newer BLOCK moved to history/ passes. (tools/ship_check.py g12). Status: fixed on 2026-11-12: G12 fails when any committed version of any file under artifacts/review/ is newer than latest.json (gate mutation test first).
 - **N28** The Highlights' E4 sentence implied the rule-to-8B cascade's held-out gain came mostly from synthetic insertions; artifacts/e4/results.json has no breakdown by source. (README.md:59-62). Status: fixed on 2026-11-12: the sentence says E4 reports no split by source and gives the split only for the E2 ensemble.
-- **N29** State files lag the commits: REVIEW_LOG.md marked N2, N19, N21, N22, N23, and N25 open although 0c0d8f0 answers them, and STATUS.md's next action, Now, and G12 row disagreed. (docs/REVIEW_LOG.md; STATUS.md). Status: fixed on 2026-11-12: the statuses above, STATUS.md (gates, Now, next actions, usage), and docs/LOG.md (goal turns 7 to 9) match the commits.
+- **N29** State files lag the commits: REVIEW_LOG.md marked N2, N19, N21, N22, N23, and N25 open although 0c0d8f0 answers them, and STATUS.md's next action, Now, and G12 row disagreed. (docs/REVIEW_LOG.md; STATUS.md). Status: fixed on 2026-11-12: the statuses above, STATUS.md (gates, Now, next actions, usage), and docs/LOG.md (goal turns 7 to 9) match the commits. Re-raised on 2026-11-25 (the review of 2a611f4); fixed the same day: Needs Raj, the G12 row, the next actions, the usage summary, and LOG entries for goal turns 10 to 13.
 
 ## Pre-review QA of 897dab0 (2026-11-12, DECISIONS.md D34): not a `make review`
 
@@ -92,4 +92,18 @@ CORRECTIONS.md).
 - **N56** STATUS.md and docs/LOG.md lagged the commits (usage, the 19dbd5a paragraph, no goal turn 7 entry). Status: fixed on 2026-11-12.
 - **N57** REVIEW_LOG marked N19 answered although the a1b287b review re-raised it, and said B6 was fixed before the next review. Status: fixed on 2026-11-12: N19 is open (for Raj, STATUS.md) and the B6 line names the second round.
 - **N58** Needs Raj asked for a commit of Raj's own as corroboration, which git cannot tell from the session's. Status: fixed on 2026-11-12: it asks for a GitHub-side action or a signed commit.
+
+## Review of 2a611f403d6c (2026-11-25): REVIEW: SHIP
+
+No blocking issues; B6 (second round) and B7 were judged fixed. Because N59 below is new,
+G12 cannot pass on this review: logging it changes this file, which a reviewed commit may
+not differ in (brief 10.1 step 8). New evidence on existing ids: N15 also covers the
+ensemble (its rank normalization is not redone in the bootstrap); N21 extends to pull
+request #2 (answered in DECISIONS.md D38: opened under Raj's account by another Claude Code
+session and merged by Raj; this session opened none); N29 (STATUS.md and docs/LOG.md lagged
+again; fixed on 2026-11-25 below); N48 gains a second case, the fixed-threshold rule result
+pooling natural and inserted violations without a label (the reviewer's recomputation
+holds the claim qualitatively).
+
+- **N59** The simulation validation of the certification calculators that research question 2 asks for is banked in artifacts/certify/validation.json, but neither README.md nor docs/REPORT.md reports it, and the tools/report.py docstring said it reads that file when no code does. (artifacts/certify/validation.json; tools/report.py). Status: open; the docstring was corrected on 2026-11-25. Reporting the validation needs claims registered from that artifact and room in docs/REPORT.md, which is near its word limit.
 

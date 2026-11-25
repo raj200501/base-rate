@@ -151,3 +151,25 @@ Iteration history moved out of STATUS.md. Newest last.
   after-midnight history. Tests failed first. A documentation fork fixed the claims
   (CORRECTIONS.md). All QA findings are logged as N30 to N58.
 
+## 2026-11-12 Goal turns 10 and 11 (waiting for the next review allowance)
+
+- `make reproduce` passed on a fresh clone of 8a0c390 (REPRODUCE: PASS 4 checks), and the
+  documentation fork's qualitative statements were checked against the artifacts. Later
+  heartbeats found nothing new and committed nothing.
+
+## 2026-11-13 Goal turn 12 (wrap-up)
+
+- `make review-start` logged the day's review run (00:05:57 UTC, e0f56d1). Raj then ended
+  the build to save usage: the reviewer was stopped at its start, before it wrote anything,
+  and every scheduled task of this session was deleted (D37). Raj merged the branch into
+  main as pull request #2 (418630d), opened by another Claude Code session (D38).
+
+## 2026-11-25 Goal turn 13 (finalize)
+
+- The replaced container needed `make setup`, and its shallow checkout failed G5 and G11
+  until `git fetch --unshallow`. The branch fast-forwarded to main (same tree).
+- The README opening now explains the review-budget operating point and lists `baserate
+  eval`, `certify`, `cascade`, and `card`.
+- The day's one review (2a611f4) returned REVIEW: SHIP with no blocking issue and one new
+  non-blocking id, N59, logged with the reviewer's new evidence on N15, N21, N29, and N48.
+
